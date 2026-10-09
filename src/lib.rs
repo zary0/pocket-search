@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 //! Independent in-memory inverted index and BM25-style ranking.
 //! Web fetching is deliberately a separate layer; this core never sends queries
 //! to another search provider or records a user's search history.
@@ -28,9 +29,14 @@ pub struct SearchHit {
 
 pub struct SearchIndex {
     documents: Vec<Document>,
-    postings: BTreeMap<String, BTreeMap<usize, f64>>,
+    postings: BTreeMap<String, Vec<Posting>>,
     lengths: Vec<f64>,
     average_length: f64,
+}
+
+struct Posting {
+    document: usize,
+    frequency: f64,
 }
 
 /// English uses lowercased words. Non-ASCII runs emit characters and bigrams
@@ -72,17 +78,28 @@ fn tokenize(input: &str, query: bool) -> Vec<String> {
 
 impl SearchIndex {
     pub fn new(documents: Vec<Document>) -> Self {
-        let mut postings: BTreeMap<String, BTreeMap<usize, f64>> = BTreeMap::new();
+        let mut postings: BTreeMap<String, Vec<Posting>> = BTreeMap::new();
         let mut lengths = Vec::with_capacity(documents.len());
         for (id, doc) in documents.iter().enumerate() {
             let mut length = 0.0;
+            let mut counts = BTreeMap::<String, f64>::new();
             for (value, weight) in [(&doc.title, 3.0), (&doc.body, 1.0)] {
                 for token in tokenize(value, false) {
-                    *postings.entry(token).or_default().entry(id).or_default() += weight;
+                    *counts.entry(token).or_default() += weight;
                     length += weight;
                 }
             }
+            for (token, frequency) in counts {
+                postings.entry(token).or_default().push(Posting {
+                    document: id,
+                    frequency,
+                });
+            }
             lengths.push(length.max(1.0));
+        }
+        // Documents are appended in ID order, enabling compact binary search.
+        for posting in postings.values_mut() {
+            posting.shrink_to_fit();
         }
         let average_length = (lengths.iter().sum::<f64>() / documents.len().max(1) as f64).max(1.0);
         Self {
@@ -105,35 +122,62 @@ impl SearchIndex {
         if terms.is_empty() || limit == 0 {
             return Vec::new();
         }
-        let mut candidates: Option<BTreeSet<usize>> = None;
+        let n = self.documents.len() as f64;
+        let mut term_postings = Vec::with_capacity(terms.len());
         for term in &terms {
             let Some(posting) = self.postings.get(term) else {
                 return Vec::new();
             };
-            let ids: BTreeSet<usize> = posting.keys().copied().collect();
-            candidates = Some(match candidates {
-                None => ids,
-                Some(previous) => previous.intersection(&ids).copied().collect(),
-            });
+            let df = posting.len() as f64;
+            let idf = (1.0 + (n - df + 0.5) / (df + 0.5)).ln();
+            term_postings.push((posting.as_slice(), idf));
         }
-        let n = self.documents.len() as f64;
-        let mut hits: Vec<SearchHit> = candidates
-            .unwrap_or_default()
-            .into_iter()
-            .map(|id| {
+        let seed = term_postings
+            .iter()
+            .min_by_key(|(posting, _)| posting.len())
+            .unwrap()
+            .0;
+        let limit = limit.min(50);
+        let mut best: Vec<(usize, f64)> = Vec::with_capacity(limit);
+        let rank = |a: &(usize, f64), b: &(usize, f64)| {
+            b.1.total_cmp(&a.1)
+                .then_with(|| self.documents[a.0].url.cmp(&self.documents[b.0].url))
+                .then_with(|| a.0.cmp(&b.0))
+        };
+        for candidate in seed {
+            let id = candidate.document;
+            let norm = 1.2 * (0.25 + 0.75 * self.lengths[id] / self.average_length);
+            let mut score = 0.0;
+            let mut matched = true;
+            for (posting, idf) in &term_postings {
+                let Ok(position) = posting.binary_search_by_key(&id, |entry| entry.document) else {
+                    matched = false;
+                    break;
+                };
+                let tf = posting[position].frequency;
+                score += idf * tf * 2.2 / (tf + norm);
+            }
+            if !matched {
+                continue;
+            }
+            if contains_normalized(&self.documents[id].title, &normalized) {
+                score += 2.0;
+            }
+            let result = (id, score);
+            let position = best
+                .binary_search_by(|entry| rank(entry, &result))
+                .unwrap_or_else(|at| at);
+            if position < limit {
+                if best.len() == limit {
+                    best.pop();
+                }
+                best.insert(position, result);
+            }
+        }
+        // Only the selected documents allocate output strings and snippets.
+        best.into_iter()
+            .map(|(id, score)| {
                 let doc = &self.documents[id];
-                let mut score = 0.0;
-                for term in &terms {
-                    let posting = &self.postings[term];
-                    let df = posting.len() as f64;
-                    let idf = (1.0 + (n - df + 0.5) / (df + 0.5)).ln();
-                    let tf = posting[&id];
-                    let norm = 1.2 * (0.25 + 0.75 * self.lengths[id] / self.average_length);
-                    score += idf * tf * 2.2 / (tf + norm);
-                }
-                if doc.title.to_lowercase().contains(&normalized) {
-                    score += 2.0;
-                }
                 SearchHit {
                     document_id: id + 1,
                     url: doc.url.clone(),
@@ -143,11 +187,22 @@ impl SearchIndex {
                     score,
                 }
             })
-            .collect();
-        hits.sort_by(|a, b| b.score.total_cmp(&a.score).then_with(|| a.url.cmp(&b.url)));
-        hits.truncate(limit.min(50));
-        hits
+            .collect()
     }
+}
+
+fn contains_normalized(value: &str, normalized: &str) -> bool {
+    if value.is_ascii() {
+        return normalized.is_ascii()
+            && value
+                .as_bytes()
+                .windows(normalized.len())
+                .any(|part| part.eq_ignore_ascii_case(normalized.as_bytes()));
+    }
+    if value.contains(normalized) {
+        return true;
+    }
+    value.to_lowercase().contains(normalized)
 }
 
 fn make_snippet(body: &str, query: &str, length: usize) -> String {
@@ -156,15 +211,15 @@ fn make_snippet(body: &str, query: &str, length: usize) -> String {
         .find(query)
         .map(|at| lower[..at].chars().count())
         .unwrap_or(0);
-    let chars: Vec<char> = body.chars().collect();
-    let start = offset.saturating_sub(25).min(chars.len());
-    let end = (start + length).min(chars.len());
-    let content: String = chars[start..end].iter().collect();
+    let start = offset.saturating_sub(25).min(body.chars().count());
+    let mut chars = body.chars().skip(start);
+    let content: String = chars.by_ref().take(length).collect();
+    let more = chars.next().is_some();
     format!(
         "{}{}{}",
         if start > 0 { "…" } else { "" },
         content,
-        if end < chars.len() { "…" } else { "" }
+        if more { "…" } else { "" }
     )
 }
 
@@ -223,6 +278,30 @@ mod tests {
         ]);
         assert_eq!(index.search("reading", 1)[0].url, "a");
         assert!(index.search("reading", 0).is_empty());
+    }
+
+    #[test]
+    fn late_candidates_can_displace_earlier_ties_and_output_is_capped() {
+        let documents = (0..60)
+            .rev()
+            .map(|id| doc(&format!("{id:02}"), "Reading", "Books"))
+            .collect();
+        let index = SearchIndex::new(documents);
+        let hits = index.search("reading", 3);
+        assert_eq!(
+            hits.iter().map(|hit| hit.url.as_str()).collect::<Vec<_>>(),
+            ["00", "01", "02"]
+        );
+        assert_eq!(hits[0].document_id, 60);
+        assert_eq!(index.search("reading", 100).len(), 50);
+    }
+
+    #[test]
+    fn normalized_title_matching_preserves_unicode_case_mapping() {
+        assert!(contains_normalized("ǅ", "ǆ"));
+        assert!(contains_normalized("CHROMATIC", "chromatic"));
+        assert!(contains_normalized("小さな日本語の本", "日本語"));
+        assert!(!contains_normalized("Chromatic", "日本語"));
     }
     #[test]
     fn snippets_are_unicode_safe_and_images_keep_source_urls() {

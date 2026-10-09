@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: GPL-3.0-only
 //! Small, allocation-free building blocks for the Chromatic firmware adapter.
 //! This crate has no display, network, allocator, or operating-system dependency.
 #![no_std]
+#![forbid(unsafe_code)]
 
 pub const DISPLAY_WIDTH: usize = 160;
 pub const DISPLAY_HEIGHT: usize = 144;
@@ -71,12 +73,20 @@ pub fn cells(text: &str) -> usize {
 }
 
 fn text(bytes: &[u8]) -> Result<&str, Error> {
-    let value = core::str::from_utf8(bytes).map_err(|_| Error::Text)?;
-    if bytes.len() > MAX_TEXT_BYTES
-        || cells(value) > TEXT_COLUMNS
-        || value.chars().any(char::is_control)
-    {
+    if bytes.len() > MAX_TEXT_BYTES {
         return Err(Error::Text);
+    }
+    let value = core::str::from_utf8(bytes).map_err(|_| Error::Text)?;
+    // Validate width and controls together, avoiding a second Unicode scan.
+    let mut used = 0;
+    for c in value.chars() {
+        if c.is_control() {
+            return Err(Error::Text);
+        }
+        used += if c.is_ascii() { 1 } else { 2 };
+        if used > TEXT_COLUMNS {
+            return Err(Error::Text);
+        }
     }
     Ok(value)
 }
@@ -144,11 +154,17 @@ impl<'a> Packet<'a> {
                 Action::Open(self.document_id)
             }
             Button::Up if self.kind == Kind::Result && self.page_index > 0 => Action::Previous,
-            Button::Down if self.kind == Kind::Result && self.page_index + 1 < self.page_count => {
+            Button::Down
+                if self.kind == Kind::Result
+                    && self.page_index.saturating_add(1) < self.page_count =>
+            {
                 Action::Next
             }
             Button::Left if self.kind == Kind::Reader && self.page_index > 0 => Action::Previous,
-            Button::Right if self.kind == Kind::Reader && self.page_index + 1 < self.page_count => {
+            Button::Right
+                if self.kind == Kind::Reader
+                    && self.page_index.saturating_add(1) < self.page_count =>
+            {
                 Action::Next
             }
             _ => Action::None,

@@ -96,3 +96,15 @@ The development Wi-Fi allowed outbound HTTPS but did not establish device-to-com
 Build the firmware adapter for query entry, result selection, and text reading, together with the bounded companion API. Complete a physical query → result → text test before expanding the browser experience. Then add collected pages and reduced images. Video is deferred until text and still-image behavior is measured on the device.
 
 See the [architecture](docs/architecture.md), [protocol](docs/chromatic-protocol.md), and [roadmap](docs/roadmap.md). Device credentials, activation codes, NVS dumps, and full-flash backups are not included.
+
+## Open-source development
+
+Repository-authored code, documentation, and original fixtures are licensed under **GPL-3.0-only**. See [LICENSE](LICENSE) and [notices](NOTICE.md). Dependencies retain their own licenses. This is an independent project, not an official ModRetro product. The repository is prepared for public development; changing GitHub visibility is a separate publishing action.
+
+Contributions should keep the device path bounded and justify performance changes with reproducible measurements. See [contributing](CONTRIBUTING.md), [security reporting](SECURITY.md), and [performance notes](docs/performance.md). The initial optimization replaces nested posting trees, candidate intersections, and full-hit formatting with compact vectors, rarest-term planning, and bounded top-k selection. Client decoding remains allocation-free and uses a single combined text-validation pass.
+
+```sh
+cargo bench --locked --bench performance > performance.json
+```
+
+Checked-in timings are host-only measurements on Apple M4, not physical Chromatic speed claims. The ESP32 CPU/heap probe has a target compile check; device execution, Rust Xtensa integration, and actual profile selection remain pending.

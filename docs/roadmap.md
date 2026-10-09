@@ -8,6 +8,9 @@
 - [x] Implement bounded text packet formatting for the 160 × 144 target.
 - [x] Implement an allocation-free `no_std` decoder and button action mapping.
 - [x] Check pagination, malformed packets, query limits, and host/client compatibility.
+- [x] Add GPL-3.0-only licensing and English contribution/security guidance for public development.
+- [x] Add repeatable host timing/allocation measurements and compact bounded search selection.
+- [x] Cross-compile an ESP32 CPU-cycle/heap probe; physical execution is pending.
 
 These checks run on a host. They are not a firmware build or physical browsing result.
 
@@ -18,6 +21,7 @@ These checks run on a host. They are not a firmware build or physical browsing r
 - [ ] Verify a reachable HTTPS endpoint on the actual Wi-Fi network.
 - [ ] Implement query entry, result navigation, text pagination, loading, timeout, and error screens.
 - [ ] Verify query → result → text physically; record packet sizes, timing, free heap, and largest free block.
+- [ ] Measure pinned-core decode cycles and stack use, then select the actual Xtensa size/speed profile.
 - [ ] Verify repeated navigation and reconnection without losing responsiveness.
 - [ ] Verify battery-only operation separately from USB-powered diagnostic testing.
 

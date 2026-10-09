@@ -1,0 +1,137 @@
+{
+  "allocation_scope": "requested System allocator bytes; not RSS or TLS/display memory",
+  "corpus": {
+    "documents": 3000,
+    "source": "original deterministic fixtures, not web pages"
+  },
+  "decoder": {
+    "ascii_packet_bytes": 182,
+    "host_packet_view_bytes": 152,
+    "japanese_timing": {
+      "iterations_per_sample": 100000,
+      "max_ns": 121.88291,
+      "median_ns_per_operation": 118.97708,
+      "min_ns": 117.44625,
+      "samples": 5
+    },
+    "memory": {
+      "allocation_calls": 0,
+      "live_bytes_delta_at_return": 0,
+      "peak_live_bytes_above_start": 0,
+      "requested_bytes_total": 0
+    },
+    "timing": {
+      "iterations_per_sample": 100000,
+      "max_ns": 187.3125,
+      "median_ns_per_operation": 185.50709,
+      "min_ns": 182.975,
+      "samples": 5
+    }
+  },
+  "host_arch": "aarch64",
+  "host_os": "macos",
+  "index_construction_memory": {
+    "allocation_calls": 193474,
+    "live_bytes_delta_at_return": 2142121,
+    "peak_live_bytes_above_start": 2144313,
+    "requested_bytes_total": 13785662
+  },
+  "measurement": "host_only_not_chromatic",
+  "profile": "Cargo bench; record compiler and flags separately",
+  "schema_version": 1,
+  "search": [
+    {
+      "memory": {
+        "allocation_calls": 30285,
+        "live_bytes_delta_at_return": 338991,
+        "peak_live_bytes_above_start": 1577195,
+        "requested_bytes_total": 9466076
+      },
+      "query": "chromatic",
+      "timing": {
+        "iterations_per_sample": 20,
+        "max_ns": 2165358.35,
+        "median_ns_per_operation": 2096343.75,
+        "min_ns": 2089875.0,
+        "samples": 5
+      },
+      "top_ids": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ]
+    },
+    {
+      "memory": {
+        "allocation_calls": 2100,
+        "live_bytes_delta_at_return": 22827,
+        "peak_live_bytes_above_start": 93357,
+        "requested_bytes_total": 653290
+      },
+      "query": "chromatic network",
+      "timing": {
+        "iterations_per_sample": 20,
+        "max_ns": 172510.4,
+        "median_ns_per_operation": 170989.6,
+        "min_ns": 169008.35,
+        "samples": 5
+      },
+      "top_ids": [
+        1,
+        18,
+        35,
+        52,
+        69,
+        86,
+        103,
+        120,
+        137,
+        154
+      ]
+    },
+    {
+      "memory": {
+        "allocation_calls": 2021,
+        "live_bytes_delta_at_return": 20797,
+        "peak_live_bytes_above_start": 57410,
+        "requested_bytes_total": 515843
+      },
+      "query": "日本語",
+      "timing": {
+        "iterations_per_sample": 20,
+        "max_ns": 139039.55,
+        "median_ns_per_operation": 136954.15,
+        "min_ns": 136450.0,
+        "samples": 5
+      },
+      "top_ids": [
+        1,
+        18,
+        35,
+        52,
+        69,
+        86,
+        103,
+        120,
+        137,
+        154
+      ]
+    }
+  ],
+  "timing_scope": "allocation byte accounting disabled during balanced timed workloads; System delegation and one flag check remain",
+  "environment": {
+    "date": "2026-10-09",
+    "cpu": "Apple M4",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "codegen": "opt-level=3, thin LTO, one codegen unit, overflow checks enabled; default portable host CPU flags",
+    "measurement_scope": "host only; not ESP32 or firmware runtime"
+  },
+  "implementation_revision": "0e157a57b022994163b4096fdb2f7861a3d9e591"
+}

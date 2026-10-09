@@ -47,3 +47,9 @@ A future MCU installer needs the intended device, exact image, verified recovery
 Never commit activation codes, passwords, tokens, NVS contents, device-specific backups, or full-flash dumps. Store sanitized measurements and distinguish host checks, streamed demos, USB diagnostics, and physical Wi-Fi operation.
 
 See the [protocol](../../docs/chromatic-protocol.md) and [hardware-first roadmap](../../docs/roadmap.md).
+
+## CPU and memory measurements
+
+The Rust client stays integer-only, dependency-free, allocation-free, and bounded. Compare the `chromatic-size` and `chromatic-speed` build profiles on the actual Xtensa toolchain before choosing a firmware setting. The current Rust build checks are host-only.
+
+`components/pocket_perf_probe` provides an ESP-IDF CPU-cycle and heap probe for the ESP32 configuration. It was cross-compiled with the existing target C compiler and SDK, but has not been linked or executed physically. Use a pinned task and fixed frequency with a bounded synchronous callback. Its measurements include interrupts; network and display tests need separate end-to-end timing. See [performance notes](../../docs/performance.md) for the exact scope and reproducible host results.

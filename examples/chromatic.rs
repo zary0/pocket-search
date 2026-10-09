@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 //! Generate and inspect one Chromatic text packet on the host.
 use chromatic_client::{Button, Packet};
 use pocket_search::{Document, SearchIndex};

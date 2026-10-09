@@ -14,3 +14,6 @@ jobs:
       - run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - run: cargo test --locked --workspace
       - run: cargo check --locked -p chromatic-client
+      - run: cargo build --locked -p chromatic-client --profile chromatic-size
+      - run: cargo build --locked -p chromatic-client --profile chromatic-speed
+      - run: cargo bench --locked --bench performance --no-run

@@ -1,0 +1,45 @@
+{
+  "environment": {
+    "date": "2026-10-09",
+    "cpu": "Apple M4",
+    "compiler": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "codegen": "opt-level=3, thin LTO, one codegen unit, overflow checks enabled; default portable host CPU flags",
+    "measurement_scope": "host only; not ESP32 or firmware runtime"
+  },
+  "search": [
+    {
+      "query": "chromatic",
+      "top_ids_unchanged": true,
+      "before_ns": 2096343.75,
+      "after_ns": 136497.9,
+      "speedup": 15.358065948267337,
+      "before_peak_live_bytes_above_start": 1577195,
+      "after_peak_live_bytes_above_start": 5032,
+      "before_allocation_calls": 30285,
+      "after_allocation_calls": 79
+    },
+    {
+      "query": "chromatic network",
+      "top_ids_unchanged": true,
+      "before_ns": 170989.6,
+      "after_ns": 18931.25,
+      "speedup": 9.032134697920107,
+      "before_peak_live_bytes_above_start": 93357,
+      "after_peak_live_bytes_above_start": 5094,
+      "before_allocation_calls": 2100,
+      "after_allocation_calls": 80
+    },
+    {
+      "query": "日本語",
+      "top_ids_unchanged": true,
+      "before_ns": 136954.15,
+      "after_ns": 13162.5,
+      "speedup": 10.404873694207026,
+      "before_peak_live_bytes_above_start": 57410,
+      "after_peak_live_bytes_above_start": 2964,
+      "before_allocation_calls": 2021,
+      "after_allocation_calls": 102
+    }
+  ],
+  "device_runtime_measured": false
+}

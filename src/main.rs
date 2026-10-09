@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 use pocket_search::{Document, SearchIndex};
 use serde_json::json;
 use std::{env, fs, process};

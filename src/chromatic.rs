@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-only
 //! Host-side formatting for the bounded PCS1 text protocol.
 use crate::SearchIndex;
 use chromatic_client::{
