@@ -1,0 +1,8 @@
+/target/
+/.cargo-cache/
+/data/
+.env
+.env.*
+*.key
+*.pem
+.DS_Store

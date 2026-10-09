@@ -1,0 +1,5 @@
+[
+  {"url":"https://example.invalid/gameboy","title":"ゲームボーイと小さな画面","body":"ゲームボーイの画面で文章と画像を読むための、オリジナルの検索テスト文です。","image_urls":[]},
+  {"url":"https://example.invalid/chromatic","title":"Chromatic WiFi guide","body":"Original fixture for a handheld reader. Search terms are matched by the Rust engine, without a remote search provider.","image_urls":["https://example.invalid/chromatic-photo.jpg"]},
+  {"url":"https://example.invalid/books","title":"本を読む","body":"検索で見つけたサイトから本文を読む。しおりと閲覧履歴の機能は設けない。","image_urls":[]}
+]
