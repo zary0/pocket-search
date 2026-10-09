@@ -49,7 +49,7 @@ The hosted readiness check prevents allocating a lab job when the application or
 A qualified release has:
 
 - `pocket-search-vX.Y.Z-source.zip`: source from the exact committed revision, including GPL license and build documentation.
-- `pocket-search-vX.Y.Z-<host-target>.tar.gz`: the compiled companion CLI, README, license, and notices.
+- `pocket-search-vX.Y.Z-<host-target>.tar.gz`: the compiled companion CLI, README with its logo, security/contribution policies, device overview, committed documentation/artwork, license, and notices. Untracked local notes are not packaged.
 - `chromatic-vX.Y.Z.bin`: the native ESP32 application image built from that same source/version.
 - `candidate.json`: the immutable tested manifest with commit, version, protocol, asset sizes, and SHA-256 hashes.
 - `release.json`: qualified status tied to the candidate digest and validated evidence digest.

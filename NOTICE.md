@@ -2,7 +2,7 @@
 
 Copyright (C) 2026 Pocket Search contributors.
 
-Repository-authored code, documentation, and original test fixtures are licensed under **GNU GPL version 3 only**, identified as `GPL-3.0-only`. See [LICENSE](LICENSE). This program is distributed without warranty, subject to that license.
+Repository-authored code, documentation, artwork, and original test fixtures are licensed under **GNU GPL version 3 only**, identified as `GPL-3.0-only`. See [LICENSE](LICENSE). This program is distributed without warranty, subject to that license. The Pocket Search logo and its generation record are in [assets](assets/README.md).
 
 Rust dependencies keep their own licenses. No third-party dependency is relicensed by this project; consult its upstream license and package metadata when distributing it. The `chromatic-client` crate currently has no external dependencies.
 

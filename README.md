@@ -1,3 +1,5 @@
+![Pocket Search logo: a pixel document and search lens beside the wordmark](assets/pocket-search-logo.png)
+
 # Pocket Search for ModRetro Chromatic
 
 A small web search and reading application designed around the **ModRetro Chromatic's 160 × 144 display, physical buttons, and ESP32 MCU**. Enter a query on the handheld, select a result, and read the site's text and reduced images over Wi-Fi.
@@ -99,7 +101,7 @@ See the [architecture](docs/architecture.md), [protocol](docs/chromatic-protocol
 
 ## Open-source development
 
-Repository-authored code, documentation, and original fixtures are licensed under **GPL-3.0-only**. See [LICENSE](LICENSE) and [notices](NOTICE.md). Dependencies retain their own licenses. This is an independent project, not an official ModRetro product. The repository is prepared for public development; changing GitHub visibility is a separate publishing action.
+Repository-authored code, documentation, artwork, and original fixtures are licensed under **GPL-3.0-only**. See [LICENSE](LICENSE) and [notices](NOTICE.md). Dependencies retain their own licenses. This is an independent project, not an official ModRetro product. The repository is prepared for public development; changing GitHub visibility is a separate publishing action.
 
 Contributions should keep the device path bounded and justify performance changes with reproducible measurements. See [contributing](CONTRIBUTING.md), [security reporting](SECURITY.md), and [performance notes](docs/performance.md). The initial optimization replaces nested posting trees, candidate intersections, and full-hit formatting with compact vectors, rarest-term planning, and bounded top-k selection. Client decoding remains allocation-free and uses a single combined text-validation pass.
 
@@ -116,3 +118,9 @@ Development integrates through **`develop`**, then promotes to **`main`**. Stabl
 Hosted CI checks versions, Rust behavior, and release-gate unit tests. Trusted branch pushes and tags invoke physical Chromatic qualification; only a real native Wi-Fi E2E result for the exact firmware/candidate permits release publication. Missing or skipped hardware tests block the release. The lab runner, native application, driver, and fixture origin are currently pending, so no physical E2E pass or firmware release is claimed.
 
 See [branches and release packages](docs/releases.md) and [physical E2E lab setup](docs/hardware-e2e.md). Packages carry source, companion and native image hashes, build identity, validated evidence, and checksums. Publication promotes tested assets without rebuilding them.
+
+## Security
+
+Read the [security policy](SECURITY.md) for supported versions, confidential reporting, disclosure coordination, device credentials, and the service/device/CI trust boundaries. The policy distinguishes implemented packet and release checks from pending networking and crawler protections.
+
+There is no production release or deployed public service yet. GitHub private vulnerability reporting is not currently available for this private repository. Until a confidential channel is enabled and verified, request a private reporting contact without posting vulnerability details, credentials, or device dumps in an issue. The security policy explains the current reporting route and public-release prerequisites.

@@ -135,8 +135,11 @@ def candidate(root, output, binary, target, tag=None):
     subprocess.run(["git", "-C", str(root), "archive", "--format=zip", "--prefix=" + prefix + "/", "HEAD", "-o", str((output / source_name).resolve())], check=True)
     binary_name = prefix + "-" + target + ".tar.gz"
     timestamp = int(git(root, "show", "-s", "--format=%ct", "HEAD"))
+    documentation = ["LICENSE", "NOTICE.md", "README.md", "CONTRIBUTING.md", "SECURITY.md", "devices/chromatic/README.md"]
+    documentation.extend(name for name in git(root, "ls-files", "-z", "--", "docs", "assets").split("\0") if name)
     with (output / binary_name).open("wb") as stream, gzip.GzipFile(filename="", fileobj=stream, mode="wb", mtime=timestamp) as compressed, tarfile.open(fileobj=compressed, mode="w") as archive:
-        for name, path in [("pocket-search", binary), ("LICENSE", root / "LICENSE"), ("NOTICE.md", root / "NOTICE.md"), ("README.md", root / "README.md")]:
+        for name, path in [("pocket-search", binary), *[(name, root / name) for name in documentation]]:
+            require(path.is_file() and not path.is_symlink(), "Missing or symlinked package file: " + name)
             data = path.read_bytes()
             info = tarfile.TarInfo(prefix + "/" + name)
             info.size, info.mtime, info.mode = len(data), timestamp, 0o755 if name == "pocket-search" else 0o644
