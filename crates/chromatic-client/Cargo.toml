@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Allocation-free text packet decoder and button actions for Chromatic"
+license = "GPL-3.0-only"
+repository = "https://github.com/zary0/pocket-search"
 publish = false
 
 [lib]
