@@ -1,9 +1,65 @@
-# Security reporting
+# Security policy
 
-This is an early development project without a deployed public service or released device firmware. The current client core validates bounded text packets; HTTPS transport and public-page fetching are not implemented here yet.
+Pocket Search is an experimental Rust search service and native ModRetro Chromatic reader foundation. No public service or physically qualified Pocket Search firmware has been released. This policy covers this repository; earlier device experiments and third-party firmware are separate projects.
 
-Please report reproducible parser, bounds, transport, or crawler issues with the affected revision, expected behavior, sanitized input, and test steps. Do not put credentials, private content, or device backups in reports.
+## Supported versions
 
-For sensitive issues, use this repository's GitHub private vulnerability reporting channel when it is enabled. Public release preparation must enable and verify that channel before advertising it as available. Do not post an exploitable issue publicly while a private report is being coordinated.
+| Revision | Security maintenance |
+| --- | --- |
+| Current `develop` head | Best-effort investigation and fixes during development; not a production support promise |
+| Current `main` head | Release preparation; physical qualification is still required |
+| Stable `vX.Y.Z` releases | None exist yet. After the first qualified release, only the latest stable version will receive security fixes |
+| Older tags, development packages, and forks | No backport guarantee; report the issue and reproduce against the current code if possible |
 
-Hardware recovery and firmware installation issues need the exact intended device and image; a host benchmark or emulator screenshot is not physical-device verification.
+Package version, commit, protocol version, and firmware identity matter. Include the output of `pocket-search --build-info` or the exact commit in a report. A `v` tag alone does not establish physical qualification; see the [release policy](docs/releases.md).
+
+## Reporting a vulnerability
+
+**Current channel status:** this repository is private, and GitHub private vulnerability reporting has not been enabled or verified. No separate security email address is published by this project. Do not assume that an issue, pull request, or discussion is a confidential channel, even while the repository is private.
+
+If you have repository access, [request a private security contact](https://github.com/zary0/pocket-search/issues/new?title=Private%20security%20contact%20request&body=Please%20provide%20a%20confidential%20channel%20for%20a%20security%20report.%20No%20vulnerability%20details%20are%20included%20here.). Post only that contact request. Do not include the affected component, exploit, payload, logs, or screenshots. If you do not have repository access, ask the maintainer who provided the project through your existing private contact; keep technical details out of any public contact request.
+
+Before public release, maintainers must enable GitHub private vulnerability reporting and verify that **Report a vulnerability** is available under this repository's Security tab. Once verified, that feature will be the preferred reporting channel and this status will be updated. GitHub documents both the [private reporting process and the contact-request fallback](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/report-privately). The fallback issue itself is not a vulnerability report.
+
+In the agreed confidential channel, include:
+
+- The affected commit/version, component, and impact.
+- Minimal reproduction steps and a sanitized input or proof of concept.
+- Expected and actual behavior, with relevant error output.
+- For device issues: model, firmware build identity, and whether this was a physical test or host/emulator test. Omit device serial numbers and network identifiers.
+- Any suggested fix or workaround, plus disclosure timing or credit preferences.
+
+Do not send Wi-Fi passwords, activation keys, tokens, private page contents, NVS dumps, full-flash backups, or unredacted captures. Keep recovery backups locally under the device owner's control.
+
+## Scope and coordination
+
+Relevant issues include malformed-packet handling, UTF-8 or bounds failures, excessive resource use, content or query injection, unsafe URL fetching, transport validation, credential exposure, and build/release or lab-runner compromise. Report concerns about planned components too, while clearly identifying that the code is not implemented yet. General feature requests and visual problems can use ordinary issues.
+
+Maintainers will investigate reproducible reports, assess affected revisions, coordinate a fix or mitigation, and agree on disclosure and reporter credit through the confidential channel. This small project has no guaranteed response time, fix deadline, or paid bounty program. Keep exploit details private while coordination is ongoing; communicate any planned disclosure date to the maintainer.
+
+Security fixes follow the same `develop` → `main` → `vX.Y.Z` path as other releases. A fix does not waive version checks, image identity checks, or physical E2E. Publish an advisory with the affected versions, impact, mitigation, and fixed version when appropriate. Credit is optional and requires the reporter's consent.
+
+Test with your own data and hardware or explicit operator authorization. Avoid scanning unrelated systems, extracting others' data, or disrupting shared Wi-Fi and CI infrastructure. For firmware issues, start with a host reproduction where possible and preserve the established device recovery procedure.
+
+## Trust boundaries and safeguards
+
+| Boundary | Implemented in this repository | Required before the corresponding feature ships |
+| --- | --- | --- |
+| Service response → device core | PCS1 decoding validates packet length, kind, payload structure, UTF-8, and display bounds. Text packets are limited to 512 bytes. The `no_std` decoder borrows its input without heap allocation and forbids unsafe Rust | Bounded transport buffers, deadlines, font/display integration checks, and physical malformed-response tests |
+| Query → companion | Host packet helpers enforce the 96-byte UTF-8 query limit | HTTP request/body limits, validation at the API boundary, rate limits, and bounded service concurrency |
+| Public URL/content → crawler | No crawler or page/image fetcher exists yet | Permit intended HTTPS origins only; reject credentials in URLs, local/private/link-local destinations and DNS rebinding; validate every redirect/resolution; bound downloads, decompressed size, parsing, image decoding, and execution time |
+| Device Wi-Fi → HTTPS origin | No Pocket Search transport adapter exists yet. Earlier SNTP/HTTPS experiments outside this repository do not qualify this application | Native time synchronization, certificate and hostname verification, bounded timeouts/retries, and real-device verification; do not bypass TLS checks to make a request succeed |
+| Source/build → release | Unified versions, exact build identity, asset hashes, annotated-tag/main provenance checks, and exact-byte promotion after validated evidence | Working native firmware, approved lab driver, controlled runner, reachable HTTPS fixtures, and real physical E2E |
+| Repository code → physical lab | Workflow orchestration checks readiness and the installed driver's path/digest. Fork PRs do not invoke the lab workflow | Operator-controlled runner, trusted branch/tag environment restrictions, recovery/settings preservation, and capture permissions. GitHub protection settings must be enabled and verified; workflow files alone do not enforce repository access policy |
+
+Memory and CPU optimization must preserve bounds, UTF-8 validation, certificate validation, and result correctness. The in-memory host index is not a hardened Internet service. Do not execute fetched JavaScript, active HTML, or downloaded code as part of the planned reader. Serve extracted content and bounded image data rather than arbitrary active web pages.
+
+The lab runner and approved driver are trusted infrastructure. JSON, JUnit, PNG metadata, and checksums cannot independently prove that a test occurred on physical hardware or authenticate an uncompromised driver. Release-gate unit fixtures are explicitly synthetic and must never be submitted as physical evidence.
+
+## Credentials and privacy
+
+Credentials, NVS contents, device identifiers, full-flash backups, private logs, and private corpus data stay outside Git history and uploaded artifacts. Use the hosting platform's secret mechanism for future service credentials; do not place secrets in repository variables, fixtures, command lines, or report attachments. Limit CI permissions and retain only sanitized evidence needed for qualification.
+
+The intended client has no bookmarks, query/browsing history, or analytics by default. This describes application storage behavior, not anonymous network access: an endpoint or network operator may observe requests. The service is not implemented, so no production retention or hosting privacy claim is made. Any future logging or collection behavior must be documented before deployment.
+
+If a secret is accidentally exposed, revoke or rotate it with its provider before treating file deletion as a fix. Notify the maintainer privately, review history and artifacts for exposure, and coordinate cleanup without copying the secret into an issue. Local ignore rules are only a convenience, not a substitute for review.
