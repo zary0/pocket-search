@@ -1,27 +1,55 @@
-# 構成と境界
+# Architecture
 
-## 検索サーバー
+## Primary target
 
-初期版は単一のRustプロセス。クローラー、文書抽出、検索インデックス、読み取り専用のAPIを分ける。検索コアは転置インデックス、語の出現回数、文書長を使う。日本語はまず文字と2文字単位で検索し、形態素解析と検索品質の改善は実際の検索例を評価してから追加する。
+Pocket Search is a Wi-Fi search and reader application for the ModRetro Chromatic MCU. The physical display and buttons determine interaction, pagination, response sizes, and image budgets. A host browser can help debug the service but is not the primary product.
 
-現時点で動作するのは `src/lib.rs` の検索コアと `src/main.rs` のJSON文書検索CLI。インデックスは起動時にメモリへ構築する。クローラーやAPI、ブラウザ表示が完成したとは扱わない。
+The official [Chromatic MCU project](https://github.com/ModRetro/oss-chromatic-console-mcu) uses ESP-IDF. Initial integration should preserve the existing display and button drivers, Wi-Fi, native SNTP, and certificate bundle. The Rust client core validates packets and maps buttons to actions; a firmware adapter must connect it to the platform. The adapter, its C ABI or native Rust integration, and the Xtensa cross-build are unimplemented. A host `no_std` check is not a device build.
 
-## 公開ページの収集
+## Device responsibilities
 
-開始URLと対象ドメインを明示して少数ページから始める。robots.txtを確認し、ページ数・深さ・同一ホストの頻度・レスポンスサイズ・待機時間を制限する。ログインしたページや私的なアカウント情報を取り込まない。
+1. Enter a bounded English or Japanese query with physical controls.
+2. Send one request after the user submits the query.
+3. Receive at most 512 bytes for one PCS1 text packet, rejecting oversized bodies before writing beyond the buffer.
+4. Validate the complete packet before updating the screen.
+5. Draw a title and up to seven lines through the font/display adapter.
+6. Fetch another result or reader page when navigating; discard the previous response.
+7. Return to query entry or home through physical controls.
 
-収集対象は公開HTTPS URL。DNS解決した送信先を検証し、接続先を固定して内部ネットワークへの到達を防ぐ。リダイレクト先も同じ検証を通す。証明書検証を省略しない。これらの通信機能は未実装であり、最初のクローラー追加時に境界テストを用意する。
+`crates/chromatic-client` is dependency-free and `no_std`. Its decoder borrows the receive buffer and checks sizes, UTF-8, cell widths, pagination, flags, and reserved bytes. It does not allocate, draw, open sockets, or operate buttons directly. The encoded packet and decoded view can share one 512-byte receive buffer. TLS, networking, fonts, UI state, and the existing framebuffer have separate costs.
 
-HTML全体をそのまま表示せず、題名・元URL・ドメイン・本文・掲載画像のURL・リンク・収集時刻を文書にする。抽出した情報は不正なHTMLやスクリプトとして実行しない。ページのJavaScript実行は初期版の対象外。内容を取得できない場合は未対応と表示し、架空の本文や画像を補わない。
+The 24-cell row profile treats ASCII as one cell and other Unicode as two. It is a conservative layout policy, not Unicode shaping or a font coverage guarantee. The firmware must visibly substitute unsupported glyphs. Font metrics, title/footer placement, contrast, and clipping require physical inspection.
 
-## 検索APIと閲覧
+## Companion responsibilities
 
-`GET /api/search?q=...` は実際の索引から結果と収集範囲を返す。`GET /api/page?id=...` は本文・画像・リンクを返す。画像は登録済みの掲載画像をサイズ制限して取得し、小さな表示用に変換する。任意のURLを無制限に取得する公開プロキシを作らない。これらのAPIは計画段階。
+The companion owns collection, HTML extraction, ranking, source metadata, and image preparation. The current host code implements an in-memory inverted index, Japanese/English tokenization, BM25-style scoring, and packet formatting. It reads JSON fixtures; it does not fetch websites or expose HTTP routes.
 
-結果は実際の題名・出典・説明を表示する。検索結果が0件なら0件と表示する。しおりや閲覧履歴を作らず、戻るための現在の状態だけをそのセッション中に保持する。
+The device receives one result per response, up to ten ranked results. Each result references a document through a numeric ID. IDs are currently one-based positions in the loaded corpus. A service must keep that corpus immutable while a client uses its IDs. Persistent storage and a corpus-generation token must be added before live index replacement, preventing an ID from opening an unrelated document after a rebuild.
 
-## Chromatic
+Bodies are split into seven-row pages. Titles can be shortened with an ellipsis; result excerpts can be shortened with an instruction to open the full page. Full bodies remain on the host and are paginated rather than silently discarded. Full source URLs stay on the host; a source/details action is needed to inspect URLs too long for a result screen.
 
-端末側は既存のWi-Fi、ネットワーク時刻同期、証明書検証付きHTTPSを利用する方針。Rustへ言語を変えるだけで本体の容量が増えるわけではないため、大きな検索索引はサーバーに置く。
+## Planned service routes
 
-初期検証では160×144の画面に本文を分割し、画像を小さく表示する。画像バッファの上限、TLSと画像処理の同時使用、フレーム更新時間は実機で測定する。本体への移植と公開HTTPSサーバーへの接続は未実装。このプロジェクト開始時点では本体へ何も書き込まない。
+The API still needs an HTTP framework and implementation. Initial device-specific routes should serve one immutable corpus:
+
+- `GET /v1/chromatic/search?q=...&result=0`: one PCS1 result packet.
+- `GET /v1/chromatic/page?id=...&page=0`: one PCS1 reader packet.
+- A later registered-image route: bounded RGB565 stripes for an image referenced by a collected document.
+
+Reject queries longer than 96 UTF-8 bytes and unknown document/page IDs. Use explicit content lengths, bounded request/response times, and no query/body logging. A zero-result packet has document ID zero and cannot open an invented document. Collection scope and timestamps need a separate bounded metadata response when crawling is added. This protocol is not Google search or a general-purpose HTML browser.
+
+## Planned public-page collection
+
+Use explicit seed URLs and domains, obey robots.txt, and cap page count, depth, response bytes, timeouts, and per-host frequency. Fetch public HTTPS pages with certificate verification. Validate resolved addresses, pin the approved destination, and validate redirects before following them. Exclude private/local destinations and authenticated content.
+
+Extract title, source URL, body, links, image references, and collection time. Render extracted content as data. Do not execute page scripts on the handheld or invent content for unsupported sites. Crawling and network boundary tests remain pending.
+
+## Image path
+
+Resize an actual site's image on the companion to fit within 128 × 80 pixels and send RGB565 stripes. Eight rows cost 2,048 bytes, avoiding a second 46,080-byte full-display buffer. Stripe headers, ordering, interrupted transfers, and display integration need implementation. Peak memory with TLS active must be measured before treating this budget as viable. Use actual source images, not generated photos presented as web content.
+
+## Connectivity and acceptance
+
+Use a reachable HTTPS endpoint with a certificate accepted after native time synchronization. Earlier hardware tests verified outbound HTTPS but did not establish device-to-computer LAN reachability. A USB relay or host example must not be reported as Wi-Fi-native search.
+
+The first hardware acceptance test is query entry → verified HTTPS response → result selection → complete text pagination, including empty results, network errors, and repeated navigation. Record sanitized firmware revision, packet sizes, minimum/largest free heap, timing, and physical observations. Hardware writes and captures follow the ModRetro deployment workflow and preserve existing backups and settings.

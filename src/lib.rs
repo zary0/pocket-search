@@ -4,6 +4,8 @@
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
+pub mod chromatic;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Document {
     pub url: String,
@@ -15,6 +17,8 @@ pub struct Document {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct SearchHit {
+    /// One-based identifier, valid only for this loaded document collection.
+    pub document_id: usize,
     pub url: String,
     pub title: String,
     pub snippet: String,
@@ -131,6 +135,7 @@ impl SearchIndex {
                     score += 2.0;
                 }
                 SearchHit {
+                    document_id: id + 1,
                     url: doc.url.clone(),
                     title: doc.title.clone(),
                     snippet: make_snippet(&doc.body, &normalized, 120),

@@ -1,0 +1,10 @@
+[package]
+name = "chromatic-client"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Allocation-free text packet decoder and button actions for Chromatic"
+publish = false
+
+[lib]
+path = "src/lib.rs"

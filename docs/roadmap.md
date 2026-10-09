@@ -1,13 +1,47 @@
-# 開発順序
+# Hardware-first roadmap
 
-- [x] 独立したRustプロジェクトと検索コア
-- [x] 日本語・英語検索、題名の順位付け、0件・Unicode・結果件数の確認
-- [ ] robots.txtと上限を守る限定クローラー
-- [ ] 実際の公開ページを収集し、重複排除と更新を行う
-- [ ] 検索・本文・画像の読み取り専用API
-- [ ] 検索窓から実際の索引を検索するWeb画面
-- [ ] サイト掲載画像の取得と縮小
-- [ ] Chromaticの軽量クライアントと実機検証
-- [ ] 動画の外部変換方式を検証する
+## 0. Chromatic development foundation
 
-最初のクローラー完了条件は、実際のURL・収集日時・ページ数が分かり、検索語を変えると結果が索引に応じて変わること。画面にテスト文を出すだけでWeb検索が完成したと報告しない。
+- [x] Make Chromatic the primary platform and document the MCU/service boundary.
+- [x] Provide English README files and architecture documentation.
+- [x] Implement Japanese/English search and ranking on the host.
+- [x] Implement bounded text packet formatting for the 160 × 144 target.
+- [x] Implement an allocation-free `no_std` decoder and button action mapping.
+- [x] Check pagination, malformed packets, query limits, and host/client compatibility.
+
+These checks run on a host. They are not a firmware build or physical browsing result.
+
+## 1. First physical search and text loop
+
+- [ ] Build an Xtensa-compatible client core and firmware adapter with existing display, buttons, fonts, Wi-Fi, SNTP, and TLS configuration.
+- [ ] Add bounded HTTP routes for one immutable document collection.
+- [ ] Verify a reachable HTTPS endpoint on the actual Wi-Fi network.
+- [ ] Implement query entry, result navigation, text pagination, loading, timeout, and error screens.
+- [ ] Verify query → result → text physically; record packet sizes, timing, free heap, and largest free block.
+- [ ] Verify repeated navigation and reconnection without losing responsiveness.
+- [ ] Verify battery-only operation separately from USB-powered diagnostic testing.
+
+Initial fixture tests must be visibly identified. They do not complete the real-web milestone.
+
+## 2. Real collected pages
+
+- [ ] Add a robots-aware, size/rate/depth-limited public HTTPS crawler and HTML extractor.
+- [ ] Preserve source URLs, collection scope, timestamps, links, and original image references.
+- [ ] Add deduplication, persistence, and corpus generation handling before replacing an active index.
+- [ ] Query actual collected pages on the handheld and inspect full source information.
+- [ ] Confirm query-dependent results from the actual index, including honest zero-result responses.
+
+## 3. Still images
+
+- [ ] Fetch registered site images and resize them on the companion.
+- [ ] Define and validate bounded RGB565 stripe transport.
+- [ ] Display one reduced image and return to text with B.
+- [ ] Measure TLS plus image/display peak memory and handle interrupted transfers.
+
+## 4. Reading and quality
+
+- [ ] Refine Japanese input, wrapping, font fallback, search quality, links, and book text import.
+- [ ] Keep temporary back navigation in memory only.
+- [ ] Evaluate externally prepared low-resolution video after still-image acceptance.
+
+Bookmarks, browsing history, launch-time reading restoration, and the Codex approval application are outside the product scope.
