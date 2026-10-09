@@ -13,12 +13,16 @@ use std::{
 
 struct Meter;
 static ACTIVE: AtomicBool = AtomicBool::new(false);
+static TRACK_LIVE: AtomicBool = AtomicBool::new(true);
 static LIVE: AtomicUsize = AtomicUsize::new(0);
 static PEAK: AtomicUsize = AtomicUsize::new(0);
 static CALLS: AtomicUsize = AtomicUsize::new(0);
 static REQUESTED: AtomicUsize = AtomicUsize::new(0);
 
 fn allocated(size: usize) {
+    if !TRACK_LIVE.load(Relaxed) {
+        return;
+    }
     let live = LIVE.fetch_add(size, Relaxed) + size;
     if ACTIVE.load(Relaxed) {
         CALLS.fetch_add(1, Relaxed);
@@ -39,11 +43,13 @@ unsafe impl GlobalAlloc for Meter {
     }
     unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
         unsafe { System.dealloc(pointer, layout) };
-        LIVE.fetch_sub(layout.size(), Relaxed);
+        if TRACK_LIVE.load(Relaxed) {
+            LIVE.fetch_sub(layout.size(), Relaxed);
+        }
     }
     unsafe fn realloc(&self, pointer: *mut u8, layout: Layout, size: usize) -> *mut u8 {
         let result = unsafe { System.realloc(pointer, layout, size) };
-        if !result.is_null() {
+        if !result.is_null() && TRACK_LIVE.load(Relaxed) {
             LIVE.fetch_sub(layout.size(), Relaxed);
             allocated(size);
         }
@@ -81,6 +87,9 @@ fn timing(iterations: usize, mut f: impl FnMut()) -> serde_json::Value {
         f();
     }
     let mut ns = [0.0; 5];
+    // Timed workloads release all temporary allocations before returning.
+    // Disable atomic live-byte accounting to reduce profiler bias in timings.
+    TRACK_LIVE.store(false, Relaxed);
     for sample in &mut ns {
         let start = Instant::now();
         for _ in 0..iterations {
@@ -88,6 +97,7 @@ fn timing(iterations: usize, mut f: impl FnMut()) -> serde_json::Value {
         }
         *sample = start.elapsed().as_nanos() as f64 / iterations as f64;
     }
+    TRACK_LIVE.store(true, Relaxed);
     ns.sort_by(f64::total_cmp);
     json!({"iterations_per_sample":iterations,"samples":5,
         "median_ns_per_operation":ns[2],"min_ns":ns[0],"max_ns":ns[4]})
@@ -146,6 +156,7 @@ fn main() {
         "host_os":std::env::consts::OS,
         "profile":"Cargo bench; record compiler and flags separately",
         "allocation_scope":"requested System allocator bytes; not RSS or TLS/display memory",
+        "timing_scope":"allocation byte accounting disabled during balanced timed workloads; System delegation and one flag check remain",
         "corpus":{"documents":3000,"source":"original deterministic fixtures, not web pages"},
         "index_construction_memory":index_memory,
         "search":searches,
