@@ -108,3 +108,11 @@ cargo bench --locked --bench performance > performance.json
 ```
 
 Checked-in timings are host-only measurements on Apple M4, not physical Chromatic speed claims. The ESP32 CPU/heap probe has a target compile check; device execution, Rust Xtensa integration, and actual profile selection remain pending.
+
+## CI, CD, and versions
+
+Development integrates through **`develop`**, then promotes to **`main`**. Stable releases use annotated **`vX.Y.Z`** tags matching the single workspace version. Development package names include the base version and commit and cannot be published as stable releases.
+
+Hosted CI checks versions, Rust behavior, and release-gate unit tests. Trusted branch pushes and tags invoke physical Chromatic qualification; only a real native Wi-Fi E2E result for the exact firmware/candidate permits release publication. Missing or skipped hardware tests block the release. The lab runner, native application, driver, and fixture origin are currently pending, so no physical E2E pass or firmware release is claimed.
+
+See [branches and release packages](docs/releases.md) and [physical E2E lab setup](docs/hardware-e2e.md). Packages carry source, companion and native image hashes, build identity, validated evidence, and checksums. Publication promotes tested assets without rebuilding them.

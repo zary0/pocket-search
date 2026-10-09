@@ -11,6 +11,9 @@
 - [x] Add GPL-3.0-only licensing and English contribution/security guidance for public development.
 - [x] Add repeatable host timing/allocation measurements and compact bounded search selection.
 - [x] Cross-compile an ESP32 CPU-cycle/heap probe; physical execution is pending.
+- [x] Align `develop`, `main`, inherited versions, `vX.Y.Z` tags, and candidate manifests.
+- [x] Add CI/CD orchestration with mandatory physical evidence before release promotion.
+- [ ] Register and verify the dedicated physical lab runner and operator-installed adapter.
 
 These checks run on a host. They are not a firmware build or physical browsing result.
 

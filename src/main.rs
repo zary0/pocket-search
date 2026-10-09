@@ -4,6 +4,19 @@ use serde_json::json;
 use std::{env, fs, process};
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().skip(1).collect();
+    if args == ["--version"] {
+        println!("pocket-search {}", env!("CARGO_PKG_VERSION"));
+        return Ok(());
+    }
+    if args == ["--build-info"] {
+        println!(
+            "{}",
+            json!({"version":env!("CARGO_PKG_VERSION"),
+            "commit":option_env!("POCKET_BUILD_COMMIT").unwrap_or("unknown"),
+            "protocol_version":1})
+        );
+        return Ok(());
+    }
     if args.len() != 2 {
         return Err("Usage: pocket-search <documents.json> <query>".into());
     }

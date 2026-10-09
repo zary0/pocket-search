@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "scope": "Initial acceptance targets, not measured device performance",
+  "maximum": {
+    "decoder_allocations": 0,
+    "text_packet_bytes": 512,
+    "decoder_cycles_per_packet": 160000,
+    "verified_https_ms": 15000
+  },
+  "minimum": {
+    "free_heap_bytes_after_warmup": 16384,
+    "largest_free_block_bytes_after_warmup": 8192
+  }
+}

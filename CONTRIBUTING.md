@@ -16,6 +16,8 @@ cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
 cargo check --locked -p chromatic-client
 cargo bench --locked --bench performance
+python3 scripts/pipeline.py version
+python3 -m unittest discover -s tests -v
 ```
 
 For performance work, compare the same corpus, queries, compiler, optimization profile, architecture, and CPU settings. Record before/after JSON, ranked result equivalence, requested allocations, peak live allocation delta, and median timings. Host timings do not prove Xtensa device performance. See [performance notes](docs/performance.md).
@@ -23,5 +25,7 @@ For performance work, compare the same corpus, queries, compiler, optimization p
 ## Pull requests
 
 Explain the problem, resulting behavior, validation, and measured tradeoffs. Keep firmware, protocol, service, and documentation changes reviewable. Add meaningful boundary or regression checks when behavior changes; ordinary documentation edits do not need redundant tests. Use English in README files and contributor documentation. Japanese fixture data and input support remain welcome.
+
+Target `develop` with feature/fix PRs. `main` promotion and `vX.Y.Z` releases require the [release policy](docs/releases.md), including actual physical qualification. Release-gate unit fixtures do not satisfy the physical requirement.
 
 Do not include credentials, activation codes, NVS dumps, physical-device identifiers, full-flash backups, or private site content. Clearly label fixture tests, host benchmarks, streamed emulator demos, USB diagnostics, and actual device measurements. Hardware writes require the existing device-specific deployment workflow.

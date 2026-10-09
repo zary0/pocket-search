@@ -1,6 +1,6 @@
 [package]
 name = "pocket-search"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 rust-version = "1.85"
 description = "Independent web search and a bounded reader protocol for ModRetro Chromatic"
@@ -11,6 +11,9 @@ publish = false
 [workspace]
 members = ["crates/chromatic-client"]
 resolver = "3"
+
+[workspace.package]
+version = "0.1.0"
 
 [dependencies]
 chromatic-client = { path = "crates/chromatic-client" }

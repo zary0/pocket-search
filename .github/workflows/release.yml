@@ -1,0 +1,37 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  qualify:
+    uses: ./.github/workflows/qualification.yml
+    with:
+      release_tag: ${{ github.ref_name }}
+  publish:
+    needs: qualify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: qualified-${{ github.sha }}
+          path: dist/qualified/
+      - name: Promote tested bytes without rebuilding
+        run: python3 scripts/pipeline.py promote --candidate dist/qualified/candidate --evidence dist/qualified/evidence --output dist/release
+      - name: Publish one versioned release, never replace existing assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: gh release create "$RELEASE_TAG" dist/release/* --verify-tag --title "$RELEASE_TAG" --generate-notes

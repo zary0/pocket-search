@@ -1,0 +1,12 @@
+name: Hardware E2E
+on:
+  push:
+    branches: [develop, main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  qualify:
+    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/qualification.yml

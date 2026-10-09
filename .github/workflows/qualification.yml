@@ -1,0 +1,102 @@
+name: Chromatic qualification
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        type: string
+        default: ''
+permissions:
+  contents: read
+  actions: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          components: rustfmt, clippy
+      - run: python3 scripts/pipeline.py version
+      - run: python3 -m unittest discover -s tests -v
+      - run: cargo fmt --all --check
+      - run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - run: cargo test --locked --workspace
+      - name: Build the candidate once
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          export POCKET_BUILD_COMMIT="$GITHUB_SHA"
+          cargo build --locked --release
+          extra=()
+          if [ -n "$RELEASE_TAG" ]; then extra=(--tag "$RELEASE_TAG"); fi
+          target="$(rustc -vV | sed -n 's/^host: //p')"
+          python3 scripts/pipeline.py candidate --output dist/candidate --binary target/release/pocket-search --target "$target" "${extra[@]}"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: candidate-${{ github.sha }}
+          path: dist/candidate/
+          if-no-files-found: error
+          retention-days: 14
+  readiness:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Require a configured real lab and MCU application
+        env:
+          CHROMATIC_E2E_READY: ${{ vars.CHROMATIC_E2E_READY }}
+          CHROMATIC_LAB_DRIVER: ${{ vars.CHROMATIC_LAB_DRIVER }}
+          CHROMATIC_LAB_DRIVER_SHA256: ${{ vars.CHROMATIC_LAB_DRIVER_SHA256 }}
+          CHROMATIC_TEST_ORIGIN: ${{ vars.CHROMATIC_TEST_ORIGIN }}
+        run: python3 scripts/pipeline.py readiness
+  hardware:
+    needs: [build, readiness]
+    runs-on: [self-hosted, chromatic]
+    environment: chromatic-lab
+    timeout-minutes: 35
+    concurrency:
+      group: chromatic-physical-lab
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: candidate-${{ github.sha }}
+          path: dist/candidate/
+      - name: Build exact native image, verify installation, run physical E2E
+        env:
+          CHROMATIC_E2E_READY: ${{ vars.CHROMATIC_E2E_READY }}
+          CHROMATIC_LAB_DRIVER: ${{ vars.CHROMATIC_LAB_DRIVER }}
+          CHROMATIC_LAB_DRIVER_SHA256: ${{ vars.CHROMATIC_LAB_DRIVER_SHA256 }}
+          CHROMATIC_TEST_ORIGIN: ${{ vars.CHROMATIC_TEST_ORIGIN }}
+        run: python3 scripts/hardware_runner.py --candidate dist/candidate --evidence dist/evidence
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: qualified-${{ github.sha }}
+          path: |
+            dist/candidate/
+            dist/evidence/
+          if-no-files-found: error
+          retention-days: 30
+  chromatic-required:
+    if: always()
+    needs: [build, readiness, hardware]
+    runs-on: ubuntu-latest
+    steps:
+      - name: A missing or skipped physical run is a failure
+        env:
+          BUILD: ${{ needs.build.result }}
+          READINESS: ${{ needs.readiness.result }}
+          HARDWARE: ${{ needs.hardware.result }}
+        run: |
+          test "$BUILD" = success
+          test "$READINESS" = success
+          test "$HARDWARE" = success
