@@ -27,6 +27,7 @@ flowchart LR
 - Promotion is a PR from `develop` to `main`, requiring hosted CI and the physical qualification result for that head. Put urgent fixes through the same path to keep branches aligned.
 - A stable tag is annotated, matches the workspace version exactly, and points to a commit in `main` history. Tag updates and deletions should be prohibited.
 - The tag pipeline builds and physically qualifies a fresh release candidate, then publishes exactly those tested files. It never promotes a development candidate or rebuilds after E2E.
+- After a release, merge `main` back into `develop` through a PR if their histories diverged, before preparing the next workspace version. Version changes follow the same PR and check requirements as other changes.
 
 `main` represents release-ready code. Until a real Pocket Search MCU application, lab adapter, reachable HTTPS fixture origin, and runner are configured, physical qualification stays blocked and there is no qualified firmware release.
 

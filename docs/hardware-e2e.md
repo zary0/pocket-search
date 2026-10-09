@@ -8,7 +8,7 @@ No lab runner is registered, the Pocket Search MCU firmware project and installe
 
 ## Dedicated runner
 
-Use an operator-controlled machine with USB access to the intended Chromatic, ESP-IDF and the actual Rust Xtensa toolchain, Python 3.11+, and the firmware deployment/capture dependencies. Register it for this repository with the `chromatic` label. Use a dedicated unit and preserve its verified recovery backup and Wi-Fi settings outside the checkout.
+Use an operator-controlled machine with USB access to the intended Chromatic, ESP-IDF and the actual Rust Xtensa toolchain, Python 3.11+, and the firmware deployment/capture dependencies. The pinned Actions use Node.js 24 and require Actions Runner **2.327.1 or newer**. Register it for this repository with the `chromatic` label. Use a dedicated unit and preserve its verified recovery backup and Wi-Fi settings outside the checkout.
 
 Configure the `chromatic-lab` environment for trusted `develop`, `main`, and stable release tags. Do not execute fork PRs or arbitrary contributor refs on the lab machine. Preconfigure physical capture access through the normal ModRetro/OS permission flow; CI cannot silently grant it. Keep the installed driver outside repository-controlled paths.
 
