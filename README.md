@@ -54,6 +54,21 @@ The handheld owns the interaction and display. A companion service on a computer
 
 These actions are implemented in the client core, not yet connected to physical button events. The query keyboard is pending; English and Japanese input remain in scope.
 
+## Runtime and development environment
+
+| Layer | Environment and validation status |
+| --- | --- |
+| Host CLI and search core | Native Rust 2024 program. Validated locally on macOS / Apple M4 / aarch64 with Rust and Cargo 1.95.0, and in hosted Ubuntu / x86_64 CI with stable Rust. Other host platforms are not verified |
+| Build and release tooling | Rust/Cargo for builds; Git and Python 3.11+ for version checks, packaging, and release-gate tests. The compiled CLI runs on its matching host OS/architecture |
+| Chromatic development hardware | One previously inspected DevDay unit: ESP32-U4WDH / Xtensa at 160 MHz, 4 MiB flash, a 2 MiB application partition, and no enabled PSRAM. Display: 160 × 144 RGB565 |
+| Native firmware integration target | ESP-IDF 5.3 with FreeRTOS, the existing Wi-Fi/network/TLS stack, and LVGL display integration. Pocket Search's firmware adapter and Rust Xtensa build remain pending |
+| Portable device core | Dependency-free `no_std` Rust with no allocator or OS bindings. It decodes bounded packets and maps buttons; networking, fonts, and rendering belong to the pending firmware adapter |
+| Network/service runtime | A DNS-resolvable HTTPS service reachable from the device, with native clock synchronization and certificate/hostname validation. The companion HTTP API and public endpoint are not implemented yet |
+
+The manifest declares Rust 1.85 as its minimum version; that minimum is not separately checked in CI. Current validation uses the toolchains above. The hardware values describe the earlier development unit and firmware, not a tested Pocket Search image or guaranteed resources on every Chromatic. See the [device profile](devices/chromatic/README.md) and [lab requirements](docs/hardware-e2e.md).
+
+The initial firmware plan keeps ESP-IDF/FreeRTOS and integrates the small Rust core. A `no_std` core does not make the complete Wi-Fi firmware bare metal. Optimize task stacks, network/TLS buffers, and incremental drawing against real-device measurements before considering a replacement platform; see the [performance trade-offs](docs/performance.md#rtos-footprint-and-bare-metal).
+
 ## Run host checks
 
 Use stable Rust and Cargo. Host checks do not require an ESP32 toolchain.
@@ -73,23 +88,11 @@ cargo clippy --workspace --all-targets -- -D warnings
 
 The Chromatic example runs entirely on the host and prints that distinction. `examples/documents.json` contains original test text and nonexistent `.invalid` URLs, including Japanese fixtures. It is not a crawled corpus or evidence of hardware browsing.
 
-## Repository layout
-
-```text
-src/                         Host search index, CLI, and packet formatting
-crates/chromatic-client/     Dependency-free, no_std decoder and button actions
-examples/                    Original fixtures and host protocol check
-devices/chromatic/           Target profile and firmware integration plan
-docs/architecture.md         Device/service boundary and collection design
-docs/chromatic-protocol.md   PCS1 text format and response limits
-docs/roadmap.md              Hardware-first implementation milestones
-```
-
 ## Hardware evidence and limits
 
 Earlier work on one Chromatic DevDay unit verified Wi-Fi, native SNTP, and certificate-validated HTTPS fetching. That firmware and its verification artifacts are outside this repository. Those checks do not verify Pocket Search, image display, or battery-only operation.
 
-The development configuration used ESP32-U4WDH at 160 MHz, 4 MiB flash, no enabled PSRAM, ESP-IDF 5.3, and LVGL with RGB565. Available heap before a small HTTPS request was about 58 KiB. These are observations of that unit and firmware, not a universal free-memory guarantee. See the [device profile](devices/chromatic/README.md).
+Available heap on that earlier unit before a small HTTPS request was about 58 KiB. This is an observation of that unit and firmware, not a universal free-memory guarantee. Its hardware/software environment is summarized above; see the [device profile](devices/chromatic/README.md) for exact measurements.
 
 The development Wi-Fi allowed outbound HTTPS but did not establish device-to-computer LAN reachability. Hardware testing needs a verified reachable endpoint; a running local service alone does not prove a Wi-Fi path to the device.
 
