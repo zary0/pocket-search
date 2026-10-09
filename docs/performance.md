@@ -57,3 +57,16 @@ When hardware integration is ready, record firmware revision, target/toolchain, 
 ## Performance acceptance
 
 Preserve ranked results, complete text pagination, UTF-8 and packet validation, time synchronization, and certificate verification. Report improvements together with allocation, retained-memory, flash-size, and latency tradeoffs. Use explicit device measurements to justify hardware-specific optimizations rather than extrapolating Apple M4 timings to Chromatic.
+
+## RTOS footprint and bare metal
+
+Removing a scheduler and application task stacks can reduce firmware overhead when the same work fits a simpler event loop. A bare-metal rewrite does not guarantee lower memory use or faster end-to-end behavior: Wi-Fi, TCP/IP, TLS, interrupts, and display buffers still need an implementation and resources. The portable `no_std` core already has no allocator or OS dependency; that property does not describe the complete firmware.
+
+The initial target remains ESP-IDF 5.3/FreeRTOS with existing device drivers. Espressif documents task/stack and network/TLS buffer tuning in its [RAM optimization guide](https://docs.espressif.com/projects/esp-idf/en/v5.3/esp32/api-guides/performance/ram-usage.html), and task-based networking in the [Wi-Fi model](https://docs.espressif.com/projects/esp-idf/en/v5.3/esp32/api-guides/wifi.html#esp32-wi-fi-programming-model). Our engineering choice is to measure and reduce that footprint first:
+
+- Consolidate application work where practical and size stacks from worst-case high-water measurements with headroom.
+- Bound concurrent requests and network/TLS buffers; measure both memory and throughput rather than assuming smaller buffers are faster.
+- Use incremental drawing and the proposed image stripes to avoid another full framebuffer; drawing and image transport remain unimplemented.
+- Keep certificate checks, UTF-8 validation, and recovery behavior intact.
+
+Compare linked image size, peak/free heap, largest free block, task stack use, decoder cycles, verified HTTPS latency, and visible rendering under identical scenarios. No complete ESP-IDF-versus-bare-metal build or physical performance comparison exists yet. Replacing the platform requires a supported Wi-Fi/TLS integration and equivalent physical E2E, not just a smaller core binary.
