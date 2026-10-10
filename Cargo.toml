@@ -9,7 +9,7 @@ repository = "https://github.com/zary0/pocket-search"
 publish = false
 
 [workspace]
-members = ["crates/chromatic-client"]
+members = ["crates/chromatic-client", "crates/chromatic-ffi"]
 resolver = "3"
 
 [workspace.package]

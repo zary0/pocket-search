@@ -1,17 +1,19 @@
-# Search UI preview
+# Search and reader preview
 
-A light search-first interface with one centered wordmark, a rounded query field, and one search action. No account, approval, bookmarks, or history screen is included.
+A white search home, query-dependent result titles/URLs/snippets, and a paginated text reader. No account, approval, bookmarks or history screen is included.
 
 From the repository root:
 
 ```sh
-python3 -m http.server 8828 --bind 127.0.0.1 --directory ui
+cargo run --locked -- serve examples/documents.json 127.0.0.1:8828
 ```
 
-Open http://127.0.0.1:8828/. If the earlier compatibility preview already owns that port, reuse it: its entry/assets now point to this directory. Do not start a competing server.
+Open http://127.0.0.1:8828/. Reuse the existing owned preview port rather than starting competing services. A plain static file server cannot serve the search API. UI files are compiled into the companion binary; rebuild/restart it after editing those assets.
 
-The service is not connected. A valid submission reports that state; it does not open Google or fabricate results. Queries stay in the current page's memory. The 96-byte UTF-8 limit matches PCS1. The optional canvas/dialog is a layout and input preview, not a physical device feed; host font rendering differs from the device.
+The current collection contains original sample articles and nonexistent `.invalid` URLs. Results come from the Rust index; this is not real-web or Google search. Queries and navigation stay in current-page memory, with no application history or storage. Requests reach the companion service; an HTTPS deployment provider may observe them.
 
-The browser field accepts normal text input. The button preview uses A to enter/select a character, B to erase/back, Start to submit, and Select to change character groups. Hiragana, Latin letters, digits, and symbols are available; no Japanese kanji conversion is provided. The native home uses Select for existing Wi-Fi configuration.
+The field accepts normal text input, capped at 96 UTF-8 bytes. Result titles open the stored article; previous/next buttons read its <=512-byte PCS1 pages. The optional 160 × 144 canvas/button dialog uses the same packets, with Up/Down to select a result, A to read, Left/Right for pages, B to return, and Start for input. It is a browser layout/input preview, not a physical device feed; host fonts differ from the device.
 
-See [native UI and verification boundary](../docs/search-ui.md). Test the bounded input with `node --test tests/test_search_input.mjs`; the MCU input helper also has a sanitizer check in hosted CI.
+The button keyboard provides hiragana, Latin letters, digits and symbols without kanji conversion. The native home retains Select for Wi-Fi configuration; result/reader Select returns home.
+
+See [search transport and evidence](../docs/search-results.md). Run `node --test tests/test_search_input.mjs tests/test_pcs1.mjs` for UTF-8 input and packet bounds; hosted CI also checks the native input helper with sanitizers.

@@ -5,11 +5,11 @@ The initial home is a white screen with Pocket Search, one query field, and a se
 ## Implemented scope
 
 - Browser search home, clear/focus behavior, UTF-8 query-length errors, and optional button/canvas preview.
-- Native C/LVGL home, physical-button adapter, bounded keyboard, existing Wi-Fi configuration, and a visible service-unconnected state.
+- Native C/LVGL home, physical-button adapter, bounded keyboard, existing Wi-Fi configuration, and visible loading/results/reader/error states.
 - Hiragana, Latin letters, digits, symbols, and kana modifiers; temporary query state only. No kanji conversion, input history, account session, or approval request.
 - Portable, allocation-free input editing with a 96-byte query bound; SSID/password entry uses its own smaller limits and masks the password.
 
-The Rust decoder, PCS1 network adapter, search API, results, and full reader are not connected to this UI. Start reports the missing search service. This is an input/display integration step, not completion of P0, native HTTPS search, or hardware release qualification. See [roadmap](roadmap.md).
+The UI now connects to the Rust search API and native PCS1/Rust adapter. Start submits a query; see [search results, integration and current evidence](search-results.md). The earlier unconnected screenshots below are historical. Complete P0 and hardware release qualification remain pending; see [roadmap](roadmap.md).
 
 ## Native integration
 
@@ -29,7 +29,7 @@ The complete upstream integration and local font/build environment are still ext
 
 Hosted checks cover UTF-8 boundaries, invalid sequences, atomic overflow rejection, whole-code-point deletion, kana modifiers, and browser button state. The current browser was checked for empty/oversized/valid submission, explicit unconnected status, kana selection/deletion, and a return to the empty home.
 
-The target component was compiled in the existing Xtensa firmware. `search_ui` provides **synthetic GUI input** (`home`, directional keys, `a`, `b`, `start`, `select`, `status`) for bounded checks; status exposes mode/query-byte count without query contents or credentials. These diagnostics do not prove physical button presses, native network traffic, panel scanout, USB-video capture, or full E2E.
+The target component was compiled in the existing Xtensa firmware. `search_ui` provides **synthetic GUI input** (`home`, directional keys, `a`, `b`, `start`, `select`, `status`) for bounded checks; status exposes mode/query-byte count without query contents or credentials. Synthetic controls alone do not prove physical button presses, panel scanout, USB-video capture or full E2E. The newer search verification separately records native network requests and Rust decoding.
 
 ## Experimental device verification — 2026-10-10
 

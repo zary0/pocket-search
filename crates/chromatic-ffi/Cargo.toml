@@ -1,0 +1,16 @@
+[package]
+name = "chromatic-ffi"
+version.workspace = true
+edition = "2024"
+rust-version = "1.85"
+license = "GPL-3.0-only"
+publish = false
+
+[lib]
+crate-type = ["rlib", "staticlib"]
+
+[features]
+native = []
+
+[dependencies]
+chromatic-client = { path = "../chromatic-client" }

@@ -22,7 +22,7 @@ Dependency source is downloaded by Cargo rather than vendored here. The companio
 
 The locked Serde packages (`serde`, `serde_core`, and `serde_derive`) share the upstream [MIT text at source commit 7fc3b4c30c94f73a96ebd1553f2b090d928fc3a8](https://github.com/serde-rs/serde/blob/7fc3b4c30c94f73a96ebd1553f2b090d928fc3a8/LICENSE-MIT). That text starts with the permission grant and supplies no copyright-holder/year line; the bundled copies preserve it verbatim rather than inserting an unverified attribution.
 
-`chromatic-client` has no external crate dependencies. It is project-authored and licensed GPL-3.0-only.
+`chromatic-client` has no external crate dependencies. `chromatic-ffi` depends only on that project crate. Both are project-authored and licensed GPL-3.0-only.
 
 ## ModRetro display transport
 
@@ -32,6 +32,6 @@ No official firmware binary, FPGA image, commercial game, device backup, or thir
 
 ## External build and runtime prerequisites
 
-ESP-IDF 5.3, FreeRTOS, LVGL 8.4.0, the Xtensa toolchain, and a suitable licensed font are external prerequisites of the experimental MCU integration. Their source/binaries are not bundled in the current packages. A future native application distribution must inventory the exact linked components and assets, include their required notices, and provide corresponding source/build instructions before release. Do not treat this list as a completed firmware distribution review.
+ESP-IDF 5.3, FreeRTOS, LVGL 8.4.0, the Xtensa C toolchain, esp-rs Rust/LLVM toolchain (installed with espup 0.17.1), Rust core/compiler-builtins used by build-std, and a suitable licensed font are external prerequisites of the experimental MCU integration. Their source/binaries are not bundled in the current packages. A future native application distribution must inventory the exact linked components and assets, include their required notices, and provide corresponding source/build instructions before release. Do not treat this list as a completed firmware distribution review.
 
 Third-party GitHub Actions execute in CI and are not part of the release application. Their upstream source and pinned revisions are recorded in `.github/workflows`; dependency updates keep those pins reviewable.

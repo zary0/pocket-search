@@ -2,11 +2,11 @@
 
 # Pocket Search for ModRetro Chromatic
 
-A small web search and reading application designed around the **ModRetro Chromatic's 160 × 144 display, physical buttons, and ESP32 MCU**. Enter a query on the handheld, select a result, and read the site's text and reduced images over Wi-Fi.
+A small search and reading application designed around the **ModRetro Chromatic's 160 × 144 display, physical buttons, and ESP32 MCU**. The experimental native application searches sample articles and reads their text over Wi-Fi. Collecting real web pages and showing source images are next steps.
 
 Chromatic is the primary platform. Host tools develop the search service and verify the device protocol. The application targets the console's MCU firmware and menu interface; a Game Boy cartridge ROM is not the deployment target for this Wi-Fi reader.
 
-**Status: development foundation, not an installed browser.** Implemented: Rust search core, bounded text packet encoder, allocation-free client decoder, and button action mapping. Pending: crawling, HTTP API, Rust firmware integration, and image display. A separate native C/LVGL platform probe has been installed and measured physically: its selected prototype cuts the draw buffer from 45 to 15 KiB and improves small updates, with a full-redraw latency tradeoff. It does not include the Rust reader or verify browsing. See [measured results](docs/performance.md#physical-lvgl-display-comparison).
+**Status: experimental native sample search and reader.** Implemented: Rust ranking, a bounded read-only HTTP API, browser results/reader, and an ESP32 HTTPS adapter that runs the allocation-free Rust decoder through a C ABI. The development image is tested separately from the future release gate; see [search results and evidence](docs/search-results.md). Crawling real web pages, images, a reproducible complete firmware distribution, and qualified physical E2E remain pending. The measured display prototype uses a 15 KiB draw buffer; see [measured results](docs/performance.md#physical-lvgl-display-comparison).
 
 ## Architecture
 
@@ -23,14 +23,14 @@ Chromatic MCU application
   button input → query → results → paginated text → reduced image
 ```
 
-The handheld owns the interaction and display. A companion service on a computer or server owns crawling, the index, and image preparation. Independent search ranks our own collected documents; it does not require storing a web-scale index on the handheld. The service must be reachable from the device. No public endpoint is deployed yet.
+The handheld owns the interaction and display. A companion service on a computer or server owns crawling, the index, and image preparation. Independent search ranks our own collected documents; it does not require storing a web-scale index on the handheld. The service must be reachable from the device. The current service searches original sample articles. An operator-authorized temporary HTTPS tunnel is used for development verification; no permanent public service is provided.
 
 | Component | Implemented | Still needed |
 | --- | --- | --- |
 | Crawler / extractor | None | Bounded HTTPS fetching, robots.txt, HTML extraction, collection timestamps |
 | Index / ranking | In-memory inverted index, BM25-style ranking, English words and Japanese character/bigram tokens | Persistent corpus, updates, deduplication, quality evaluation |
-| Companion API | Host-side PCS1 text packet encoder | HTTP routes, corpus identity, deployment, real content |
-| Device client | `no_std` decoder/button actions on the host; separate C/LVGL search home and bounded keyboard prototype | Rust Xtensa build, decoder/transport integration, results/reader, physical search E2E |
+| Companion API | Read-only HTTP routes, immutable sample collection, bounded PCS1 and JSON responses | Persistent corpus identity, production deployment, real collected content |
+| Device client | Xtensa Rust decoder with C ABI, native HTTPS/SNTP, keyboard, results and paginated reader | Reproducible full firmware, complete physical-controls/error E2E, battery-only verification |
 | Images | Proposed 128 × 80 RGB565 stripe budget | Fetching, resizing, stripe protocol, display and heap measurements |
 
 ## Designed for the handheld
@@ -52,7 +52,7 @@ The handheld owns the interaction and display. A companion service on a computer
 | Start | Query entry | Query entry |
 | Select | Home | Home |
 
-These result/reader actions are implemented in the client core but are not connected to a physical search flow. A separate native C UI provides the search home and a bounded hiragana/Latin keyboard; its search service remains unconnected. See [search UI status](docs/search-ui.md) and the [browser preview](ui/README.md).
+These actions are connected to the experimental native C/LVGL adapter and Rust decoder. The handheld fetches one result or reader packet over native Wi-Fi; USB diagnostics configure the temporary service origin and queue synthetic controls for development checks. See [search UI status](docs/search-ui.md) and the [browser preview](ui/README.md).
 
 ## Runtime and development environment
 
@@ -61,11 +61,11 @@ These result/reader actions are implemented in the client core but are not conne
 | Host CLI and search core | Native Rust 2024 program. Validated locally on macOS / Apple M4 / aarch64 with Rust and Cargo 1.95.0, and in hosted Ubuntu / x86_64 CI with stable Rust. Other host platforms are not verified |
 | Build and release tooling | Rust/Cargo for builds; Git and Python 3.11+ for version checks, packaging, and release-gate tests. The compiled CLI runs on its matching host OS/architecture |
 | Chromatic development hardware | One previously inspected DevDay unit: ESP32-U4WDH / Xtensa at 160 MHz, 4 MiB flash, a 2 MiB application partition, and no enabled PSRAM. Display: 160 × 144 RGB565 |
-| Native firmware integration target | ESP-IDF 5.3 with FreeRTOS, the existing Wi-Fi/network/TLS stack, and LVGL display integration. Pocket Search's firmware adapter and Rust Xtensa build remain pending |
-| Portable device core | Dependency-free `no_std` Rust with no allocator or OS bindings. It decodes bounded packets and maps buttons; networking, fonts, and rendering belong to the pending firmware adapter |
-| Network/service runtime | A DNS-resolvable HTTPS service reachable from the device, with native clock synchronization and certificate/hostname validation. The companion HTTP API and public endpoint are not implemented yet |
+| Native firmware integration target | ESP-IDF 5.3 with FreeRTOS, the existing Wi-Fi/network/TLS stack, and LVGL display integration. The repository-owned adapter and Rust Xtensa static library compile in an operator-local experimental firmware; complete reproducible integration remains pending |
+| Portable device core | Dependency-free `no_std` Rust with no allocator or OS bindings. It decodes bounded packets and maps buttons; networking and rendering belong to the experimental firmware adapter; complete font coverage remains pending |
+| Network/service runtime | A DNS-resolvable HTTPS service reachable from the device, with native clock synchronization and certificate/hostname validation. The HTTP API is implemented; HTTPS terminates at the development deployment origin. A permanent endpoint remains pending |
 
-The manifest declares Rust 1.85 as its minimum version; that minimum is not separately checked in CI. Current validation uses the toolchains above. The hardware values describe the earlier development unit and firmware, not a tested Pocket Search image or guaranteed resources on every Chromatic. See the [device profile](devices/chromatic/README.md) and [lab requirements](docs/hardware-e2e.md).
+The manifest declares Rust 1.85 as its minimum version; that minimum is not separately checked in CI. Current validation uses the toolchains above. The hardware values describe the earlier development unit and firmware, not guaranteed resources on every Chromatic; experimental search evidence is scoped to that same development unit. See the [device profile](devices/chromatic/README.md) and [lab requirements](docs/hardware-e2e.md).
 
 The initial firmware plan keeps ESP-IDF/FreeRTOS and integrates the small Rust core. A `no_std` core does not make the complete Wi-Fi firmware bare metal. Optimize task stacks, network/TLS buffers, and incremental drawing against real-device measurements before considering a replacement platform; see the [performance trade-offs](docs/performance.md#rtos-footprint-and-bare-metal).
 
@@ -79,6 +79,9 @@ cargo run -- examples/documents.json 'chromatic wifi'
 
 # Build and decode a result packet, then open its first reader page.
 cargo run --example chromatic -- examples/documents.json 'chromatic wifi'
+
+# Start the read-only sample API and browser UI.
+cargo run -- serve examples/documents.json 127.0.0.1:8828
 
 # Run all search and protocol checks.
 cargo test --workspace
@@ -98,7 +101,7 @@ The development Wi-Fi allowed outbound HTTPS but did not establish device-to-com
 
 ## Next milestone
 
-Build the firmware adapter for query entry, result selection, and text reading, together with the bounded companion API. Complete a physical query → result → text test before expanding the browser experience. Then add collected pages and reduced images. Video is deferred until text and still-image behavior is measured on the device.
+Finish reproducible firmware integration and physical-controls/error acceptance for the implemented sample query → result → text loop. Then add collected pages and reduced images. Video is deferred until text and still-image behavior is measured on the device.
 
 See the [architecture](docs/architecture.md), [protocol](docs/chromatic-protocol.md), and [roadmap](docs/roadmap.md). Device credentials, activation codes, NVS dumps, and full-flash backups are not included.
 
@@ -112,7 +115,7 @@ Contributions should keep the device path bounded and justify performance change
 cargo bench --locked --bench performance > performance.json
 ```
 
-The Rust search and decoder timings are host-only measurements on Apple M4. A separate C/LVGL display probe measures native rendering on one physical console; see [display integration](docs/chromatic-rendering.md) and [performance results](docs/performance.md). The CPU-cycle probe has a target compile check; physical Rust decoder execution, Xtensa integration, and profile selection remain pending.
+The Rust search and decoder timings are host-only measurements on Apple M4. A separate C/LVGL display probe measures native rendering on one physical console; see [display integration](docs/chromatic-rendering.md) and [performance results](docs/performance.md). The CPU-cycle probe has a target compile check; the experimental search image now executes the Rust decoder on Xtensa. Decoder cycle/peak-memory measurements and profile comparison remain pending.
 
 ## CI, CD, and versions
 
@@ -126,6 +129,6 @@ See [GitHub governance](docs/github-governance.md) for review ownership, branch-
 
 ## Security
 
-Read the [security policy](SECURITY.md) for supported versions, confidential reporting, disclosure coordination, device credentials, and the service/device/CI trust boundaries. The policy distinguishes implemented packet and release checks from pending networking and crawler protections.
+Read the [security policy](SECURITY.md) for supported versions, confidential reporting, disclosure coordination, device credentials, and the service/device/CI trust boundaries. The policy distinguishes implemented packet and release checks from implemented experimental transport bounds and pending crawler/production protections.
 
 There is no production release or deployed public service yet. GitHub private vulnerability reporting is not currently available for this private repository. Until a confidential channel is enabled and verified, request a private reporting contact without posting vulnerability details, credentials, or device dumps in an issue. The security policy explains the current reporting route and public-release prerequisites.

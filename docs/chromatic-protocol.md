@@ -1,6 +1,6 @@
 # PCS1 text protocol
 
-PCS1 is the implemented host/client text format for the initial Chromatic reader. HTTP transport, firmware rendering, image stripes, links, and collection metadata remain unimplemented.
+PCS1 is the implemented host/client text format for the initial Chromatic reader. The experimental API and native adapter transport and render these packets. Image stripes, links, collected-page metadata and qualified physical E2E remain pending.
 
 ## Limits
 
@@ -47,10 +47,10 @@ IDs are one-based positions in the loaded collection, valid only while it is unc
 
 ## Client behavior
 
-The caller owns and caps the receive buffer. After complete receipt, `Packet::decode` borrows it without copying text or allocating. Keep it alive during drawing/action dispatch, then discard it on the next screen. Reject malformed packets before changing the screen. Timeouts, loading, errors, and rendering belong to the pending adapter.
+The caller owns and caps the receive buffer. After complete receipt, `Packet::decode` borrows it without copying text or allocating. Keep it alive during drawing/action dispatch, then discard it on the next screen. Reject malformed packets before changing the screen. The native adapter supplies bounded HTTPS receipt, loading/errors, request correlation and rendering. Its localized unsafe C ABI is separate from the safe decoder core.
 
-Result up/down and reader left/right navigate only within bounds. A opens a nonzero result ID; B goes back, Start requests query entry, and Select requests home. These are actions, not network requests or physical device operations.
+Result up/down and reader left/right navigate only within bounds. A opens a nonzero result ID; B goes back, Start requests query entry, and Select requests home. The core returns actions; the native adapter turns them into Wi-Fi requests and GUI updates.
 
 ## Verification boundary
 
-Host tests round-trip Japanese text across reader pages, enforce row/packet limits, map navigation, and reject truncated, malformed, oversized, trailing, and invalid-UTF-8 packets. They do not verify the target compiler, physical fonts, TLS memory, or Wi-Fi transport.
+Host tests round-trip Japanese text across reader pages, enforce row/packet limits, map navigation, and reject truncated, malformed, oversized, trailing, and invalid-UTF-8 packets. These host tests do not establish target behavior. Separate [experimental evidence](search-results.md) records actual Xtensa decoding and native Wi-Fi transport with synthetic controls; physical-buttons/USB-video E2E and peak TLS memory remain pending.

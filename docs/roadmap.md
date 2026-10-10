@@ -17,29 +17,29 @@ Work in this order. During P0, fix bounds, transport validation, layout, crashes
 
 ### 1. Bounded companion API — start here
 
-- [ ] Expose the existing Rust index and PCS1 encoder through `GET /v1/chromatic/search?q=...&result=0` and `GET /v1/chromatic/page?id=...&page=0`.
-- [ ] Load one immutable, original English/Japanese fixture collection; keep document IDs stable for the experiment and mark fixture content visibly.
-- [ ] Enforce the 96-byte decoded UTF-8 query limit and 512-byte packet limit; reject invalid IDs/pages, return honest empty results, and bound request time/concurrency with explicit response lengths.
+- [x] Expose the existing Rust index and PCS1 encoder through `GET /v1/chromatic/search?q=...&result=0` and `GET /v1/chromatic/page?id=...&page=0`.
+- [x] Load one immutable, original English/Japanese fixture collection; keep document IDs stable for the experiment and mark fixture content visibly.
+- [x] Enforce the 96-byte decoded UTF-8 query limit and 512-byte packet limit; reject invalid IDs/pages, return honest empty results, and bound request time/concurrency with explicit response lengths.
 - [ ] Add deterministic failure cases and test hooks for timeouts, malformed/oversized packets, and request correlation. Keep query/body logging disabled.
-- [ ] Make a certificate-validated HTTPS origin reachable from the actual device network. Verify this before relying on a local service: earlier tests did not establish device-to-computer LAN reachability.
+- [x] Make a certificate-validated HTTPS origin reachable from the actual device network. Verify this before relying on a local service: earlier tests did not establish device-to-computer LAN reachability.
 
 **Completion:** known queries produce query-dependent PCS1 results and complete reader pages through the service, with compatible decoding and deterministic errors. This API check alone is not a physical-device pass.
 
 ### 2. Reproducible native application and adapter
 
-- [ ] Build `chromatic-client` for the actual ESP32 Xtensa toolchain and link it through a defined C ABI or native Rust integration. A host `no_std` check does not meet this requirement.
+- [x] Build `chromatic-client` for the actual ESP32 Xtensa toolchain and link it through a defined C ABI or native Rust integration. A host `no_std` check does not meet this requirement.
 - [ ] Build the Pocket Search application from repository-controlled source and documented, licensed dependencies, including the display/button/font adapter and build configuration. An operator-local experimental image is not the application deliverable.
-- [ ] Reuse ESP-IDF/FreeRTOS, native Wi-Fi, SNTP, certificate/hostname validation, and the measured display components. Start with the 48-row graphics-optimized prototype and verify it with the reader workload; retain the 16-row alternative for measured memory constraints.
-- [ ] Correct the retained LVGL tick-unit issue and verify application timer/input behavior separately from the recorded display comparison.
-- [ ] Keep one request in flight; cap the receive buffer before writing, decode only a complete packet, and retain its borrowed data until drawing/action dispatch finishes.
-- [ ] Produce an application-only image within 2 MiB, with exact source/version/image identity and the established recovery, settings-preservation, and installation verification procedure.
+- [x] Reuse ESP-IDF/FreeRTOS, native Wi-Fi, SNTP, certificate/hostname validation, and the measured display components. Start with the 48-row graphics-optimized prototype and verify it with the reader workload; retain the 16-row alternative for measured memory constraints.
+- [x] Correct the retained LVGL tick-unit issue and verify application timer/input behavior separately from the recorded display comparison.
+- [x] Keep one request in flight; cap the receive buffer before writing, decode only a complete packet, and retain its borrowed data until drawing/action dispatch finishes.
+- [x] Produce an application-only image within 2 MiB, with exact source/version/image identity and the established recovery, settings-preservation, and installation verification procedure.
 
 **Completion:** the exact image runs the Rust decoder on the intended MCU and renders a verified packet through the real font/display adapter. This integration check does not yet complete the search flow.
 
 ### 3. Physical input and text interaction
 
-- [ ] Implement a bounded on-device keyboard with editing, deletion, and submit. State the initial supported character set explicitly; retain UTF-8 limits as input support expands.
-- [ ] Connect buttons to query entry, result up/down, A to open, reader left/right, B to return, Start for query entry, and Select to go home.
+- [x] Implement a bounded on-device keyboard with editing, deletion, and submit. State the initial supported character set explicitly; retain UTF-8 limits as input support expands.
+- [x] Connect buttons to query entry, result up/down, A to open, reader left/right, B to return, Start for query entry, and Select to go home.
 - [ ] Show loading, no results, timeout, disconnected, and invalid-response states without blocking controls or inventing content.
 - [ ] Display title, seven body rows, and navigation hints without overlap. Inspect English/Japanese fixture text physically, with visible unsupported-glyph fallback.
 - [ ] Preserve the complete stored body across pagination, enforce first/last-page boundaries, and keep only temporary navigation state for returning to results.
@@ -91,13 +91,13 @@ Bookmarks, browsing history, launch-time reading restoration, and the Codex appr
 
 ## Completed enablers — not product completion
 
-The [search-first UI](search-ui.md) now has a browser preview and separate native C home/input prototype. API/Rust decoder/reader integration and physical search acceptance remain P0 work.
+The [search-first UI](search-ui.md) now connects to the bounded API and Xtensa Rust decoder. [Experimental evidence](search-results.md) verifies native Wi-Fi search, reader navigation, and user-confirmed LCD/A/Left/Right/B behavior. Full reproducible firmware, error/mixed-language acceptance and qualified physical E2E remain P0 work. Checked image/build items describe this local experiment, not release completion.
 
 - [x] Chromatic-first MCU/service architecture, English documentation, and GPL-3.0-only contribution/security guidance.
 - [x] Rust search/ranking, bounded text encoding, allocation-free `no_std` decoding, and button action mapping with host validation.
 - [x] Repeatable host timing/allocation measurements and compact bounded search selection.
-- [x] Target compilation of the ESP32 CPU-cycle/heap probe; native Rust decoder execution remains a P0 task.
+- [x] Target compilation of the ESP32 CPU-cycle/heap probe; native Rust decoder execution is now verified in the experimental search image.
 - [x] Physical C/LVGL rendering measurements, 16/48-row display transports, and an opt-in graphics compiler experiment. These do not verify the reader or native Wi-Fi search.
 - [x] `develop` → `main` → annotated `vX.Y.Z` version/package policy and CI/CD orchestration requiring physical evidence before release.
 
-The application, API, collected corpus, and complete physical search E2E are still pending. Keep [implementation status](../README.md) accurate as each acceptance boundary is met.
+The complete reproducible application, collected real-web corpus, and qualified physical search E2E are still pending; the experimental sample API/reader loop is implemented. Keep [implementation status](../README.md) accurate as each acceptance boundary is met.

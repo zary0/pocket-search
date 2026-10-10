@@ -17,6 +17,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         );
         return Ok(());
     }
+    if args.first().is_some_and(|arg| arg == "serve") {
+        if args.len() != 3 {
+            return Err("Usage: pocket-search serve <documents.json> <bind-address:port>".into());
+        }
+        let index = pocket_search::server::load(&args[1])?;
+        pocket_search::server::serve(index, &args[2])?;
+        return Ok(());
+    }
     if args.len() != 2 {
         return Err("Usage: pocket-search <documents.json> <query>".into());
     }
