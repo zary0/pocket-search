@@ -3,8 +3,14 @@
 #include <stddef.h>
 #include <stdint.h>
 
-enum { POCKET_WIDTH = 160, POCKET_HEIGHT = 144, POCKET_BAND_ROWS = 16,
-       POCKET_SPI_CHUNK_BYTES = 1024, POCKET_BAND_MAX_TRANSFERS = 5,
+#ifndef POCKET_BAND_ROWS
+#define POCKET_BAND_ROWS 16
+#endif
+_Static_assert(POCKET_BAND_ROWS == 16 || POCKET_BAND_ROWS == 48,
+               "Measured band heights are 16 and 48 rows");
+enum { POCKET_WIDTH = 160, POCKET_HEIGHT = 144,
+       POCKET_SPI_CHUNK_BYTES = 1024,
+       POCKET_BAND_MAX_TRANSFERS = POCKET_BAND_ROWS * 320 / 1024,
        POCKET_BAND_BUFFER_BYTES = POCKET_WIDTH * POCKET_BAND_ROWS * 2 };
 typedef struct { uint32_t address, offset, bytes; } pocket_band_transfer_t;
 
