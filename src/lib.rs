@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod chromatic;
+pub mod dom;
 pub mod server;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -33,6 +34,7 @@ pub struct SearchIndex {
     postings: BTreeMap<String, Vec<Posting>>,
     lengths: Vec<f64>,
     average_length: f64,
+    dom_documents: BTreeMap<usize, dom::DomDocument>,
 }
 
 struct Posting {
@@ -108,6 +110,7 @@ impl SearchIndex {
             postings,
             lengths,
             average_length,
+            dom_documents: BTreeMap::new(),
         }
     }
 

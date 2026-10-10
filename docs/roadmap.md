@@ -11,7 +11,7 @@ The top priority is a working handheld search and reading loop: **enter a query 
 | P2 | View a site's reduced image and return to text | Text flow works; image transfer fits measured TLS/display memory budgets |
 | P3 | Improve input, reading quality, search relevance, and performance | Improvements are evaluated against the working device flow |
 
-Work in this order. During P0, fix bounds, transport validation, layout, crashes, and memory/responsiveness failures needed to finish the loop. Further standalone benchmarks, visual polish, a launcher/app system, and OS replacement must not displace that implementation. Stable publication remains subject to the physical release gate at every priority.
+Keep P0 acceptance as the release priority. The operator-requested DOM/image experiment implements selected P1/P2 foundations early; it does not waive P0 or complete real-web collection. During P0, fix bounds, transport validation, layout, crashes, and memory/responsiveness failures needed to finish the loop. Further standalone benchmarks, visual polish, a launcher/app system, and OS replacement must not displace that implementation. Stable publication remains subject to the physical release gate at every priority.
 
 ## P0 — First usable native search and reader
 
@@ -62,7 +62,7 @@ P0 uses controlled fixtures to prove integration. It must not be presented as se
 ## P1 — Real web content and book text
 
 - [ ] Add a public-HTTPS crawler/extractor for explicit seeds and allowed domains. Respect robots.txt; bound page count, depth, bytes, parsing time, redirects, and per-host request rate; validate destinations before fetching.
-- [ ] Extract actual title, complete text, source URL, links, image references, and collection time. Do not execute fetched scripts or substitute invented content for unsupported sites.
+- [ ] Collect actual public pages and collection time. Registered local HTML now provides title, complete extracted text, source URL, links and image references; live-page acquisition/provenance remains pending. Do not execute fetched scripts or substitute invented content for unsupported sites.
 - [ ] Add deduplication, persistence, and corpus-generation checks before live index replacement so a result ID cannot open an unrelated document.
 - [ ] Add a bounded source/details view for complete URLs and collection information that do not fit a result screen.
 - [ ] Import user-provided or redistributable plain-text books into the companion, with bounded file/page sizes and source metadata. Reuse the reader; device requests refer to registered document IDs rather than arbitrary filesystem paths.
@@ -74,11 +74,13 @@ P0 uses controlled fixtures to prove integration. It must not be presented as se
 ## P2 — Source images
 
 - [ ] Fetch registered images referenced by collected documents, applying the crawler's origin/redirect/size protections, and resize them on the companion.
-- [ ] Define bounded RGB565 stripe headers, ordering, cancellation, and incomplete-transfer behavior for an image up to 128 × 80 pixels.
-- [ ] Integrate incoming image stripes with the display driver's full-width transfer alignment without another permanent full framebuffer.
+- [x] Define and implement PCI1 RGB565 stripes, CRC/order/document/page validation, cooperative cancellation and incomplete-transfer rejection for an image up to 128 × 80 pixels.
+- [x] Display registered image stripes through LVGL and the bounded band driver using one temporary <=20 KiB image cache; release it when leaving the image.
 - [ ] Display an actual source image and return to text with B; measure TLS-active peak memory, responsiveness, and interrupted-transfer recovery.
 
 **Completion:** an image from the selected source displays correctly on the physical console within the measured memory budget, and failure/back navigation works.
+
+Registered local PNG/JPEG resizing and two original source images have native Wi-Fi/render-buffer verification; see [DOM/image evidence](dom-images.md). Actual network collection, physical interruption acceptance and TLS allocator peak tracing remain pending.
 
 ## P3 — Quality and measured improvements
 

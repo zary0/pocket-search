@@ -13,7 +13,7 @@ pub enum Error {
     InvalidPacket,
 }
 
-fn wrap(text: &str) -> Vec<String> {
+pub(crate) fn wrap(text: &str) -> Vec<String> {
     let mut lines = Vec::new();
     let mut line = String::new();
     let mut used = 0;
@@ -65,13 +65,14 @@ fn title(text: &str) -> String {
     value
 }
 
-fn encode(
+pub(crate) fn encode(
     kind: Kind,
     document_id: usize,
     page_index: usize,
     page_count: usize,
     heading: &str,
     lines: &[String],
+    link_target: u32,
 ) -> Result<Vec<u8>, Error> {
     let document_id = u32::try_from(document_id).map_err(|_| Error::NotFound)?;
     let page_index = u16::try_from(page_index).map_err(|_| Error::TooManyPages)?;
@@ -89,6 +90,9 @@ fn encode(
     bytes[8..12].copy_from_slice(&document_id.to_le_bytes());
     bytes[12..14].copy_from_slice(&page_index.to_le_bytes());
     bytes[14..16].copy_from_slice(&page_count.to_le_bytes());
+    if kind == Kind::Link {
+        bytes.extend_from_slice(&link_target.to_le_bytes());
+    }
     bytes.extend_from_slice(heading.as_bytes());
     for line in lines {
         bytes.push(u8::try_from(line.len()).map_err(|_| Error::InvalidPacket)?);
@@ -118,6 +122,7 @@ impl SearchIndex {
                 1,
                 "Pocket Search",
                 &["No results".into()],
+                0,
             );
         }
         let hit = hits.get(result_index).ok_or(Error::NotFound)?;
@@ -133,6 +138,7 @@ impl SearchIndex {
             hits.len(),
             &hit.title,
             &lines,
+            0,
         )
     }
 
@@ -140,6 +146,18 @@ impl SearchIndex {
     pub fn chromatic_page(&self, document_id: usize, page_index: usize) -> Result<Vec<u8>, Error> {
         let index = document_id.checked_sub(1).ok_or(Error::NotFound)?;
         let document = self.documents.get(index).ok_or(Error::NotFound)?;
+        if let Some(dom) = self.dom_documents.get(&document_id) {
+            let scene = dom.pages.get(page_index).ok_or(Error::NotFound)?;
+            return encode(
+                scene.kind,
+                document_id,
+                page_index,
+                dom.pages.len(),
+                &document.title,
+                &scene.lines,
+                scene.link_target,
+            );
+        }
         let lines = wrap(&document.body);
         let page_count = lines.len().div_ceil(TEXT_ROWS);
         if page_count > u16::MAX as usize {
@@ -156,6 +174,7 @@ impl SearchIndex {
             page_count,
             &document.title,
             page,
+            0,
         )
     }
 }

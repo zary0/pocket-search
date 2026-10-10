@@ -1,0 +1,18 @@
+{
+  "root": "..",
+  "pages": [
+    {
+      "url": "https://example.invalid/dom",
+      "html": "examples/fixtures/dom.html",
+      "images": {
+        "/logo.png": "assets/pocket-search-logo.png",
+        "/rgb.png": "examples/fixtures/rgb.png"
+      }
+    },
+    {
+      "url": "https://example.invalid/reading",
+      "html": "examples/fixtures/reading.html",
+      "images": {}
+    }
+  ]
+}

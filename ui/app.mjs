@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-only
 import {groups,bytes,key,tail,QUERY_BYTES} from './input.mjs';
 import {decodePacket} from './pcs1.mjs';
+import {decodeImage} from './images.mjs';
 const $=id=>document.getElementById(id),ctx=$('screen').getContext('2d');
-const state={query:'',mode:'home',script:0,group:0,letter:0,choosing:false,results:[],selected:0,packet:null,seq:0,controller:null,busy:false,error:''};
+const state={query:'',mode:'home',script:0,group:0,letter:0,choosing:false,results:[],selected:0,packet:null,seq:0,controller:null,busy:false,error:'',document:0,back:[],image:null};
 function box(x,y,w,h,r,color,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=color;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke();}}
 function text(value,x,y,color='#202124',size=12){ctx.font=`${size}px Arial, "Hiragino Sans", sans-serif`;ctx.fillStyle=color;ctx.fillText(value,x,y+size);}
 function cancel(){state.seq++;state.controller?.abort();state.controller=null;state.busy=false;}
-function home(){cancel();state.mode='home';state.packet=null;state.results=[];state.error='';$('notice').textContent='オリジナルのサンプル記事を検索できます';$('notice').classList.remove('error');render();}
+function home(){cancel();state.mode='home';state.packet=null;state.results=[];state.back=[];state.image=null;state.error='';$('notice').textContent='オリジナルのサンプル記事を検索できます';$('notice').classList.remove('error');render();}
 function render(){
   ctx.fillStyle='#fff';ctx.fillRect(0,0,160,144);
   if(state.mode==='home'){
@@ -20,8 +21,10 @@ function render(){
     text('Select:ABC Start:OK',8,129,'#70757a',10);
   }else if(state.busy){text('Pocket Search',8,4);text('Loading...',8,38);text('B:Cancel',8,129,'#70757a',10);}
   else if(state.packet&&['results','reader'].includes(state.mode)){
-    const p=state.packet;text(`Samples ${p.page+1}/${p.count}`,8,3,'#70757a',10);text(p.title,8,18,'#1a73e8',11);
-    p.lines.forEach((line,i)=>text(line,8,35+i*13,'#202124',11));text(state.mode==='reader'?'Left/Right B:Results':'Up/Down A:Read B:Back',8,129,'#70757a',9);
+    const p=state.packet;text(`${p.page+1}/${p.count}`,8,3,'#70757a',10);text(p.title,8,18,'#1a73e8',11);
+    if(state.mode==='reader'&&state.image){const image=state.image,off=document.createElement('canvas');off.width=image.width;off.height=image.height;off.getContext('2d').putImageData(new ImageData(image.rgba,image.width,image.height),0,0);ctx.drawImage(off,(160-image.width)/2,34+(80-image.height)/2);text(p.lines[0]||'',8,116,'#202124',10);}
+    else p.lines.forEach((line,i)=>text(line,8,35+i*13,p.kind===4||p.kind===5?'#1a73e8':'#202124',11));
+    text(state.mode==='reader'?(p.kind===4&&p.target?'A:Open Left/Right B':'Left/Right B:Back'):'Up/Down A:Read B:Back',8,129,'#70757a',9);
   }else{text('Pocket Search',8,4);text(state.error?'Connection error':'Enter a query',8,38);text('B:Search home',8,129,'#70757a',10);}
   $('screen').setAttribute('aria-label',`本体プレビュー。${state.mode}。${state.packet?.title||tail(state.query)}。${state.packet?.lines.join(' ')||''}`);
   $('clear').hidden=!$('query').value;document.body.classList.toggle('has-results',['results','reader','loading'].includes(state.mode));
@@ -35,13 +38,13 @@ async function fetchBounded(url,limit,signal){
   const out=new Uint8Array(total);let at=0;for(const part of parts){out.set(part,at);at+=part.length;}return out;
 }
 async function request(work){cancel();const seq=state.seq,controller=new AbortController();state.controller=controller;state.busy=true;state.error='';$('notice').textContent='';$('notice').classList.remove('error');render();const timer=setTimeout(()=>controller.abort(),12000);
-  try{await work(controller.signal,seq);}catch(error){if(seq!==state.seq)return;state.error='検索サービスに接続できませんでした。再試行してください。';$('notice').textContent=state.error;$('notice').classList.add('error');if(!state.results.length)state.mode='notice';}
-  finally{clearTimeout(timer);if(seq===state.seq){state.busy=false;state.controller=null;render();}}
+  let completed=false;try{await work(controller.signal,seq);completed=true;}catch(error){if(seq!==state.seq)return;state.error='検索サービスに接続できませんでした。再試行してください。';$('notice').textContent=state.error;$('notice').classList.add('error');if(!state.results.length)state.mode='notice';}
+  finally{clearTimeout(timer);if(seq===state.seq){state.busy=false;state.controller=null;render();}}return completed&&seq===state.seq;
 }
-async function getPacket(url,signal,expected){const p=decodePacket((await fetchBounded(url,512,signal)).buffer);if(p.kind!==expected.kind||p.page!==expected.page||(expected.id!==undefined&&p.id!==expected.id))throw Error('Response mismatch');return p;}
+async function getPacket(url,signal,expected){const p=decodePacket((await fetchBounded(url,512,signal)).buffer);if((expected.kind===2?![2,3,4,5].includes(p.kind):p.kind!==expected.kind)||p.page!==expected.page||(expected.id!==undefined&&p.id!==expected.id))throw Error('Response mismatch');return p;}
 function resultNodes(){const list=$('result-list');list.replaceChildren();state.results.forEach((hit,i)=>{const item=document.createElement('li'),source=document.createElement('p'),button=document.createElement('button'),snippet=document.createElement('p');source.className='result-source';source.textContent=hit.url;button.className='result-title';button.textContent=hit.title;button.onclick=()=>open(i);snippet.className='result-snippet';snippet.textContent=hit.snippet;item.append(source,button,snippet);list.append(item);});}
 async function search(){const q=$('query').value.trim();if(!q||bytes(q)>QUERY_BYTES){cancel();state.mode='notice';state.error='';state.results=[];$('notice').textContent=!q?'検索語を入力してください。':'検索語はUTF-8で96バイト以内にしてください。';$('notice').classList.add('error');render();return;}
-  state.query=q;state.selected=0;state.results=[];state.packet=null;state.mode='loading';
+  state.query=q;state.selected=0;state.results=[];state.packet=null;state.back=[];state.image=null;state.mode='loading';
   await request(async(signal,seq)=>{const raw=await fetchBounded(`/v1/search?q=${encodeURIComponent(q)}`,16384,signal),data=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw));
     if(data.sample!==true||!Array.isArray(data.results)||data.results.length>10||data.results.some(h=>!Number.isInteger(h.document_id)||h.document_id<1||h.document_id>256||typeof h.title!=='string'||typeof h.url!=='string'||typeof h.snippet!=='string'))throw Error('Invalid results');
     const p=await getPacket(`/v1/chromatic/search?q=${encodeURIComponent(q)}&result=0`,signal,{kind:1,page:0,id:data.results[0]?.document_id??0});
@@ -50,15 +53,31 @@ async function search(){const q=$('query').value.trim();if(!q||bytes(q)>QUERY_BY
   });
 }
 async function selectResult(i){if(i<0||i>=state.results.length)return;await request(async(signal,seq)=>{const p=await getPacket(`/v1/chromatic/search?q=${encodeURIComponent(state.query)}&result=${i}`,signal,{kind:1,page:i,id:state.results[i].document_id});if(seq!==state.seq)return;state.selected=i;state.packet=p;state.mode='results';});}
-async function open(i,page=0){const hit=state.results[i];if(!hit)return;await request(async(signal,seq)=>{const p=await getPacket(`/v1/chromatic/page?id=${hit.document_id}&page=${page}`,signal,{kind:2,page,id:hit.document_id});if(seq!==state.seq)return;state.selected=i;state.packet=p;state.mode='reader';$('reader-title').textContent=hit.title;$('reader-source').textContent=hit.url;$('reader-text').textContent=p.lines.join('\n');$('reader-page').textContent=`${p.page+1} / ${p.count}`;$('reader-prev').disabled=p.page===0;$('reader-next').disabled=p.page+1===p.count;});}
+async function open(i,page=0){const hit=state.results[i];if(!hit)return;state.selected=i;state.back=[];await showDocument(hit.document_id,page);}
+function readingNodes(p,meta,image){
+  const area=$('reader-text');area.replaceChildren();
+  if(p.kind===3){const figure=document.createElement('figure'),caption=document.createElement('figcaption');caption.textContent=p.lines.join(' ');if(image){const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;canvas.setAttribute('role','img');canvas.setAttribute('aria-label',caption.textContent||'Image');canvas.getContext('2d').putImageData(new ImageData(image.rgba,image.width,image.height),0,0);figure.append(canvas);}else{const unavailable=document.createElement('p');unavailable.textContent='画像が登録されていません';figure.append(unavailable);}figure.append(caption);area.append(figure);return;}
+  if(p.kind===4){const label=document.createElement('p');label.textContent=p.lines.join(' ');area.append(label);if(p.target){const button=document.createElement('button');button.textContent='リンク先の記事を読む';button.onclick=followLink;area.append(button);}else{const note=document.createElement('p');note.className='source-only';note.textContent='このリンク先は未収録です';area.append(note);}return;}
+  const tag=meta.style==='heading'?`h${meta.heading_level}`:meta.style==='pre'?'pre':meta.style==='quote'?'blockquote':'p',element=document.createElement(tag);element.textContent=p.lines.join('\n');
+  if(meta.style==='list'){const ul=document.createElement('ul'),li=document.createElement('li');li.textContent=p.lines.join(' ').replace(/^- /,'');ul.append(li);area.append(ul);}else area.append(element);
+}
+async function showDocument(id,page=0){return request(async(signal,seq)=>{
+  const p=await getPacket(`/v1/chromatic/page?id=${id}&page=${page}`,signal,{kind:2,page,id});
+  const raw=await fetchBounded(`/v1/dom?id=${id}&page=${page}`,8192,signal),meta=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(raw));
+  if(meta.document_id!==id||meta.page_index!==page||meta.page_count!==p.count||meta.kind!==p.kind||typeof meta.title!=='string'||typeof meta.url!=='string'||!['paragraph','heading','pre','quote','list','caption','image','link','missing-image'].includes(meta.style)||meta.link_target!==p.target||(p.kind===5&&(!Number.isInteger(meta.heading_level)||meta.heading_level<1||meta.heading_level>6)))throw Error('DOM mismatch');
+  let image=null;if(p.kind===3&&meta.image_width){image=decodeImage(await fetchBounded(`/v1/chromatic/image?id=${id}&page=${page}`,20720,signal),id,page);if(image.width!==meta.image_width||image.height!==meta.image_height)throw Error('Image mismatch');}
+  if(seq!==state.seq)return;state.document=id;state.packet=p;state.image=image;state.mode='reader';$('reader-title').textContent=meta.title;$('reader-source').textContent=meta.url;readingNodes(p,meta,image);$('reader-back').textContent=state.back.length?'前の記事へ戻る':'検索結果へ戻る';$('reader-page').textContent=`${p.page+1} / ${p.count}`;$('reader-prev').disabled=p.page===0;$('reader-next').disabled=p.page+1===p.count;
+});}
+async function followLink(){const p=state.packet;if(state.busy||state.mode!=='reader'||!p?.target)return;if(state.back.length>=4){$('notice').textContent='リンクは4段階まで開けます。戻ってから再試行してください。';return;}const previous={id:state.document,page:p.page};if(await showDocument(p.target)){state.back.push(previous);$('reader-back').textContent='前の記事へ戻る';}}
+async function back(){if(state.busy){home();return;}if(state.back.length){const previous=state.back.at(-1);if(await showDocument(previous.id,previous.page)){state.back.pop();$('reader-back').textContent=state.back.length?'前の記事へ戻る':'検索結果へ戻る';}}else selectResult(state.selected);}
 function press(button){if(state.busy){if(['b','select','start'].includes(button)){home();if(button==='start'){state.mode='keyboard';render();}}return;}
   if(['results','reader'].includes(state.mode)){const p=state.packet;if(button==='select'){home();return;}if(button==='start'){cancel();state.mode='keyboard';state.script=0;state.group=0;state.choosing=false;render();return;}
-    if(button==='b'){if(state.mode==='reader')selectResult(state.selected);else home();return;}
-    if(state.mode==='results'){if(button==='up')selectResult(state.selected-1);if(button==='down')selectResult(state.selected+1);if(button==='a')open(state.selected);}else{if(button==='left'&&p.page>0)open(state.selected,p.page-1);if(button==='right'&&p.page+1<p.count)open(state.selected,p.page+1);}return;
+    if(button==='b'){if(state.mode==='reader')back();else home();return;}
+    if(state.mode==='results'){if(button==='up')selectResult(state.selected-1);if(button==='down')selectResult(state.selected+1);if(button==='a')open(state.selected);}else{if(button==='a')followLink();if(button==='left'&&p.page>0)showDocument(state.document,p.page-1);if(button==='right'&&p.page+1<p.count)showDocument(state.document,p.page+1);}return;
   }
   const action=key(state,button);$('query').value=state.query;if(action==='search')search();else if(action==='wifi'){$('notice').textContent='Wi-Fi設定は本体のSelectから開けます。';$('notice').classList.remove('error');}render();
 }
 $('query').addEventListener('input',()=>{cancel();state.query=$('query').value;state.mode='home';state.packet=null;state.results=[];$('notice').classList.remove('error');$('notice').textContent=bytes(state.query)>QUERY_BYTES?'検索語はUTF-8で96バイト以内にしてください。':'オリジナルのサンプル記事を検索できます';render();});
 $('search-form').addEventListener('submit',e=>{e.preventDefault();search();});$('clear').onclick=()=>{$('query').value='';state.query='';home();$('query').focus();};
-$('preview-open').onclick=()=>{$('preview').showModal();render();};$('preview-close').onclick=()=>{$('preview').close();};$('reader-back').onclick=()=>selectResult(state.selected);$('reader-prev').onclick=()=>press('left');$('reader-next').onclick=()=>press('right');
+$('preview-open').onclick=()=>{$('preview').showModal();render();};$('preview-close').onclick=()=>{$('preview').close();};$('reader-back').onclick=back;$('reader-prev').onclick=()=>press('left');$('reader-next').onclick=()=>press('right');
 document.querySelectorAll('[data-key]').forEach(b=>b.onclick=()=>press(b.dataset.key));$('screen').onkeydown=e=>{const map={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',z:'a',x:'b',Enter:'start',Shift:'select'};if(map[e.key]){e.preventDefault();press(map[e.key]);}};render();

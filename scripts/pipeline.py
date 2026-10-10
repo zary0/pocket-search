@@ -136,7 +136,7 @@ def candidate(root, output, binary, target, tag=None):
     binary_name = prefix + "-" + target + ".tar.gz"
     timestamp = int(git(root, "show", "-s", "--format=%ct", "HEAD"))
     documentation = ["LICENSE", "NOTICE.md", "THIRD_PARTY_NOTICES.md", "README.md", "CONTRIBUTING.md", "SECURITY.md", "devices/chromatic/README.md"]
-    documentation.extend(name for name in git(root, "ls-files", "-z", "--", "docs", "assets", "ui", "third_party/licenses").split("\0") if name)
+    documentation.extend(name for name in git(root, "ls-files", "-z", "--", "docs", "assets", "ui", "examples", "third_party").split("\0") if name)
     with (output / binary_name).open("wb") as stream, gzip.GzipFile(filename="", fileobj=stream, mode="wb", mtime=timestamp) as compressed, tarfile.open(fileobj=compressed, mode="w") as archive:
         for name, path in [("pocket-search", binary), *[(name, root / name) for name in documentation]]:
             require(path.is_file() and not path.is_symlink(), "Missing or symlinked package file: " + name)

@@ -1,6 +1,6 @@
-# PCS1 text protocol
+# PCS1 reading-scene protocol
 
-PCS1 is the implemented host/client text format for the initial Chromatic reader. The experimental API and native adapter transport and render these packets. Image stripes, links, collected-page metadata and qualified physical E2E remain pending.
+PCS1 is the implemented host/client text format for the initial Chromatic reader. The experimental API and native adapter transport and render these packets. Kinds 3–5 add image descriptors, registered links and headings. [PCI1](dom-images.md#pci1-image-stripes) carries prepared image pixels separately. Live collected-page provenance and qualified physical E2E remain pending.
 
 ## Limits
 
@@ -23,7 +23,7 @@ The header is 20 bytes. Multibyte integers are little-endian.
 | Offset | Bytes | Field |
 | --- | --- | --- |
 | 0 | 4 | ASCII magic `PCS1` |
-| 4 | 1 | Kind: `1` result, `2` reader |
+| 4 | 1 | Kind: `1` result, `2` text, `3` image descriptor, `4` link, `5` heading |
 | 5 | 1 | Flags: bit 0 previous, bit 1 next; other bits zero |
 | 6 | 1 | Body line count, 0–7 |
 | 7 | 1 | Title byte length |
@@ -33,9 +33,9 @@ The header is 20 bytes. Multibyte integers are little-endian.
 | 16 | 2 | Payload byte length, excluding header |
 | 18 | 2 | Reserved, must be zero |
 
-Flags must agree with index and count. Reader IDs must be nonzero. Result ID zero is an empty-result screen with no open action.
+Flags must agree with index and count. All non-result IDs must be nonzero. Result ID zero is an empty-result screen with no open action.
 
-Payload: UTF-8 title, then each body line as `one-byte length + UTF-8 bytes`. No terminators or padding. The supplied slice must equal the payload length plus 20, and parsing must consume it exactly.
+Payload: kind 4 starts with a four-byte little-endian registered target ID (0 = unavailable, 1–256 = registered document), included in the payload length. Other kinds have no target prefix. Then UTF-8 title, then each body line as `one-byte length + UTF-8 bytes`. No terminators or padding. The supplied slice must equal the payload length plus 20, and parsing must consume it exactly.
 
 ## Host behavior
 
@@ -49,8 +49,10 @@ IDs are one-based positions in the loaded collection, valid only while it is unc
 
 The caller owns and caps the receive buffer. After complete receipt, `Packet::decode` borrows it without copying text or allocating. Keep it alive during drawing/action dispatch, then discard it on the next screen. Reject malformed packets before changing the screen. The native adapter supplies bounded HTTPS receipt, loading/errors, request correlation and rendering. Its localized unsafe C ABI is separate from the safe decoder core.
 
-Result up/down and reader left/right navigate only within bounds. A opens a nonzero result ID; B goes back, Start requests query entry, and Select requests home. The core returns actions; the native adapter turns them into Wi-Fi requests and GUI updates.
+Result up/down and reader left/right navigate only within bounds. A opens a nonzero result ID or registered link target; B goes back, Start requests query entry, and Select requests home. The core returns actions; the native adapter turns them into Wi-Fi requests and GUI updates.
 
 ## Verification boundary
 
 Host tests round-trip Japanese text across reader pages, enforce row/packet limits, map navigation, and reject truncated, malformed, oversized, trailing, and invalid-UTF-8 packets. These host tests do not establish target behavior. Separate [experimental evidence](search-results.md) records actual Xtensa decoding and native Wi-Fi transport with synthetic controls; physical-buttons/USB-video E2E and peak TLS memory remain pending.
+
+The current C ABI uses a 48-byte `PS_View` including the link target, and a 20-byte `PS_ImageView` for borrowed stripe offsets. Build both sides together; the earlier text-only image used a 44-byte view. Unknown kinds fail closed in older clients. Kind 3 is a scene descriptor, not pixels: fetch `/v1/chromatic/image` for that exact document/page and reject incomplete or mismatched image streams.
