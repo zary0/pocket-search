@@ -18,9 +18,13 @@ cargo check --locked -p chromatic-client
 cargo bench --locked --bench performance
 python3 scripts/pipeline.py version
 python3 -m unittest discover -s tests -v
+cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined tests/test_band_plan.c -o /tmp/test-band-plan
+/tmp/test-band-plan
+cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -DPOCKET_BAND_ROWS=48 tests/test_band_plan.c -o /tmp/test-band-plan48
+/tmp/test-band-plan48
 ```
 
-For performance work, compare the same corpus, queries, compiler, optimization profile, architecture, and CPU settings. Record before/after JSON, ranked result equivalence, requested allocations, peak live allocation delta, and median timings. Host timings do not prove Xtensa device performance. See [performance notes](docs/performance.md).
+For performance work, compare the same corpus, queries, compiler, optimization profile, architecture, and CPU settings. Record before/after JSON, ranked result equivalence, requested allocations, peak live allocation delta, and median timings. Host timings do not prove Xtensa device performance. See [performance notes](docs/performance.md) and the [physical display probe](docs/chromatic-rendering.md).
 
 ## Pull requests
 

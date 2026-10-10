@@ -1,0 +1,459 @@
+{
+  "schema_version": 1,
+  "execution_mode": "physical-lvgl-platform-probe",
+  "release_qualification": false,
+  "measured_date_local": "2026-10-10",
+  "timezone": "Asia/Tokyo",
+  "device": {
+    "model": "Chromatic DevDay development unit",
+    "mcu": "ESP32-U4WDH",
+    "fpga_version": "18.14",
+    "chromatic_version": "4.6",
+    "cpu_hz": 160000000,
+    "core": 1,
+    "flash_bytes": 4194304,
+    "app_partition_bytes": 2097152,
+    "psram_enabled": false,
+    "display_width": 160,
+    "display_height": 144,
+    "pixel_format": "RGB565"
+  },
+  "build": {
+    "upstream_mcu_commit": "63ed3b62b16768ad2415c9e3b865b438ca40fcc6",
+    "idf": "5.3.0",
+    "lvgl": "8.4.0",
+    "compiler": "Xtensa GCC 13.2.0",
+    "optimization_by_mode": {
+      "stock-full": "-Og",
+      "stripe16": "-Og",
+      "stripe48": "-Og",
+      "stripe48-o2": "-O2 for lvgl/fonts/pocket_band_display; -Og elsewhere"
+    },
+    "wifi_connected": true,
+    "font": "existing pocket_jp (not bundled)",
+    "font_line_height_px": 14,
+    "extra_line_spacing_px": 0,
+    "graphics_optimized_targets": [
+      "lvgl",
+      "fonts",
+      "pocket_band_display"
+    ],
+    "network_tls_flags_changed": false,
+    "gui_loop_delay_ms": 30,
+    "gui_task_stack_bytes": 8192,
+    "qspi_hz": 40000000,
+    "spi_payload_bytes": 1024,
+    "upstream_tick_configuration_retained": true,
+    "complete_measured_firmware_source_bundled": false
+  },
+  "method": {
+    "repeats": 3,
+    "steps_per_case": 32,
+    "settling_steps": 6,
+    "native_step_spacing_min_us": 100000,
+    "statistic": "median of three per-window mean render-start to final-DMA times",
+    "capture": "MCU render-buffer over USB, outside timing/heap windows",
+    "panel_scanout_measured": false,
+    "native_rust_client_measured": false
+  },
+  "linked_sections_bytes": {
+    "stock-full": {
+      ".iram0.text": 108247,
+      ".dram0.data": 67568,
+      ".dram0.bss": 61408,
+      ".flash.rodata": 768004,
+      ".flash.text": 922710
+    },
+    "stripe16": {
+      ".iram0.text": 108247,
+      ".dram0.data": 26608,
+      ".dram0.bss": 59832,
+      ".flash.rodata": 768372,
+      ".flash.text": 923450
+    },
+    "stripe48": {
+      ".iram0.text": 108247,
+      ".dram0.data": 36848,
+      ".dram0.bss": 60232,
+      ".flash.rodata": 768372,
+      ".flash.text": 923474
+    },
+    "stripe48-o2": {
+      ".iram0.text": 108247,
+      ".dram0.data": 36848,
+      ".dram0.bss": 60232,
+      ".flash.rodata": 768356,
+      ".flash.text": 931906
+    }
+  },
+  "application_bytes": {
+    "stock-full": 1867936,
+    "stripe16": 1828080,
+    "stripe48": 1838352,
+    "stripe48-o2": 1846768
+  },
+  "render_buffer_bytes": {
+    "stock-full": 46080,
+    "stripe16": 5120,
+    "stripe48": 15360,
+    "stripe48-o2": 15360
+  },
+  "render_buffer_saved_bytes": {
+    "stripe16": 40960,
+    "stripe48": 30720,
+    "stripe48-o2": 30720
+  },
+  "static_dram_saved_bytes": {
+    "stripe16": 42536,
+    "stripe48": 31896,
+    "stripe48-o2": 31896
+  },
+  "installation_verification": {
+    "application_only": true,
+    "readback_verified": true,
+    "application_integrity_check": "esptool verify_flash against local image; SHA-256 records local image identity",
+    "previous_image_verified": true,
+    "partition_table_unchanged": true,
+    "nvs_preserved": true,
+    "original_recovery_backup_verified": true,
+    "bootloader_modified": false,
+    "fpga_modified": false,
+    "efuse_modified": false
+  },
+  "framebuffer_sha256_equal": true,
+  "capture_png_sha256_equal": true,
+  "source_sha256": {
+    "stripe16": {
+      "devices/chromatic/components/pocket_render_probe/pocket_render_probe.c": "4fc7edb143a03dfbedf61e8cbc205fb2f02403b467af16fa0692555974f64fe4",
+      "devices/chromatic/components/pocket_render_probe/pocket_render_probe.h": "c8aea35cb33d4afd11bcee445c77ea07327b32f8358facf4aacbfdc7e2b65761",
+      "devices/chromatic/components/pocket_band_display/pocket_band_display.c": "a1d10e0fa7accde1f3bed6b1619a76a3dc71c4220612a978ecf4b4ebb26e89af",
+      "devices/chromatic/components/pocket_band_display/pocket_band_display.h": "fe265b683f94c5d5da298c1c5ccb33ff06ebf647f9afac1c81f53566d789d913",
+      "devices/chromatic/components/pocket_band_display/pocket_band_plan.h": "a4b7431c6bc5a638d71e98004f29c68b26de4b43cad50272e7ed07c37d4d8fa1"
+    },
+    "stripe48": {
+      "devices/chromatic/components/pocket_render_probe/pocket_render_probe.c": "4fc7edb143a03dfbedf61e8cbc205fb2f02403b467af16fa0692555974f64fe4",
+      "devices/chromatic/components/pocket_render_probe/pocket_render_probe.h": "c8aea35cb33d4afd11bcee445c77ea07327b32f8358facf4aacbfdc7e2b65761",
+      "devices/chromatic/components/pocket_band_display/pocket_band_display.c": "a1d10e0fa7accde1f3bed6b1619a76a3dc71c4220612a978ecf4b4ebb26e89af",
+      "devices/chromatic/components/pocket_band_display/pocket_band_display.h": "fe265b683f94c5d5da298c1c5ccb33ff06ebf647f9afac1c81f53566d789d913",
+      "devices/chromatic/components/pocket_band_display/pocket_band_plan.h": "89f605616ab7a6bd3d4c283d51750acb3a8f3cf957439cdd26592156f0b93eea"
+    },
+    "stripe48-o2": {
+      "devices/chromatic/components/pocket_render_probe/pocket_render_probe.c": "4fc7edb143a03dfbedf61e8cbc205fb2f02403b467af16fa0692555974f64fe4",
+      "devices/chromatic/components/pocket_render_probe/pocket_render_probe.h": "c8aea35cb33d4afd11bcee445c77ea07327b32f8358facf4aacbfdc7e2b65761",
+      "devices/chromatic/components/pocket_band_display/pocket_band_display.c": "a1d10e0fa7accde1f3bed6b1619a76a3dc71c4220612a978ecf4b4ebb26e89af",
+      "devices/chromatic/components/pocket_band_display/pocket_band_display.h": "fe265b683f94c5d5da298c1c5ccb33ff06ebf647f9afac1c81f53566d789d913",
+      "devices/chromatic/components/pocket_band_display/pocket_band_plan.h": "89f605616ab7a6bd3d4c283d51750acb3a8f3cf957439cdd26592156f0b93eea"
+    }
+  },
+  "component_source_commits": {
+    "stripe16": "581ac953808b611c47b035a03344a73ea5d3a0ee",
+    "stripe48": "98a4961b3f6d884bc84a2b987173f338e9d321b8",
+    "stripe48-o2": "a493cd9bd4297e7d20e419ec87c2361372eab1a1"
+  },
+  "cases": {
+    "idle": {
+      "stock-full": {
+        "mean_frame_us": null,
+        "frames_per_window": [
+          0,
+          0,
+          0
+        ],
+        "transfer_bytes_per_update": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "minimum_window_free_heap_bytes": 57604,
+        "gui_stack_minimum_free_bytes": 5372
+      },
+      "stripe16": {
+        "mean_frame_us": null,
+        "frames_per_window": [
+          0,
+          0,
+          0
+        ],
+        "transfer_bytes_per_update": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "minimum_window_free_heap_bytes": 102500,
+        "gui_stack_minimum_free_bytes": 5588
+      },
+      "stripe48": {
+        "mean_frame_us": null,
+        "frames_per_window": [
+          0,
+          0,
+          0
+        ],
+        "transfer_bytes_per_update": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "minimum_window_free_heap_bytes": 90056,
+        "gui_stack_minimum_free_bytes": 5588
+      },
+      "stripe48-o2": {
+        "mean_frame_us": null,
+        "frames_per_window": [
+          0,
+          0,
+          0
+        ],
+        "transfer_bytes_per_update": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "minimum_window_free_heap_bytes": 90036,
+        "gui_stack_minimum_free_bytes": 5604
+      }
+    },
+    "counter": {
+      "stock-full": {
+        "mean_frame_us": {
+          "min": 20770.59375,
+          "median": 20873.9375,
+          "max": 20888.46875
+        },
+        "frames_per_window": [
+          32,
+          32,
+          32
+        ],
+        "transfer_bytes_per_update": [
+          46080.0,
+          46080.0,
+          46080.0
+        ],
+        "minimum_window_free_heap_bytes": 57516,
+        "gui_stack_minimum_free_bytes": 5372
+      },
+      "stripe16": {
+        "mean_frame_us": {
+          "min": 9698.5,
+          "median": 9997.71875,
+          "max": 10010.5625
+        },
+        "frames_per_window": [
+          32,
+          32,
+          32
+        ],
+        "transfer_bytes_per_update": [
+          10240.0,
+          10240.0,
+          10240.0
+        ],
+        "minimum_window_free_heap_bytes": 101056,
+        "gui_stack_minimum_free_bytes": 5588
+      },
+      "stripe48": {
+        "mean_frame_us": {
+          "min": 10134.84375,
+          "median": 10514.875,
+          "max": 10531.5625
+        },
+        "frames_per_window": [
+          32,
+          32,
+          32
+        ],
+        "transfer_bytes_per_update": [
+          15360.0,
+          15360.0,
+          15360.0
+        ],
+        "minimum_window_free_heap_bytes": 90092,
+        "gui_stack_minimum_free_bytes": 5588
+      },
+      "stripe48-o2": {
+        "mean_frame_us": {
+          "min": 8827.0,
+          "median": 8971.21875,
+          "max": 9077.28125
+        },
+        "frames_per_window": [
+          32,
+          32,
+          32
+        ],
+        "transfer_bytes_per_update": [
+          15360.0,
+          15360.0,
+          15360.0
+        ],
+        "minimum_window_free_heap_bytes": 89972,
+        "gui_stack_minimum_free_bytes": 5604
+      }
+    },
+    "page": {
+      "stock-full": {
+        "mean_frame_us": {
+          "min": 20444.28125,
+          "median": 20512.03125,
+          "max": 20650.15625
+        },
+        "frames_per_window": [
+          32,
+          32,
+          32
+        ],
+        "transfer_bytes_per_update": [
+          46080.0,
+          46080.0,
+          46080.0
+        ],
+        "minimum_window_free_heap_bytes": 59704,
+        "gui_stack_minimum_free_bytes": 5372
+      },
+      "stripe16": {
+        "mean_frame_us": {
+          "min": 46166.3125,
+          "median": 46183.15625,
+          "max": 46353.40625
+        },
+        "frames_per_window": [
+          32,
+          32,
+          32
+        ],
+        "transfer_bytes_per_update": [
+          40960.0,
+          40960.0,
+          40960.0
+        ],
+        "minimum_window_free_heap_bytes": 103152,
+        "gui_stack_minimum_free_bytes": 5588
+      },
+      "stripe48": {
+        "mean_frame_us": {
+          "min": 31065.71875,
+          "median": 31083.0,
+          "max": 31096.125
+        },
+        "frames_per_window": [
+          32,
+          32,
+          32
+        ],
+        "transfer_bytes_per_update": [
+          46080.0,
+          46080.0,
+          46080.0
+        ],
+        "minimum_window_free_heap_bytes": 90612,
+        "gui_stack_minimum_free_bytes": 5588
+      },
+      "stripe48-o2": {
+        "mean_frame_us": {
+          "min": 24717.5625,
+          "median": 24745.28125,
+          "max": 24755.9375
+        },
+        "frames_per_window": [
+          32,
+          32,
+          32
+        ],
+        "transfer_bytes_per_update": [
+          46080.0,
+          46080.0,
+          46080.0
+        ],
+        "minimum_window_free_heap_bytes": 90504,
+        "gui_stack_minimum_free_bytes": 5604
+      }
+    },
+    "full": {
+      "stock-full": {
+        "mean_frame_us": {
+          "min": 20856.1875,
+          "median": 20884.0625,
+          "max": 20963.34375
+        },
+        "frames_per_window": [
+          32,
+          32,
+          32
+        ],
+        "transfer_bytes_per_update": [
+          46080.0,
+          46080.0,
+          46080.0
+        ],
+        "minimum_window_free_heap_bytes": 59016,
+        "gui_stack_minimum_free_bytes": 5372
+      },
+      "stripe16": {
+        "mean_frame_us": {
+          "min": 49508.78125,
+          "median": 49634.59375,
+          "max": 49740.53125
+        },
+        "frames_per_window": [
+          32,
+          32,
+          32
+        ],
+        "transfer_bytes_per_update": [
+          46080.0,
+          46080.0,
+          46080.0
+        ],
+        "minimum_window_free_heap_bytes": 97564,
+        "gui_stack_minimum_free_bytes": 5588
+      },
+      "stripe48": {
+        "mean_frame_us": {
+          "min": 31565.625,
+          "median": 31628.375,
+          "max": 31690.96875
+        },
+        "frames_per_window": [
+          32,
+          32,
+          32
+        ],
+        "transfer_bytes_per_update": [
+          46080.0,
+          46080.0,
+          46080.0
+        ],
+        "minimum_window_free_heap_bytes": 89932,
+        "gui_stack_minimum_free_bytes": 5588
+      },
+      "stripe48-o2": {
+        "mean_frame_us": {
+          "min": 24608.21875,
+          "median": 24683.71875,
+          "max": 24837.34375
+        },
+        "frames_per_window": [
+          32,
+          32,
+          32
+        ],
+        "transfer_bytes_per_update": [
+          46080.0,
+          46080.0,
+          46080.0
+        ],
+        "minimum_window_free_heap_bytes": 91660,
+        "gui_stack_minimum_free_bytes": 5604
+      }
+    }
+  },
+  "graphics_helper_sha256": "c1b9f0b9b7da08347e448fad1c64cfeb34550d62a1362fb28066b4e0f1178164",
+  "selected_prototype_mode": "stripe48-o2",
+  "selection_reason": "Retain 30 KiB of buffer savings and faster small updates, with lower page/full latency than either unoptimized band candidate. Full redraw remains slower than the stock debug transport.",
+  "operator_lcd_check": {
+    "baseline_visible_confirmed": true,
+    "final_optimized_frame": "confirmation pending",
+    "physical_usb_video_captured": false
+  }
+}

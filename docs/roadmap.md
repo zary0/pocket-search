@@ -10,12 +10,13 @@
 - [x] Check pagination, malformed packets, query limits, and host/client compatibility.
 - [x] Add GPL-3.0-only licensing and English contribution/security guidance for public development.
 - [x] Add repeatable host timing/allocation measurements and compact bounded search selection.
-- [x] Cross-compile an ESP32 CPU-cycle/heap probe; physical execution is pending.
+- [x] Cross-compile an ESP32 CPU-cycle/heap probe; physical decoder execution is pending.
+- [x] Add a native C/LVGL rendering probe and a bounded 16-row display driver; measure the platform physically.
 - [x] Align `develop`, `main`, inherited versions, `vX.Y.Z` tags, and candidate manifests.
 - [x] Add CI/CD orchestration with mandatory physical evidence before release promotion.
 - [ ] Register and verify the dedicated physical lab runner and operator-installed adapter.
 
-These checks run on a host. They are not a firmware build or physical browsing result.
+Search/protocol checks run on a host. The separate native C/LVGL rendering probe is a physical platform measurement; it does not verify the Rust decoder or browsing.
 
 ## 1. First physical search and text loop
 
