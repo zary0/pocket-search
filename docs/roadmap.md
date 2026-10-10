@@ -85,6 +85,7 @@ Registered local PNG/JPEG resizing and two original source images have native Wi
 ## P3 — Quality and measured improvements
 
 - [ ] Refine Japanese input, keyboard ergonomics, long-text layout, links, reading controls, and search relevance using the working product.
+- [ ] Add native character-commit click feedback after a verified FPGA audio command/path is available; preserve the wheel/mute and game/USB audio. Browser input feedback is implemented separately; see [UI scope](search-ui.md#input-click-feedback).
 - [ ] Optimize actual decoder, HTTPS, and rendering bottlenecks while preserving validation, content correctness, and source information. Compare target size/speed profiles on the real Xtensa build.
 - [ ] Evaluate stack/task consolidation or platform replacement only against equivalent networking, recovery, and physical E2E behavior.
 - [ ] Evaluate externally prepared low-resolution video after text and still-image acceptance.

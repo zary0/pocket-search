@@ -2,6 +2,9 @@
 import {groups,bytes,key,tail,QUERY_BYTES} from './input.mjs';
 import {decodePacket} from './pcs1.mjs';
 import {decodeImage} from './images.mjs';
+import {committedEdit,createInputClick} from './feedback.mjs';
+const inputClick=createInputClick();
+let compositionBefore=null;
 const $=id=>document.getElementById(id),ctx=$('screen').getContext('2d');
 const state={query:'',mode:'home',script:0,group:0,letter:0,choosing:false,results:[],selected:0,packet:null,seq:0,controller:null,busy:false,error:'',document:0,back:[],image:null};
 function box(x,y,w,h,r,color,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=color;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke();}}
@@ -75,9 +78,11 @@ function press(button){if(state.busy){if(['b','select','start'].includes(button)
     if(button==='b'){if(state.mode==='reader')back();else home();return;}
     if(state.mode==='results'){if(button==='up')selectResult(state.selected-1);if(button==='down')selectResult(state.selected+1);if(button==='a')open(state.selected);}else{if(button==='a')followLink();if(button==='left'&&p.page>0)showDocument(state.document,p.page-1);if(button==='right'&&p.page+1<p.count)showDocument(state.document,p.page+1);}return;
   }
-  const action=key(state,button);$('query').value=state.query;if(action==='search')search();else if(action==='wifi'){$('notice').textContent='Wi-Fi設定は本体のSelectから開けます。';$('notice').classList.remove('error');}render();
+  const previous=state.query;const action=key(state,button);if(previous!==state.query)inputClick();$('query').value=state.query;if(action==='search')search();else if(action==='wifi'){$('notice').textContent='Wi-Fi設定は本体のSelectから開けます。';$('notice').classList.remove('error');}render();
 }
-$('query').addEventListener('input',()=>{cancel();state.query=$('query').value;state.mode='home';state.packet=null;state.results=[];$('notice').classList.remove('error');$('notice').textContent=bytes(state.query)>QUERY_BYTES?'検索語はUTF-8で96バイト以内にしてください。':'オリジナルのサンプル記事を検索できます';render();});
+$('query').addEventListener('compositionstart',()=>{compositionBefore=$('query').value;});
+$('query').addEventListener('compositionend',()=>{if(committedEdit(compositionBefore??state.query,$('query').value,'insertCompositionText'))inputClick();state.query=$('query').value;compositionBefore=null;});
+$('query').addEventListener('input',event=>{if(committedEdit(state.query,$('query').value,event.inputType,event.isComposing||compositionBefore!==null))inputClick();cancel();state.query=$('query').value;state.mode='home';state.packet=null;state.results=[];$('notice').classList.remove('error');$('notice').textContent=bytes(state.query)>QUERY_BYTES?'検索語はUTF-8で96バイト以内にしてください。':'オリジナルのサンプル記事を検索できます';render();});
 $('search-form').addEventListener('submit',e=>{e.preventDefault();search();});$('clear').onclick=()=>{$('query').value='';state.query='';home();$('query').focus();};
 $('preview-open').onclick=()=>{$('preview').showModal();render();};$('preview-close').onclick=()=>{$('preview').close();};$('reader-back').onclick=back;$('reader-prev').onclick=()=>press('left');$('reader-next').onclick=()=>press('right');
 document.querySelectorAll('[data-key]').forEach(b=>b.onclick=()=>press(b.dataset.key));$('screen').onkeydown=e=>{const map={ArrowUp:'up',ArrowDown:'down',ArrowLeft:'left',ArrowRight:'right',z:'a',x:'b',Enter:'start',Shift:'select'};if(map[e.key]){e.preventDefault();press(map[e.key]);}};render();
