@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Wi-Fi fetches scene/image data; USB configures the origin and synthetic controls.
 #include "pocket_search_net.h"
+#include "pocket_search_origin.h"
 #include "chromatic_wifi.h"
 #include "network_time.h"
 #include "esp_console.h"
@@ -14,10 +15,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
-#include <ctype.h>
 static portMUX_TYPE lock=portMUX_INITIALIZER_UNLOCKED;
-static char origin[192];
-static struct {bool running,ready,cancelled;PS_Request request;PS_Reply reply;char endpoint[192];} job;
+static char origin[PS_ORIGIN_BYTES];
+static bool origin_saved;
+static esp_err_t origin_error;
+static struct {bool running,ready,cancelled,configuring;PS_Request request;PS_Reply reply;char endpoint[PS_ORIGIN_BYTES];} job;
 enum {NO_WIFI=1,NO_CLOCK,NO_MEMORY,CONNECT_FAILED,HTTP_FAILED,TOO_LARGE,INCOMPLETE,WRONG_TYPE,CANCELLED,INVALID_IMAGE,STALE_COLLECTION=PS_NET_STALE_COLLECTION};
 typedef struct {PS_Reply *reply;bool correct_type,generation_seen,sample_seen,collection_error;const char *expected;} Events;
 static esp_err_t event(esp_http_client_event_t *e){
@@ -142,7 +144,7 @@ done:
 bool PS_NetConfigured(void){taskENTER_CRITICAL(&lock);bool configured=origin[0]!=0;taskEXIT_CRITICAL(&lock);return configured;}
 bool PS_NetStart(const PS_Request *request){
     if(!request||!memchr(request->query,0,sizeof(request->query))||!memchr(request->generation,0,sizeof(request->generation))||(request->generation[0]&&!ps_generation_valid(request->generation))||request->kind<1||request->kind>3)return false;
-    taskENTER_CRITICAL(&lock);bool allowed=!job.running&&!job.ready&&origin[0];if(allowed){job.running=true;job.cancelled=false;job.request=*request;memcpy(job.endpoint,origin,sizeof(origin));}taskEXIT_CRITICAL(&lock);
+    taskENTER_CRITICAL(&lock);bool allowed=!job.running&&!job.ready&&!job.configuring&&origin[0];if(allowed){job.running=true;job.cancelled=false;job.request=*request;memcpy(job.endpoint,origin,sizeof(origin));}taskEXIT_CRITICAL(&lock);
     if(!allowed)return false;
     if(xTaskCreatePinnedToCore(worker,"search_https",10240,NULL,2,NULL,0)==pdPASS)return true;
     taskENTER_CRITICAL(&lock);job.running=false;memset(job.request.query,0,sizeof(job.request.query));taskEXIT_CRITICAL(&lock);return false;
@@ -150,11 +152,28 @@ bool PS_NetStart(const PS_Request *request){
 bool PS_NetPoll(PS_Reply *reply){taskENTER_CRITICAL(&lock);bool ready=job.ready;if(ready){*reply=job.reply;memset(job.reply.bytes,0,sizeof(job.reply.bytes));job.ready=false;}taskEXIT_CRITICAL(&lock);return ready;}
 void PS_NetCancel(unsigned sequence){taskENTER_CRITICAL(&lock);if(job.running&&job.request.sequence==sequence)job.cancelled=true;taskEXIT_CRITICAL(&lock);}
 static int configure(int argc,char **argv){
-    if(argc!=2)return 1;
-    const char *value=argv[1];size_t n=strlen(value);if(n<12||n>=sizeof(origin)||strncmp(value,"https://",8))return 1;
-    for(size_t i=8;i<n;++i)if(!isalnum((unsigned char)value[i])&&value[i]!='-'&&value[i]!='.')return 1;
-    taskENTER_CRITICAL(&lock);bool allowed=!job.running&&!job.ready;if(allowed)memcpy(origin,value,n+1);taskEXIT_CRITICAL(&lock);
+    if(argc==2&&!strcmp(argv[1],"status")){
+        taskENTER_CRITICAL(&lock);bool configured=origin[0]!=0,saved=origin_saved,busy=job.configuring;esp_err_t error=origin_error;taskEXIT_CRITICAL(&lock);
+        printf("SEARCH_ENDPOINT_STATE {\"configured\":%s,\"restore_on_restart\":%s,\"saving\":%s,\"storage_error\":\"%s\"}\n",configured?"true":"false",saved?"true":"false",busy?"true":"false",esp_err_to_name(error));return 0;
+    }
+    if(argc<2||argc>3||(argc==3&&strcmp(argv[2],"--save")))return 1;
+    const char *value=argv[1];if(!PS_OriginValid(value))return 1;
+    bool save=argc==3;
+    taskENTER_CRITICAL(&lock);bool allowed=!job.running&&!job.ready&&!job.configuring;if(allowed)job.configuring=true;taskEXIT_CRITICAL(&lock);
+    if(!allowed)return 1;
+    // NVS may block: reserve configuration, but never hold a spinlock during I/O.
+    esp_err_t error=save?PS_OriginSave(value):ESP_OK;
+    taskENTER_CRITICAL(&lock);
+    origin_error=error;
+    if(error==ESP_OK){memset(origin,0,sizeof(origin));memcpy(origin,value,strlen(value)+1);origin_saved=save;}
+    job.configuring=false;taskEXIT_CRITICAL(&lock);
+    if(error!=ESP_OK){printf("SEARCH_ENDPOINT_SAVE_FAILED %s\n",esp_err_to_name(error));return 1;}
     if(allowed)printf("SEARCH_ENDPOINT_CONFIGURED\n");
-    return allowed?0:1;
+    return 0;
 }
-void PS_NetRegister(void){const esp_console_cmd_t command={.command="search_endpoint",.help="Experimental HTTPS origin in RAM only",.func=configure};ESP_ERROR_CHECK(esp_console_cmd_register(&command));esp_log_level_set("HTTP_CLIENT",ESP_LOG_ERROR);}
+void PS_NetRegister(void){
+    char saved[PS_ORIGIN_BYTES];esp_err_t error=PS_OriginLoad(saved);
+    taskENTER_CRITICAL(&lock);origin_error=error;if(error==ESP_OK){memcpy(origin,saved,sizeof(origin));origin_saved=true;}taskEXIT_CRITICAL(&lock);
+    const esp_console_cmd_t command={.command="search_endpoint",.help="HTTPS origin [--save] or status; no origin in diagnostics",.func=configure};
+    ESP_ERROR_CHECK(esp_console_cmd_register(&command));esp_log_level_set("HTTP_CLIENT",ESP_LOG_ERROR);
+}
