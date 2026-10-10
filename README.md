@@ -2,11 +2,11 @@
 
 # Pocket Search for ModRetro Chromatic
 
-A small search and reading application designed around the **ModRetro Chromatic's 160 × 144 display, physical buttons, and ESP32 MCU**. The experimental native application searches original sample articles and reads HTML-derived text, links, and reduced images over Wi-Fi. Live public-page collection remains a next step.
+A small search and reading application designed around the **ModRetro Chromatic's 160 × 144 display, physical buttons, and ESP32 MCU**. The experimental native application searches an immutable collection and reads HTML-derived text, links, and reduced images over Wi-Fi. The Rust companion now also collects bounded public HTTPS pages for the same reader; see [crawler scope and usage](docs/crawling.md).
 
 Chromatic is the primary platform. Host tools develop the search service and verify the device protocol. The application targets the console's MCU firmware and menu interface; a Game Boy cartridge ROM is not the deployment target for this Wi-Fi reader.
 
-**Status: experimental native DOM and image reader.** Implemented: Rust ranking, HTML5 DOM extraction from registered local HTML, PNG/JPEG preparation, bounded read-only API, and browser/ESP32 readers for headings, text, images and registered links. The native client runs allocation-free Rust packet/image validation through a C ABI. See [DOM/image behavior and evidence](docs/dom-images.md) and [earlier search evidence](docs/search-results.md). Live crawling, JavaScript/CSS layout, complete firmware distribution and qualified physical E2E remain pending. The measured display prototype uses a 15 KiB draw buffer; see [measured results](docs/performance.md#physical-lvgl-display-comparison).
+**Status: experimental bounded public-web collector and native reader.** Implemented: public HTTPS crawling, Rust ranking, HTML5 DOM extraction, PNG/JPEG preparation, immutable snapshots, bounded read-only API, and browser/ESP32 readers for headings, text, images and registered links. The native client runs allocation-free Rust packet/image validation through a C ABI. See [DOM/image behavior and evidence](docs/dom-images.md) and [earlier search evidence](docs/search-results.md). Unattended crawling at scale, JavaScript/CSS layout, complete firmware distribution and qualified physical E2E remain pending. The measured display prototype uses a 15 KiB draw buffer; see [measured results](docs/performance.md#physical-lvgl-display-comparison).
 
 ## Architecture
 
@@ -23,15 +23,15 @@ Chromatic MCU application
   button input → query → results → paginated text → reduced image
 ```
 
-The handheld owns the interaction and display. A companion service on a computer or server owns crawling, the index, and image preparation. Independent search ranks our own collected documents; it does not require storing a web-scale index on the handheld. The service must be reachable from the device. The current service searches original JSON articles and explicitly registered HTML/image files. An operator-authorized temporary HTTPS tunnel is used for development verification; no permanent public service is provided.
+The handheld owns the interaction and display. A companion service on a computer or server owns crawling, the index, and image preparation. Independent search ranks our own collected documents; it does not require storing a web-scale index on the handheld. The service must be reachable from the device. The current service searches original JSON articles, explicitly registered HTML/image files, or a validated collected snapshot. An operator-authorized temporary HTTPS tunnel is used for development verification; no permanent public service is provided.
 
 | Component | Implemented | Still needed |
 | --- | --- | --- |
-| Crawler / extractor | HTML5 DOM extraction from registered UTF-8 HTML: headings, paragraphs, lists, preformatted text, links and image references | Public HTTPS fetching, robots.txt, collection timestamps and live-page acceptance |
+| Crawler / extractor | Bounded public HTTPS crawling, robots.txt/noindex/nofollow, source/time/hash records, and HTML5 extraction | Durable frontier, incremental collection updates and unattended/live-page acceptance |
 | Index / ranking | In-memory inverted index, BM25-style ranking, English words and Japanese character/bigram tokens | Persistent corpus, updates, deduplication, quality evaluation |
-| Companion API | Read-only HTTP routes, immutable sample collection, bounded PCS1 and JSON responses | Persistent corpus identity, production deployment, real collected content |
+| Companion API | Read-only HTTP routes, immutable sample or collected snapshot, generation checks, bounded PCS1/JSON | Cross-snapshot persistence/updates, source details and production deployment |
 | Device client | Xtensa Rust decoder with C ABI, native HTTPS/SNTP, keyboard, results and paginated reader | Reproducible full firmware, complete physical-controls/error E2E, battery-only verification |
-| Images | Registered PNG/JPEG preparation, 128 × 80 RGB565 stripes, CRC/order validation, native/browser display and sampled native heap | Protected network fetching, interruption/error qualification and allocator peak tracing |
+| Images | Registered PNG/JPEG preparation, 128 × 80 RGB565 stripes, CRC/order validation, native/browser display and sampled native heap | Unattended fetching, interruption/error qualification and allocator peak tracing |
 
 ## Designed for the handheld
 
@@ -101,7 +101,9 @@ The development Wi-Fi allowed outbound HTTPS but did not establish device-to-com
 
 ## Next milestone
 
-Finish reproducible firmware integration and physical-controls/error acceptance for the implemented sample query → result → text loop. Continue bounded real-page collection after the controlled DOM/image experiment. Video is deferred until text and still-image behavior is measured on the device.
+Finish reproducible firmware integration and physical-controls/error acceptance for the implemented sample query → result → text loop. Extend the bounded public-page collector with durable frontier/storage after acceptance of the current immutable snapshot flow. Video is deferred until text and still-image behavior is measured on the device.
+
+To collect actual public pages, run `pocket-search crawl examples/crawl-public.json data/crawl-001`, then `pocket-search serve-crawl data/crawl-001 127.0.0.1:8838`. Public-web mode can follow links across domains, but each snapshot currently contains at most 16 indexed pages; it does not search the entire Internet. See [limits and safety boundaries](docs/crawling.md).
 
 See the [architecture](docs/architecture.md), [protocol](docs/chromatic-protocol.md), and [roadmap](docs/roadmap.md). Device credentials, activation codes, NVS dumps, and full-flash backups are not included.
 

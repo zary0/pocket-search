@@ -1,6 +1,6 @@
 # Experimental DOM and image reader
 
-Pocket Search now extracts an HTML5 DOM into small reading scenes: headings, paragraphs, lists, preformatted text, quotations, images and links. The companion parses HTML and prepares PNG/JPEG images; the Chromatic receives only bounded scene/pixel data. It does not hold the DOM or decode PNG/JPEG on the MCU. There is no JavaScript execution, source CSS layout, live crawler, arbitrary URL proxy or Chrome engine.
+Pocket Search now extracts an HTML5 DOM into small reading scenes: headings, paragraphs, lists, preformatted text, quotations, images and links. The companion parses HTML and prepares PNG/JPEG images; the Chromatic receives only bounded scene/pixel data. It does not hold the DOM or decode PNG/JPEG on the MCU. There is no JavaScript execution, source CSS layout, arbitrary URL proxy or Chrome engine. A separate [bounded crawler](crawling.md) can now prepare public-page snapshots for this reader.
 
 ## Run and register content
 
@@ -30,7 +30,7 @@ Each text scene uses the existing seven-row profile. An image has one caption ro
 | Prepared image | <=128 × 80, aspect ratio retained without upscaling; alpha composited onto white; RGB565 little-endian |
 | Prepared image collection | <=8 MiB of retained pixel/preview data |
 
-Preparation occurs on the host at startup. These byte/node/dimension limits are not a parser or codec execution-time sandbox. Network fetching and its DNS/redirect/robots safeguards remain separate pending work.
+Preparation occurs on the host at startup. These byte/node/dimension limits are not a parser or codec execution-time sandbox. The separate CLI crawler now applies DNS/redirect/robots safeguards and time-supervises acquisition/preparation; manually registered file loading alone is not a process sandbox.
 
 ## Read-only routes
 

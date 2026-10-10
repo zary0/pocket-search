@@ -17,13 +17,14 @@ typedef enum { QUERY, SSID, PASSWORD } Role;
 static struct {
     Mode mode; Role role, notice_role; int script, group, letter, selection;
     bool choosing, dirty;
-    char query[PS_INPUT_CAPACITY], draft[PS_INPUT_CAPACITY], ssid[33];
+    char query[PS_INPUT_CAPACITY], draft[PS_INPUT_CAPACITY], ssid[33],generation[PS_GENERATION_BYTES];
+    bool sample;
     const char *notice; CW_Status wifi;
     unsigned sequence; uint16_t result_index,requested_page;uint32_t requested_id;uint8_t requested_kind;
     uint8_t packet[512];PS_View view;int network_error;bool verified;
     uint8_t *image_pixels;uint16_t image_width,image_height,image_rows;
     struct {uint32_t document;uint16_t page;} back[4];unsigned back_count;
-} u = {.dirty=true};
+} u = {.dirty=true,.sample=true};
 static lv_obj_t *root, *brand, *field, *input, *heading, *body, *footer, *status, *submit, *cells[12], *entry;
 static lv_obj_t *rows[7], *picture;
 static lv_img_dsc_t image_descriptor;
@@ -94,7 +95,7 @@ static void keyboard(Role role) {
 static void message(const char *value,Role destination) { mode(NOTICE); u.notice=value; u.notice_role=destination; }
 static void request(uint8_t kind,uint32_t document,uint16_t page){
     PS_NetCancel(u.sequence);release_image();
-    PS_Request r={.sequence=++u.sequence,.kind=kind,.document=document,.page=page};if(kind==1)memcpy(r.query,u.query,sizeof(r.query));
+    PS_Request r={.sequence=++u.sequence,.kind=kind,.document=document,.page=page};if(kind==1)memcpy(r.query,u.query,sizeof(r.query));memcpy(r.generation,u.generation,sizeof(r.generation));
     u.requested_kind=kind;u.requested_id=document;u.requested_page=page;u.network_error=0;u.verified=false;
     if(!PS_NetStart(&r)){message(PS_NetConfigured()?"Previous request\nfinishing. Try again.":"Search service\nnot configured.",QUERY);return;}
     mode(kind==3?IMAGE_LOADING:LOADING);
@@ -103,7 +104,7 @@ static void submit_query(void) {
     if(u.mode==KEYBOARD && u.role==QUERY) memcpy(u.query,u.draft,sizeof(u.query));
     bool empty=true; for(const char *s=u.query;*s;++s) if(*s!=' ') empty=false;
     if(empty) { message("Enter a query.\n\nA: Type",QUERY); return; }
-    u.result_index=0;u.back_count=0;request(1,0,0);
+    u.generation[0]=0;u.result_index=0;u.back_count=0;request(1,0,0);
 }
 static void modify_kana(void) {
     static const char *cycles[]={"あぁ","いぃ","うぅゔ","えぇ","おぉ","かが","きぎ","くぐ","けげ","こご","さざ","しじ","すず","せぜ","そぞ","ただ","ちぢ","つっづ","てで","とど","はばぱ","ひびぴ","ふぶぷ","へべぺ","ほぼぽ","やゃ","ゆゅ","よょ","わゎ"};
@@ -274,9 +275,9 @@ void PocketUI_Poll(void) {
         }else{
             PS_View view;valid=valid&&reply.finished&&reply.length<=sizeof(u.packet)&&ps_packet_decode(reply.bytes,reply.length,&view)==0;
             if(valid&&(view.page_index!=u.requested_page||(u.requested_kind==1?(view.kind!=1||view.page_count>10):(view.kind<2||view.kind>5||view.document_id!=u.requested_id))))valid=false;
-            if(valid){memcpy(u.packet,reply.bytes,reply.length);u.view=view;u.verified=true;if(view.kind==1){u.result_index=view.page_index;mode(RESULTS);}else if(view.kind==3)request(3,view.document_id,view.page_index);else mode(READER);}
+            if(valid){memcpy(u.generation,reply.generation,sizeof(u.generation));u.sample=reply.sample;memcpy(u.packet,reply.bytes,reply.length);u.view=view;u.verified=true;if(view.kind==1){u.result_index=view.page_index;mode(RESULTS);}else if(view.kind==3)request(3,view.document_id,view.page_index);else mode(READER);}
         }
-        if(!valid){release_image();u.network_error=reply.error;u.verified=false;message(reply.error==1?"Wi-Fi disconnected.\nSelect: Wi-Fi setup":reply.error==2?"Clock sync failed.\nTry again.":reply.error?"Connection failed.\nTry again.":"Invalid response.\nTry again.",QUERY);}
+        if(!valid){release_image();u.network_error=reply.error;u.verified=false;message(reply.error==12?"Collection changed.\nStart: Search again":reply.error==1?"Wi-Fi disconnected.\nSelect: Wi-Fi setup":reply.error==2?"Clock sync failed.\nTry again.":reply.error?"Connection failed.\nTry again.":"Invalid response.\nTry again.",QUERY);}
     }
     char query[97];taskENTER_CRITICAL(&lock); int key=pending_key; pending_key=0;bool set_query=pending_query_set;if(set_query){memcpy(query,pending_query,sizeof(query));memset(pending_query,0,sizeof(pending_query));pending_query_set=false;}taskEXIT_CRITICAL(&lock);
     if(set_query){cancel();u.back_count=0;mode(HOME);memcpy(u.query,query,sizeof(u.query));MenuMgr_SelectTab(kTabID_Search);return;}if(!key)return;

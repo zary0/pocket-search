@@ -50,6 +50,8 @@ pub enum Block {
 pub struct Parsed {
     pub title: String,
     pub blocks: Vec<Block>,
+    pub noindex: bool,
+    pub nofollow: bool,
 }
 
 fn selector(value: &str) -> Selector {
@@ -316,9 +318,26 @@ pub fn parse(source: &str, url: &str) -> Result<Parsed, String> {
     if collector.blocks.len() > 256 {
         return Err("DOM block limit".into());
     }
+    let mut noindex = false;
+    let mut nofollow = false;
+    for meta in html.select(&selector("meta[name]")) {
+        if meta.value().attr("name").is_some_and(|name| {
+            name.eq_ignore_ascii_case("robots") || name.eq_ignore_ascii_case("PocketSearchBot")
+        }) {
+            let content = meta.value().attr("content").unwrap_or("");
+            for directive in content.split(|c: char| c.is_whitespace() || c == ',') {
+                noindex |= directive.eq_ignore_ascii_case("noindex")
+                    || directive.eq_ignore_ascii_case("none");
+                nofollow |= directive.eq_ignore_ascii_case("nofollow")
+                    || directive.eq_ignore_ascii_case("none");
+            }
+        }
+    }
     Ok(Parsed {
         title,
         blocks: collector.blocks,
+        noindex,
+        nofollow,
     })
 }
 pub fn prepare_image(bytes: &[u8]) -> Result<ImageAsset, String> {
@@ -491,6 +510,8 @@ pub fn append(index: SearchIndex, path: &str) -> Result<SearchIndex, String> {
             return Err("Image registration limit".into());
         }
     }
+    let collection = index.collection;
+    let provenance = index.provenance;
     let mut docs = index.documents;
     let mut doms = index.dom_documents;
     let mut total_images = 0usize;
@@ -641,6 +662,8 @@ pub fn append(index: SearchIndex, path: &str) -> Result<SearchIndex, String> {
     }
     let mut index = SearchIndex::new(docs);
     index.dom_documents = doms;
+    index.collection = collection;
+    index.provenance = provenance;
     Ok(index)
 }
 
