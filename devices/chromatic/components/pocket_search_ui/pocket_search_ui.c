@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Native search/input UI. PCS1 is fetched over verified Wi-Fi HTTPS and decoded in Rust.
+// Native UI. Rust produces PCS1 from pages collected and indexed on this console.
 #include "pocket_search_ui.h"
 #include "pocket_search_input.h"
 #include "pocket_search_net.h"
@@ -74,8 +74,8 @@ static void create(lv_obj_t *screen) {
     heading=label(root,8,4,144); body=label(root,8,28,144); lv_obj_set_height(body,90);
     footer=label(root,8,129,144); lv_obj_set_style_text_color(footer,lv_color_hex(0x70757a),0);
     status=label(root,104,5,48); lv_obj_set_style_text_align(status,LV_TEXT_ALIGN_RIGHT,0); lv_obj_set_style_text_color(status,lv_color_hex(0x70757a),0);
-    submit=label(root,48,105,64); lv_obj_set_style_text_align(submit,LV_TEXT_ALIGN_CENTER,0); lv_obj_set_style_bg_color(submit,lv_color_hex(0xf1f3f4),0);
-    lv_obj_set_style_bg_opa(submit,LV_OPA_COVER,0); lv_obj_set_style_radius(submit,3,0); lv_obj_set_height(submit,18); lv_label_set_text_static(submit,"Search");
+    submit=label(root,36,105,88); lv_obj_set_style_text_align(submit,LV_TEXT_ALIGN_CENTER,0); lv_obj_set_style_bg_color(submit,lv_color_hex(0xf1f3f4),0);
+    lv_obj_set_style_bg_opa(submit,LV_OPA_COVER,0); lv_obj_set_style_radius(submit,3,0); lv_obj_set_height(submit,18); lv_label_set_text_static(submit,"Start:Search");
     for(unsigned i=0;i<12;++i) { cells[i]=label(root,0,0,46); lv_obj_set_height(cells[i],16); lv_obj_set_style_radius(cells[i],3,0); }
     for(unsigned i=0;i<7;++i){rows[i]=label(root,8,34+i*13,144);lv_obj_set_height(rows[i],13);}
     picture=lv_img_create(root);lv_obj_add_flag(picture,LV_OBJ_FLAG_HIDDEN);
@@ -97,7 +97,7 @@ static void request(uint8_t kind,uint32_t document,uint16_t page){
     PS_NetCancel(u.sequence);release_image();
     PS_Request r={.sequence=++u.sequence,.kind=kind,.document=document,.page=page};if(kind==1)memcpy(r.query,u.query,sizeof(r.query));memcpy(r.generation,u.generation,sizeof(r.generation));
     u.requested_kind=kind;u.requested_id=document;u.requested_page=page;u.network_error=0;u.verified=false;
-    if(!PS_NetStart(&r)){message(PS_NetConfigured()?"Previous request\nfinishing. Try again.":"Search service\nnot configured.",QUERY);return;}
+    if(!PS_NetStart(&r)){message("Previous request\nfinishing. Try again.",QUERY);return;}
     mode(kind==3?IMAGE_LOADING:LOADING);
 }
 static void submit_query(void) {
@@ -122,7 +122,7 @@ static void render(void) {
     visible(picture,false);
     lv_label_set_text_static(status,u.wifi.state==CW_CONNECTED?"Wi-Fi":"Offline");
     lv_obj_set_pos(field,8,home?72:25); lv_obj_set_size(field,144,28);
-    lv_label_set_text_static(heading,"Pocket Search"); lv_label_set_text_static(footer,"A:Type Start:Search");
+    lv_label_set_text_static(heading,"Pocket Search"); lv_label_set_text_static(footer,"A:Type >:Recrawl");
     if(home) { lv_label_set_text(input,u.query[0]?tail(u.query,20):"検索語を入力"); }
     else if(typing) {
         lv_label_set_text_static(heading,u.role==QUERY?"Search":u.role==SSID?"Wi-Fi name":"Wi-Fi password");
@@ -139,7 +139,7 @@ static void render(void) {
             lv_obj_set_style_text_color(o,lv_color_hex(selected?0xffffff:0x202124),0);
         }
         lv_label_set_text_static(footer,u.notice?u.notice:"Select:ABC Start:OK");
-    } else if(u.mode==LOADING||u.mode==IMAGE_LOADING){lv_label_set_text_static(body,"Loading...\n\nVerified HTTPS");lv_label_set_text_static(footer,"B:Cancel Start:Type");}
+    } else if(u.mode==LOADING||u.mode==IMAGE_LOADING){lv_label_set_text_static(body,"On-device search\n\nCollecting if needed\nVerified HTTPS");lv_label_set_text_static(footer,"B:Cancel Start:Type");}
     else if(u.mode==RESULTS||u.mode==READER||u.mode==IMAGE_READER){
         visible(body,false);visible(status,true);lv_obj_set_pos(status,8,3);lv_obj_set_width(status,144);lv_obj_set_style_text_align(status,LV_TEXT_ALIGN_LEFT,0);
         snprintf(text,sizeof(text),"%u/%u",u.view.page_index+1,u.view.page_count);lv_label_set_text(status,text);lv_obj_set_pos(heading,8,18);
@@ -206,6 +206,7 @@ OSD_Result_t PocketUI_Button(Button_t b,ButtonState_t state,void *arg) {
     if(u.mode==HOME) {
         if(b==kButton_A) keyboard(QUERY);
         else if(b==kButton_Start) submit_query();
+        else if(b==kButton_Right) { if(PS_NetRefresh()) message("Collection cleared.\nEnter query to crawl.",QUERY); else message("Previous request\nfinishing. Try again.",QUERY); }
         else if(b==kButton_Select) { mode(WIFI_LIST); if(!u.wifi.scanning) (void)CW_Scan(); }
         else if(b==kButton_B) MenuMgr_SelectTab(kTabID_System);
     } else if(u.mode==KEYBOARD) {
@@ -277,7 +278,7 @@ void PocketUI_Poll(void) {
             if(valid&&(view.page_index!=u.requested_page||(u.requested_kind==1?(view.kind!=1||view.page_count>256):(view.kind<2||view.kind>5||view.document_id!=u.requested_id))))valid=false;
             if(valid){memcpy(u.generation,reply.generation,sizeof(u.generation));u.sample=reply.sample;memcpy(u.packet,reply.bytes,reply.length);u.view=view;u.verified=true;if(view.kind==1){u.result_index=view.page_index;mode(RESULTS);}else if(view.kind==3)request(3,view.document_id,view.page_index);else mode(READER);}
         }
-        if(!valid){release_image();u.network_error=reply.error;u.verified=false;message(reply.error==PS_NET_STALE_COLLECTION?"Collection changed.\nA: Search again":reply.error==1?"Wi-Fi disconnected.\nSelect: Wi-Fi setup":reply.error==2?"Clock sync failed.\nTry again.":reply.error?"Connection failed.\nTry again.":"Invalid response.\nTry again.",QUERY);}
+        if(!valid){release_image();u.network_error=reply.error;u.verified=false;message(reply.error==PS_NET_STALE_COLLECTION?"Collection changed.\nA: Search again":reply.error==1?"Wi-Fi disconnected.\nSelect: Wi-Fi setup":reply.error==2?"Clock sync failed.\nTry again.":reply.error==12?"robots.txt blocks\nthis collection.":reply.error==13?"No usable pages.\nRight on home:\nRetry collection.":reply.error?"Connection failed.\nTry again.":"Invalid response.\nTry again.",QUERY);}
     }
     char query[97];taskENTER_CRITICAL(&lock); int key=pending_key; pending_key=0;bool set_query=pending_query_set;if(set_query){memcpy(query,pending_query,sizeof(query));memset(pending_query,0,sizeof(pending_query));pending_query_set=false;}taskEXIT_CRITICAL(&lock);
     if(set_query){cancel();u.back_count=0;mode(HOME);memcpy(u.query,query,sizeof(u.query));MenuMgr_SelectTab(kTabID_Search);return;}if(!key)return;

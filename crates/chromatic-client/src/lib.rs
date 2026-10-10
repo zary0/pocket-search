@@ -4,6 +4,8 @@
 #![no_std]
 #![forbid(unsafe_code)]
 
+pub mod local;
+
 pub const DISPLAY_WIDTH: usize = 160;
 pub const DISPLAY_HEIGHT: usize = 144;
 pub const TEXT_COLUMNS: usize = 24;

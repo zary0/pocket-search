@@ -1,5 +1,7 @@
 # Bounded public-web crawler
 
+> This document describes optional or historical companion tooling. The current native on-device mode does not require this service or a temporary tunnel; see [the main README](../README.md). Its fixed native source profile and image limitations are separate.
+
 The Rust companion can now fetch public HTTPS pages, extract text/links, prepare PNG/JPEG images, and persist an immutable collection for the existing browser and Chromatic protocol. Search queries never trigger arbitrary URL fetching. Acquisition runs as a separate CLI worker process.
 
 ## Run

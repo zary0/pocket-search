@@ -1,59 +1,35 @@
 # Architecture
 
-## Primary target
+## Primary native data path
 
-Pocket Search is a Wi-Fi search and reader application for the ModRetro Chromatic MCU. The physical display and buttons determine interaction, pagination, response sizes, and image budgets. A host browser can help debug the service but is not the primary product.
+Pocket Search runs a small collector, index and reader on the Chromatic MCU. Public HTTPS pages flow directly to the device; a host computer does not collect, rank, format or proxy native page data. The current firmware keeps ESP-IDF 5.3, FreeRTOS, Wi-Fi, SNTP, verified TLS, LVGL and the established input/display drivers. Its dependency-free Rust core is compiled for `xtensa-esp32-none-elf` and called through `chromatic-ffi`.
 
-The official [Chromatic MCU project](https://github.com/ModRetro/oss-chromatic-console-mcu) uses ESP-IDF. Initial integration should preserve the existing display and button drivers, Wi-Fi, native SNTP, and certificate bundle. The Rust client core validates packets and maps buttons to actions; a firmware adapter must connect it to the platform. The experimental C/LVGL adapter links `chromatic-ffi`, compiled for `xtensa-esp32-none-elf`, into the existing development firmware. Full upstream/font/build integration remains operator-local; this is not a reproducible qualified release.
+On first search after boot or refresh, the adapter checks Wi-Fi and clock synchronization, retrieves the source host's robots policy, and asks Rust for the next permitted URL. Rust starts with one public seed, recognizes only relative or exact HTTPS links within the fixed source profile, deduplicates the frontier, and admits at most four complete pages. The C adapter verifies certificates and hostnames, disables redirects, requests identity encoding, reads at most 512 bytes at a time, and caps each HTML response at 64 KiB and the collection at 90 seconds. It does not send search terms to the website.
 
-## Device responsibilities
+The streaming parser keeps a title and at most 2,560 valid UTF-8 body bytes per document. It excludes scripts, styles and comments, normalizes whitespace, decodes basic/numeric entities, and never runs page code. It is a compact text parser, not an HTML5 DOM or CSS engine. Truncation is visible at the end of the local reader.
 
-1. Enter a bounded English or Japanese query with physical controls.
-2. Send one request after the user submits the query.
-3. Receive at most 512 bytes for one PCS1 text packet, rejecting oversized bodies before writing beyond the buffer.
-4. Validate the complete packet before updating the screen.
-5. Draw a title and up to seven lines through the font/display adapter.
-6. Fetch another result or reader page when navigating; discard the previous response.
-7. Return to query entry or home through physical controls.
+The fixed-capacity inverted index maps 256 term hashes to document masks. Exact retained-text matching verifies each candidate, avoiding false results from hash collisions. If the table fills, matching falls back to scanning the four bounded documents. ASCII query words all have to match; non-ASCII terms use substring matching. Title occurrences receive higher weight than body occurrences; ties retain collection order. This is independent search, not the host BM25 model or Google results.
 
-`crates/chromatic-client` is dependency-free and `no_std`. Its decoder borrows the receive buffer and checks sizes, UTF-8, cell widths, pagination, flags, and reserved bytes. It does not allocate, draw, open sockets, or operate buttons directly. The encoded packet and decoded view can share one 512-byte receive buffer. TLS, networking, fonts, UI state, and the existing framebuffer have separate costs.
+## Memory, ownership and concurrency
 
-The 24-cell row profile treats ASCII as one cell and other Unicode as two. It is a conservative layout policy, not Unicode shaping or a font coverage guarantee. The firmware must visibly substitute unsupported glyphs. Font metrics, title/footer placement, contrast, and clipping require physical inspection.
+The C adapter reserves one aligned 16 KiB opaque state region and a 2,049-byte robots buffer. Rust performs no allocation. The one network worker exclusively owns Rust state; status reads use copied counters, and refresh refuses a running job or pending response. The FFI checks pointer alignment, region size and input lengths. Calls still require readable/writable, non-overlapping caller-owned regions; those contracts are explicit in the source.
 
-## Companion responsibilities
+A retained collection is immutable while results/readers are in use. Rust generates one bounded PCS1 result or reader page locally and the existing decoder validates it before LVGL displays it. No request to a companion is made during search or navigation. Verified flags on cached packets describe source provenance from collection, not a new TLS handshake. Cancellation discards incomplete page text. Refresh clears the volatile collection and the next submitted query recollects it. Reset discards the index; Wi-Fi configuration remains in NVS.
 
-The companion owns collection, HTML extraction, ranking, source metadata, and image preparation. The current host code implements an in-memory inverted index, Japanese/English tokenization, BM25-style scoring, and packet formatting. It reads JSON fixtures, registered local files, or an immutable snapshot produced by the separate bounded public-HTTPS crawler. HTML5 parsing produces semantic reading scenes. Search-serving routes never fetch an arbitrary URL.
+Networking, TLS, the 10 KiB worker stack, GUI objects, fonts and the 15 KiB display band have separate memory costs. The fixed index budget is not total firmware RAM use. Physical minimum free heap, largest block, stack high-water mark and local compute time must be measured with collection and reading active.
 
-The device receives one result per response, up to ten ranked results. Each result references a document through a numeric ID. IDs are currently one-based positions in the loaded corpus. A service must keep that corpus immutable while a client uses its IDs. Collected snapshots are stored with source/time/hash records and a generation token. Reader/image requests bind to that generation; mismatches fail with HTTP 409. Durable cross-snapshot storage and live replacement remain pending.
+## Scope and security boundaries
 
-Bodies are split into seven-row pages. Titles can be shortened with an ellipsis; result excerpts can be shortened with an instruction to open the full page. Full bodies remain on the host and are paginated rather than silently discarded. Full source URLs stay on the host; a source/details action is needed to inspect URLs too long for a result screen.
+The initial profile is one fixed public host and the `jmc/whatisai/node*.html` path family. External hosts, credentials, ports, query strings, fragments, parent paths and arbitrary user-supplied URLs cannot enter the frontier. One serial request stream waits at least a second between page requests. A missing robots resource confirmed with HTTP 404/410 allows collection; other status errors, redirects, unsupported encoding, invalid or oversized policies fail closed. The compact policy evaluator handles matching agent groups, longest allow/disallow rules and basic wildcard/end markers for these ASCII paths; it refuses percent-encoded policies instead of guessing. It is not a general RFC-compliant robots implementation.
 
-## Experimental service routes
+The on-device mode does not implement general robots metadata/noindex/nofollow interpretation, image decoding, arbitrary links, forms, authentication, JavaScript or video. The restricted research profile and clear limits remain part of the experiment. Expand the parser and policy only with equivalent bounded tests and physical measurements.
 
-`src/server.rs` uses a small standard-library HTTP service with four workers and eight queued sockets. It serves one immutable sample or collected corpus:
+## Optional host path
 
-- `GET /v1/chromatic/search?q=...&result=0`: one PCS1 result packet.
-- `GET /v1/chromatic/page?id=...&page=0`: one PCS1 reader packet.
-- `GET /v1/search?q=...`: up to ten JSON results for the companion browser.
-- `GET /v1/collection`: the collection label, sample flag, generation and count.
-- `GET /v1/dom?id=...&page=...`: bounded semantic scene metadata.
-- `GET /v1/chromatic/image?id=...&page=...`: validated RGB565 stripes for a registered image scene.
-- `GET /v1/image?id=...&page=...`: the same quantized pixels as a prepared PNG.
+The original Rust CLI remains useful for broad public-page collection, richer HTML5 parsing, BM25/Japanese tokenization, immutable snapshots, image preparation and browser development. Its API and browser are optional companion tools, with their own collection-generation and transport checks. They do not participate in the autonomous native path and must not be used as its acceptance evidence.
 
-Reject queries longer than 96 UTF-8 bytes and unknown document/page IDs. Use explicit content lengths, bounded request/response times, and no query/body logging. A zero-result packet has document ID zero and cannot open an invented document. Collection metadata identifies fixtures or collected pages, and DOM metadata includes collected-source provenance. No hot reload or live index replacement is implemented. See [API limits](search-results.md). This protocol is not Google search or a general-purpose HTML browser.
+Earlier native image display used host-prepared RGB565/PCI1 stripes. Autonomous image acquisition/decoding/resizing is a separate pending milestone. Existing image and API evidence remains labeled with its actual firmware and execution mode.
 
-## Bounded public-page collection
+## Acceptance
 
-Use explicit seed URLs and domains, obey robots.txt, and cap page count, depth, response bytes, timeouts, and per-host frequency. Fetch public HTTPS pages with certificate verification. Validate resolved addresses, pin the approved destination, and validate redirects before following them. Exclude private/local destinations and authenticated content.
-
-Extract title, source URL, body, links, image references, and collection time. Render extracted content as data. Do not execute page scripts on the handheld or invent content for unsupported sites. The CLI collector and mocked boundary tests are implemented; public-web scope and operational limits are described in [crawling](crawling.md). Actual adversarial network acceptance, durable frontier/storage and unattended operation remain pending.
-
-## Image path
-
-The companion decodes registered PNG/JPEG sources with byte/dimension/allocation limits and resizes to 128 × 80. PCI1 sends RGB565 little-endian stripes of at most eight rows, with per-stripe CRC. Native Rust validates each stripe; the transport/UI enforce document/page identity, dimensions, order and complete receipt. A temporary cache of at most 20 KiB keeps the selected image visible in LVGL, in addition to the 15 KiB display band. It is freed on page change, cancellation, error or menu transition. This is a measured development path with original images, not arbitrary URL fetching or complete TLS peak tracing. See [DOM/image limits and native evidence](dom-images.md).
-
-## Connectivity and acceptance
-
-Use a reachable HTTPS endpoint with a certificate accepted after native time synchronization. Earlier hardware tests verified outbound HTTPS but did not establish device-to-computer LAN reachability. A USB relay or host example must not be reported as Wi-Fi-native search.
-
-The first hardware acceptance test is query entry → verified HTTPS response → result selection → complete text pagination, including empty results, network errors, and repeated navigation. Record sanitized firmware revision, packet sizes, minimum/largest free heap, timing, and physical observations. Hardware writes and captures follow the ModRetro deployment workflow and preserve existing backups and settings.
+See [on-device scope and verification](on-device-search.md). Verify exact app-only image identity and settings preservation, stop the task-owned companion and tunnel, cold-start the native collector, search real fetched pages, navigate text, test honest empty results and cancellation, and distinguish synthetic USB controls/render-buffer reads from physical-button/LCD/battery observations. No USB page proxy or host-emulated frame proves standalone execution. Release remains subject to the complete physical E2E and recovery gate.

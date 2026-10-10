@@ -1,17 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-only
 use super::*;
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicU64, Ordering},
+};
+static TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 struct Temp(PathBuf);
 use std::path::PathBuf;
 impl Temp {
     fn new() -> Self {
         let path = std::env::temp_dir().join(format!(
-            "pocket-crawl-test-{}-{}",
+            "pocket-crawl-test-{}-{}-{}",
             std::process::id(),
             SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
-                .as_nanos()
+                .as_nanos(),
+            TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed)
         ));
         fs::create_dir(&path).unwrap();
         Self(path)

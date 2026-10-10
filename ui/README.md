@@ -1,5 +1,7 @@
 # Search and reader preview
 
+> This document describes optional or historical companion tooling. The current native on-device mode does not require this service or a temporary tunnel; see [the main README](../README.md). Its fixed native source profile and image limitations are separate.
+
 A white search home, query-dependent result titles/URLs/snippets, and a paginated semantic reader with headings, paragraphs, images and registered links. No account, approval, bookmarks or history screen is included.
 
 From the repository root:
