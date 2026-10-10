@@ -50,9 +50,32 @@ Both profiles retain overflow checks, thin LTO, and one codegen unit. The future
 
 Reports contain per-call CPU-cycle minimum/maximum/total, elapsed microseconds, start/end frequency, core ID, before/after free bytes and largest blocks, and a since-boot heap low-water mark. Cycle timings include interruption overhead and counter reads. The since-boot minimum is not the callback's peak memory. A 25 ms batch budget is checked between calls; it cannot interrupt a blocking callback. Only complete `ESP_OK` reports are valid comparisons.
 
-The component compiled with the existing ESP32 Xtensa GCC 13.2 toolchain and inspected ESP-IDF 5.3 configuration using warnings as errors. Its object had 389 bytes of text and no object data/BSS; that excludes linked SDK routines, call-stack use, and the caller's report buffer. It has not been linked into or run on the device. The Rust client has not yet been cross-built or installed either.
+The CPU-cycle component compiled with the existing ESP32 Xtensa GCC 13.2 toolchain and inspected ESP-IDF 5.3 configuration using warnings as errors. Its object had 389 bytes of text and no object data/BSS; that excludes linked SDK routines, call-stack use, and the caller's report buffer. It has not been linked into or run on the device. The Rust client has not yet been cross-built or installed either.
 
 When hardware integration is ready, record firmware revision, target/toolchain, CPU frequency, core pinning, build profile, packet corpus, cycles, heap and largest-block measurements, stack high-water mark, TLS peak costs, transfer time, and visible render time. Keep CPU-only decode, verified HTTPS, and display latency as separate measurements before reporting end-to-end performance.
+
+## Physical LVGL display comparison
+
+On 2026-10-10, one USB-powered Chromatic DevDay unit ran four native C/LVGL transport candidates. These are **physical platform rendering measurements**, not host timings, Rust decoder measurements, Wi-Fi browsing E2E, or release qualification. ModRetro plugin discovery identified the unit; a device-specific application-only installation workflow verified the previous image, unchanged partition table, settings preservation, recovery backup, and installed-image integrity. No bootloader, FPGA, eFuse, or cartridge was changed. The collector’s image SHA-256 is operator-asserted; separate installation checks verified the installed flash against that local image, and the comparison links both records. Complete experimental firmware images and prior Wi-Fi/font integration remain operator-local; this repository distributes the new component sources and sanitized measurements.
+
+The common platform was ESP32-U4WDH at fixed 160 MHz, GUI core 1, ESP-IDF 5.3.0, LVGL 8.4.0, Xtensa GCC 13.2.0, RGB565 160 × 144, native Wi-Fi connected, and the same original text/font fixture. Three modes retain `-Og`. The fourth appends `-O2` only to LVGL, fonts, and the band driver; the probe, network/TLS, assertions, and other platform flags remain unchanged. Raw reports, hashes, source commits, linked section sizes, and compiler settings are in the [comparison record](benchmarks/2026-10-10-chromatic-comparison.json). See the [integration procedure](chromatic-rendering.md).
+
+Each mode has three repeats of four cases: idle, counter update, page replacement, and full-background update. Each window has six settling steps and 32 native-timer steps spaced at least 100 ms apart. The table gives the median of three **per-window mean** render-start → final-DMA-completion times; it does not give per-frame latency percentiles or LCD scanout time. The raw comparison also records the min/max of those sample means.
+
+| Native transport | Draw buffer | Static DRAM saved | Counter (ms) | Page (ms) | Full background (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Stock full-refresh, `-Og` | 45 KiB | — | 20.87 | 20.51 | 20.88 |
+| 16 rows, `-Og` | 5 KiB | 42,536 bytes | 10.00 | 46.18 | 49.63 |
+| 48 rows, `-Og` | 15 KiB | 31,896 bytes | 10.51 | 31.08 | 31.63 |
+| 48 rows, graphics `-O2` | 15 KiB | 31,896 bytes | 8.97 | 24.75 | 24.68 |
+
+Static DRAM saving is the difference in linked `.dram0.data` plus `.dram0.bss`; it includes buffer/descriptor/state differences and is not total firmware RAM or runtime peak allocation. The selected 48-row prototype saves **30 KiB of draw-buffer storage (66.7%)** and makes the counter workload **2.33× faster**. Counter payload drops from 46,080 to 15,360 bytes per update. Page and full updates still transfer 46,080 bytes. Their latency is about 21% and 18% worse than stock respectively. Sixteen rows save more memory but more than double page/full latency in this debug build, so they remain an explicit memory-first alternative.
+
+The lowest free heap observed across all windows was 57,516 bytes for stock and 89,972 bytes for the selected prototype. These window minima include background firmware/Wi-Fi work; they are not Rust-core memory costs or a TLS worst-case guarantee. The installed application sizes were 1,867,936 and 1,846,768 bytes respectively. Intermediate modes and all samples remain in the raw record.
+
+All 48 measured windows completed; each active window recorded 32 frames, and idle recorded zero transfers. The final RGB565 render-buffer and PNG digests match across all four modes. Captures are [stock](benchmarks/2026-10-10-chromatic-stock-full.png), [16 rows](benchmarks/2026-10-10-chromatic-stripe16.png), [48 rows](benchmarks/2026-10-10-chromatic-stripe48.png), and [48 rows with graphics optimization](benchmarks/2026-10-10-chromatic-stripe48-o2.png). They are physical MCU render-buffer readbacks over USB, **not USB-video captures or independent FPGA/panel readback**. Capture allocates another temporary full-frame buffer only after measurement; it is excluded from the window metrics. Incomplete captures caused by interleaved diagnostic logging were retried without repeating measurements. The operator confirmed the baseline screen was visible; final-panel inspection is recorded separately in the comparison metadata.
+
+The engineering choice for this text prototype is 48 rows plus graphics `-O2`, retaining ESP-IDF/FreeRTOS. This establishes a measured display-memory improvement, not an ESP-IDF-versus-bare-metal result or a universal optimal buffer size. The integrated reader, TLS/image peak memory, Japanese layout, input latency, panel scanout, and production tick behavior still need physical checks. The retained upstream tick-unit issue and exact timing scope are documented in [integration notes](chromatic-rendering.md). The physical search release gate stays blocked until the complete native application and lab E2E exist.
 
 ## Performance acceptance
 
@@ -66,7 +89,7 @@ The initial target remains ESP-IDF 5.3/FreeRTOS with existing device drivers. Es
 
 - Consolidate application work where practical and size stacks from worst-case high-water measurements with headroom.
 - Bound concurrent requests and network/TLS buffers; measure both memory and throughput rather than assuming smaller buffers are faster.
-- Use incremental drawing and the proposed image stripes to avoid another full framebuffer; drawing and image transport remain unimplemented.
+- Use incremental drawing and the proposed image stripes to avoid another full framebuffer; the experimental native band display driver is measured separately from the pending reader/image transport.
 - Keep certificate checks, UTF-8 validation, and recovery behavior intact.
 
-Compare linked image size, peak/free heap, largest free block, task stack use, decoder cycles, verified HTTPS latency, and visible rendering under identical scenarios. No complete ESP-IDF-versus-bare-metal build or physical performance comparison exists yet. Replacing the platform requires a supported Wi-Fi/TLS integration and equivalent physical E2E, not just a smaller core binary.
+Compare linked image size, peak/free heap, largest free block, task stack use, decoder cycles, verified HTTPS latency, and visible rendering under identical scenarios. Neither a complete bare-metal counterpart nor an ESP-IDF-versus-bare-metal physical comparison exists yet. Replacing the platform requires a supported Wi-Fi/TLS integration and equivalent physical E2E, not just a smaller core binary.

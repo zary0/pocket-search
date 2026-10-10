@@ -6,7 +6,7 @@ A small web search and reading application designed around the **ModRetro Chroma
 
 Chromatic is the primary platform. Host tools develop the search service and verify the device protocol. The application targets the console's MCU firmware and menu interface; a Game Boy cartridge ROM is not the deployment target for this Wi-Fi reader.
 
-**Status: development foundation, not an installed browser.** Implemented: Rust search core, bounded text packet encoder, allocation-free client decoder, and button action mapping. Pending: crawling, HTTP API, firmware integration, and image display. No Pocket Search firmware has been flashed or tested on the physical console.
+**Status: development foundation, not an installed browser.** Implemented: Rust search core, bounded text packet encoder, allocation-free client decoder, and button action mapping. Pending: crawling, HTTP API, Rust firmware integration, and image display. A separate native C/LVGL platform probe has been installed and measured physically: its selected prototype cuts the draw buffer from 45 to 15 KiB and improves small updates, with a full-redraw latency tradeoff. It does not include the Rust reader or verify browsing. See [measured results](docs/performance.md#physical-lvgl-display-comparison).
 
 ## Architecture
 
@@ -112,7 +112,7 @@ Contributions should keep the device path bounded and justify performance change
 cargo bench --locked --bench performance > performance.json
 ```
 
-Checked-in timings are host-only measurements on Apple M4, not physical Chromatic speed claims. The ESP32 CPU/heap probe has a target compile check; device execution, Rust Xtensa integration, and actual profile selection remain pending.
+The Rust search and decoder timings are host-only measurements on Apple M4. A separate C/LVGL display probe measures native rendering on one physical console; see [display integration](docs/chromatic-rendering.md) and [performance results](docs/performance.md). The CPU-cycle probe has a target compile check; physical Rust decoder execution, Xtensa integration, and profile selection remain pending.
 
 ## CI, CD, and versions
 

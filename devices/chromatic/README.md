@@ -36,7 +36,7 @@ Device-to-computer LAN reachability was not established. An externally reachable
 5. Translate actions into requests and UI state changes.
 6. Inspect text layout, Unicode fallback, controls, TLS memory costs, and errors physically.
 
-The platform source is [ModRetro's Chromatic MCU repository](https://github.com/ModRetro/oss-chromatic-console-mcu). Existing firmware and font code are not copied here. Future imported or modified upstream source must retain its licensing and notices.
+The platform source is [ModRetro's Chromatic MCU repository](https://github.com/ModRetro/oss-chromatic-console-mcu). Experimental display/probe components are supplied here; complete existing firmware and font assets are not bundled. Future imported or modified upstream source must retain its licensing and notices.
 
 ## Deployment boundary
 
@@ -53,3 +53,11 @@ See the [protocol](../../docs/chromatic-protocol.md) and [hardware-first roadmap
 The Rust client stays integer-only, dependency-free, allocation-free, and bounded. Compare the `chromatic-size` and `chromatic-speed` build profiles on the actual Xtensa toolchain before choosing a firmware setting. The current Rust build checks are host-only.
 
 `components/pocket_perf_probe` provides an ESP-IDF CPU-cycle and heap probe for the ESP32 configuration. It was cross-compiled with the existing target C compiler and SDK, but has not been linked or executed physically. Use a pinned task and fixed frequency with a bounded synchronous callback. Its measurements include interrupts; network and display tests need separate end-to-end timing. See [performance notes](../../docs/performance.md) for the exact scope and reproducible host results.
+
+## Experimental display components
+
+`components/pocket_render_probe` measures idle, counter, text-page, and full-background updates in the existing native LVGL platform. `components/pocket_band_display` replaces the full framebuffer with a single 16-row or 48-row DMA buffer and retires completed SPI transactions before descriptor reuse. The portable transfer-boundary test runs in hosted CI; actual target builds and physical measurements are separate evidence.
+
+This is a platform-level C integration. It does not connect the Rust decoder, implement images/search, or satisfy the physical release gate. The collector uses USB diagnostics and native Wi-Fi status; its screenshots are actual MCU render-buffer readbacks rather than USB-video captures. See [integration and measurement details](../../docs/chromatic-rendering.md).
+
+The measured text prototype uses 48 rows and an opt-in graphics-only `-O2` build: 15 KiB of draw-buffer storage, 8.97 ms counter updates, and 24.68 ms full-background updates. Stock was 45 KiB and 20.87/20.88 ms respectively. The smaller buffer improves memory and small counter updates; page replacement and full updates remain slower. These are medians of three window means on one development unit, not complete reader or panel-scanout performance. See [raw-backed results](../../docs/performance.md#physical-lvgl-display-comparison).
