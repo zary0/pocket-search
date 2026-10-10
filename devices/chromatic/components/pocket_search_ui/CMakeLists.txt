@@ -1,6 +1,6 @@
-idf_component_register(SRCS "pocket_search_ui.c" "pocket_search_net.c" INCLUDE_DIRS "."
+idf_component_register(SRCS "pocket_search_ui.c" "pocket_search_net.c" "pocket_search_origin.c" INCLUDE_DIRS "."
     REQUIRES common button menu_mgr tab lvgl chromatic_wifi fonts
-    PRIV_REQUIRES console esp_http_client esp-tls mbedtls esp_timer)
+    PRIV_REQUIRES console esp_http_client esp-tls mbedtls esp_timer nvs_flash)
 if(NOT DEFINED POCKET_RUST_ARCHIVE OR NOT EXISTS "${POCKET_RUST_ARCHIVE}")
     message(FATAL_ERROR "Build chromatic-ffi for Xtensa and set POCKET_RUST_ARCHIVE to its static library")
 endif()

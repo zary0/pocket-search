@@ -97,7 +97,7 @@ Earlier work on one Chromatic DevDay unit verified Wi-Fi, native SNTP, and certi
 
 Available heap on that earlier unit before a small HTTPS request was about 58 KiB. This is an observation of that unit and firmware, not a universal free-memory guarantee. Its hardware/software environment is summarized above; see the [device profile](devices/chromatic/README.md) for exact measurements.
 
-The development Wi-Fi allowed outbound HTTPS but did not establish device-to-computer LAN reachability. Hardware testing needs a verified reachable endpoint; a running local service alone does not prove a Wi-Fi path to the device.
+The development Wi-Fi allowed outbound HTTPS but did not establish device-to-computer LAN reachability. Hardware testing needs a verified reachable endpoint; a running local service alone does not prove a Wi-Fi path to the device. Save a verified origin with `search_endpoint https://hostname --save` to restore it after restart; see [service setup and recovery](docs/search-service.md). A saved temporary URL still depends on the companion and tunnel staying available.
 
 ## Next milestone
 

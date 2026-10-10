@@ -10,6 +10,8 @@ Prefer measured changes with a clear behavior or resource benefit. Do not trade 
 
 ## Checks
 
+The CI also compiles `tests/test_search_origin.c` with the origin implementation and test NVS headers under `tests/platform`, using address/undefined sanitizers. Actual restart/network checks require the intended physical MCU and a reachable authorized origin; the host fixture alone is not hardware qualification.
+
 ```sh
 node --test tests/test_search_input.mjs
 cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined tests/test_search_input.c -o /tmp/test-search-input
