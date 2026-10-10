@@ -28,3 +28,13 @@ Saving a temporary tunnel address does not make it permanent. Both the companion
 ## Verification scope
 
 The host C test exercises the actual origin storage implementation with a controlled NVS fixture: cold-start restoration, missing/corrupt/oversized records, hostname bounds, failed open/set/commit/read, and unchanged-save write suppression. This fixture is not physical flash evidence. The full MCU build and physical request/restart evidence must be recorded separately. USB diagnostic inputs are synthetic; native Wi-Fi requests and MCU render-buffer readbacks do not prove physical button automation, LCD scanout, or release qualification.
+
+## Physical recovery check — 2026-10-10
+
+The experimental application-only image **0.13.15-svc**, **1,874,896 bytes**, SHA-256 `c7a025f9a70a027716e6de9e13fba7b72b8920e7539a750d52336269e13b9c5f`, was built with ESP-IDF 5.3 and the existing linked Xtensa decoder. The installer verified the previous 0.13.13-dom application, intended backed-up unit, unchanged partition table/NVS, and new application readback. Bootloader, FPGA and eFuses were unchanged. The image is 1,104 bytes larger than the previous experimental image; this is a file-size comparison, not a RAM or CPU benchmark.
+
+The origin was explicitly saved after installation. Reopening the development USB connection restarted the MCU. The fresh clock was initially unsynchronized (`unix_time: 6`, `sync_count: 0`); endpoint status already reported a valid saved origin. **No configure/save command was sent after this restart.** The handheld then synchronized its own clock, fetched the three-result `wifi` search, opened the first article with synthetic A, and returned with synthetic B. All three requests passed certificate/hostname validation and completed in 1,980–2,792 ms. USB carried controls and diagnostics; it did not supply pages or time.
+
+The [sanitized evidence](evidence/search-service/verification.json) binds source hashes, the linked decoder, installed image and actual MCU requests. The operator separately confirmed that search results were visible on the physical LCD. The retained image below is a **physical MCU render-buffer readback**, not a USB video capture. A battery-only power cycle and automated physical-button E2E were not performed. This experiment does not qualify a stable release or make the temporary development origin permanent.
+
+![Restored native search after MCU restart](evidence/search-service/native-results.png)

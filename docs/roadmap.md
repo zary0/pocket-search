@@ -22,6 +22,7 @@ Keep P0 acceptance as the release priority. The operator-requested DOM/image exp
 - [x] Enforce the 96-byte decoded UTF-8 query limit and 512-byte packet limit; reject invalid IDs/pages, return honest empty results, and bound request time/concurrency with explicit response lengths.
 - [ ] Add deterministic failure cases and test hooks for timeouts, malformed/oversized packets, and request correlation. Keep query/body logging disabled.
 - [x] Make a certificate-validated HTTPS origin reachable from the actual device network. Verify this before relying on a local service: earlier tests did not establish device-to-computer LAN reachability.
+- [x] Offer explicit saved-origin setup and restore it after an MCU restart. Verify native search/read/back without reconfiguring the origin; keep the companion/tunnel availability and battery-only acceptance boundaries explicit. See [restart recovery evidence](search-service.md).
 
 **Completion:** known queries produce query-dependent PCS1 results and complete reader pages through the service, with compatible decoding and deterministic errors. This API check alone is not a physical-device pass.
 
