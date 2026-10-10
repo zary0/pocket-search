@@ -334,5 +334,6 @@
       "gui_stack_free_bytes": 5604,
       "sample": 3
     }
-  ]
+  ],
+  "application_sha256_provenance": "operator-asserted"
 }

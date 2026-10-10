@@ -12,6 +12,12 @@ import zlib
 
 CASES = ('idle', 'counter', 'page', 'full')
 
+def validate_output_paths(output, capture, resume=False):
+    if output.resolve() == capture.resolve():
+        raise ValueError('Measurement JSON and PNG output paths must differ')
+    if capture.exists() or (output.exists() and not resume):
+        raise ValueError('Keep existing measurements; choose new output paths')
+
 def validate_report(value, version, mode, case):
     required = ('elapsed_us', 'handler_calls', 'handler_total_us', 'handler_max_us',
                 'flushes', 'transfer_bytes', 'frames', 'frame_total_us', 'frame_max_us',
@@ -67,8 +73,6 @@ def send(connection, command):
     connection.flush()
 
 def main():
-    import serial
-    from serial.tools import list_ports
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--port',required=True)
     parser.add_argument('--firmware-version',required=True)
@@ -81,8 +85,10 @@ def main():
     args=parser.parse_args()
     if not 1 <= args.repeat <= 10 or not re.fullmatch('[0-9a-f]{64}',args.application_sha256):
         parser.error('Invalid sample count or installed application digest')
-    if args.capture.exists() or (args.output.exists() and not args.resume_capture):
-        parser.error('Keep existing measurements; choose new output paths')
+    try:
+        validate_output_paths(args.output,args.capture,args.resume_capture)
+    except ValueError as error:
+        parser.error(str(error))
     samples=[]
     if args.resume_capture:
         saved=json.loads(args.output.read_text())
@@ -95,6 +101,8 @@ def main():
             if not (value.get('firmware_version')==args.firmware_version and value.get('mode')==args.mode
                     and value.get('case')==CASES[index%len(CASES)] and value.get('sample')==index//len(CASES)+1):
                 parser.error('Saved physical samples do not match the requested capture')
+    import serial
+    from serial.tools import list_ports
     matches=[port for port in list_ports.comports() if port.device==args.port and port.vid==0x374e and port.pid==0x0101]
     if len(matches)!=1:
         parser.error('Selected port is not the expected Chromatic interface')
@@ -143,7 +151,7 @@ def main():
                 # Preserve completed samples immediately if later hardware access fails.
                 args.output.parent.mkdir(parents=True,exist_ok=True)
                 args.output.write_text(json.dumps({'schema_version':1,'execution_mode':'physical-lvgl-platform-probe',
-                    'complete':False,'application_sha256':args.application_sha256,'samples':samples},indent=2)+'\n')
+                    'complete':False,'application_sha256':args.application_sha256,'application_sha256_provenance':'operator-asserted','samples':samples},indent=2)+'\n')
                 print(json.dumps({key:value[key] for key in ('sample','case','frames','transfer_bytes','frame_total_us','free_heap_bytes','window_min_free_bytes')}),flush=True)
         # Readback is deliberately outside every measurement window. It needs a
         # temporary full-frame buffer and is not a physical USB-video capture.
@@ -163,7 +171,7 @@ def main():
         args.capture.parent.mkdir(parents=True,exist_ok=True)
         args.capture.write_bytes(png(raw))
         result={'schema_version':1,'execution_mode':'physical-lvgl-platform-probe','complete':True,
-            'application_sha256':args.application_sha256,'wifi_connected':True,
+            'application_sha256':args.application_sha256,'application_sha256_provenance':'operator-asserted','wifi_connected':True,
             'frame_source':'physical-mcu-render-buffer-over-usb','capture_outside_measurement':True,
             'capture_attempts':capture_attempt,'framebuffer_sha256':hashlib.sha256(raw).hexdigest(),
             'capture_sha256':hashlib.sha256(args.capture.read_bytes()).hexdigest(),'samples':samples}

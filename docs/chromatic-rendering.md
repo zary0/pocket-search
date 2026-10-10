@@ -45,9 +45,9 @@ The collector also requires the existing development adapter's `fwversion`, `wif
 
 `pocket_screen` returns `POCKETFRAME 160 144 RGB565`, 144 rows of 640 lowercase hexadecimal characters, then `POCKETFRAME_END`. This is MCU render-buffer data, not a USB-video capture. The full-buffer adapter copies a completed render. The band adapter must claim a requested snapshot on the GUI task **before** invalidating the whole scene, then concatenate all bands at `area.y1 * 320`. Signal completion only after the last band. On timeout, the console must not free a snapshot that the GUI task owns. Never copy only the last band buffer or claim a partially initialized frame as complete.
 
-The diagnostic snapshot temporarily allocates another 46,080 bytes. Allocate it only after all measurement windows; exclude this diagnostic memory from normal-operation claims. The collector retries only incomplete read-only captures, at most three times, and preserves completed measurements after a failure. It never flashes firmware, changes Wi-Fi settings, or approves a release.
+The diagnostic snapshot temporarily allocates another 46,080 bytes. Allocate it only after all measurement windows; exclude this diagnostic memory from normal-operation claims. The collector retries only terminated captures with an invalid row count, at most three attempts total. A missing `POCKETFRAME_END` times out immediately; resume capture explicitly after checking device readiness. It preserves completed measurements after a failure. It never flashes firmware, changes Wi-Fi settings, or approves a release.
 
-Install pyserial in a suitable Python environment. After device-specific application installation, recovery/settings checks, and read-back verification, supply that verified image digest:
+Install pyserial in a suitable Python environment. After device-specific application installation, recovery/settings checks, and read-back verification, supply that verified image digest. The collector records it as **operator-asserted**; it does not hash the installed application or independently authenticate the supplied digest. External installation verification is recorded separately in the checked-in comparison:
 
 ```sh
 python3 scripts/measure_chromatic_render.py \

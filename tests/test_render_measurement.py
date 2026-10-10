@@ -3,6 +3,7 @@
 import importlib.util
 from pathlib import Path
 import unittest
+import tempfile
 
 spec = importlib.util.spec_from_file_location('measurement', Path(__file__).parents[1] / 'scripts/measure_chromatic_render.py')
 measurement = importlib.util.module_from_spec(spec)
@@ -36,7 +37,8 @@ class PhysicalReportValidation(unittest.TestCase):
 
     def test_idle_requires_no_rendering(self):
         report=self.fixture(case='idle')
-        with self.assertRaises(ValueError):
+        report['frames']=0
+        with self.assertRaisesRegex(ValueError,'Unexpected rendering during idle case'):
             measurement.validate_report(report,'fixture-version','stock-full','idle')
         for key in ('frames','flushes','transfer_bytes','frame_total_us','frame_max_us'):
             report[key]=0
@@ -47,6 +49,14 @@ class PhysicalReportValidation(unittest.TestCase):
             report=self.fixture(mode=mode)
             measurement.validate_report(report,'fixture-version',mode,'counter')
             self.assertEqual(report['execution_mode'],'physical-lvgl-platform-probe')
+
+    def test_output_aliases_rejected_before_hardware_access(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output=Path(directory)/'result.json'
+            alias=Path(directory)/'nested'/'..'/'result.json'
+            with self.assertRaisesRegex(ValueError,'paths must differ'):
+                measurement.validate_output_paths(output,alias)
+            measurement.validate_output_paths(output,Path(directory)/'frame.png')
 
     def test_incomplete_frame_rejected(self):
         with self.assertRaises(ValueError):
