@@ -85,3 +85,9 @@ The operator separately confirmed the physical LCD color image and real Left/Rig
 ![Browser image and controls preview; not physical video](evidence/dom-images/browser-preview.png)
 
 Host tests cover parsing/order/entities/hidden content, unsafe links, file/path bounds, codec limits, API registration, packet/stripe truncation, CRC, dimensions and order. Hosted CI checks these independently. Full malformed-transfer/cancellation/reconnection physical acceptance, GUI stack tracing, long-duration memory tests, complete Japanese font coverage, battery-only operation and the dedicated physical-buttons/USB-video release lab remain pending. `CHROMATIC_E2E_READY` remains false. This evidence does not qualify a stable firmware release.
+
+## Final clock-cancellation revision
+
+Application **0.13.13-dom**, **1,873,792 bytes**, SHA-256 `1dae32aca1cb4a3aab7f0916941bcd669f82a4300f2d3179704dc55dbab07f0d`, was installed with the same application-only/readback/settings-preservation procedure. [Its separate evidence](evidence/dom-images/v0.13.13/verification.json) repeats 30 successful native Wi-Fi HTTPS requests, all 14 scenes, both full image-region comparisons and registered link/back navigation against source commit `f716bdd6fb834c51dbc52d5d4ba3e071c6a404f0`. The earlier record and operator confirmation remain unchanged.
+
+The final worker checks cancellation between 200 ms polls of native SNTP state, without restarting synchronization. Blocking socket calls keep their timeouts; unsynchronized-clock cancellation timing and the full interruption/error release acceptance are not measured by this positive-flow run. Lowest sampled free heap: 44560 bytes; lowest sampled largest free block: 40960 bytes. These remain sampled values, not allocator peaks. The final image is 3,232 bytes larger than the earlier text-only 0.13.11-results image. No stable firmware package or physical release qualification is produced.
