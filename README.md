@@ -56,6 +56,8 @@ These actions are connected to the experimental native C/LVGL adapter and Rust d
 
 ## Runtime and development environment
 
+An optional [native button-click implementation](docs/native-click.md) generates short feedback in the FPGA while menus are open. Its RTL simulation and pinned-source integration pass; the required licensed Gowin build and physical speaker test remain pending.
+
 | Layer | Environment and validation status |
 | --- | --- |
 | Host CLI and search core | Native Rust 2024 program. Validated locally on macOS / Apple M4 / aarch64 with Rust and Cargo 1.95.0, and in hosted Ubuntu / x86_64 CI with stable Rust. Other host platforms are not verified |

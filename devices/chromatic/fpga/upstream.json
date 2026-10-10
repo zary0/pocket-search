@@ -1,0 +1,15 @@
+{
+  "repository": "https://github.com/ModRetro/oss-chromatic-console-fpga",
+  "commit": "a01aa375147943cbcd4a41f41585220d55e0c28a",
+  "gameboy_mister_commit": "44f43d5797cf6e67480c156b47974d6f1ca9ce4a",
+  "custom_version": "0x1392",
+  "sha256": {
+    "esp32t/src/top.v": "659a7fb66e45ffb055dcc2ca3c3f1cf6978db14898e1709b2b1386fc15cbd5a8",
+    "esp32t/src/rtl/BSP/system_monitor.sv": "e4f15ef12ce06470db93516d2b0fa6986f7d305d6cd0ca86813225ced822c43e",
+    "esp32t/evt1_x2.gprj": "c5fe912c6621ecb883d8701a6537da33b9e6e2bd652e8368cd65d0f75a4797bc",
+    "LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+    "esp32t/build.tcl": "e76e6ee815e8f6beca0a9aa42965baf402c807c70b8da9a80b00963e01cca29c",
+    "esp32t/build_options.tcl": "c877c984c2954c513c47e1a559824510a4b25dee1f6c41949039fb20224cb547",
+    "esp32t/src/gowin_pll_preevt/gowin_pll.v": "716ba20c03b4fc5e9fcd43df4f0326379a5b33b7f4f3c15bfddd16d631c8ce24"
+  }
+}

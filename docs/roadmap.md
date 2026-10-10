@@ -84,6 +84,9 @@ Registered local PNG/JPEG resizing and two original source images have native Wi
 
 ## P3 — Quality and measured improvements
 
+- [x] Implement optional FPGA physical menu-button clicks and validate the waveform/mixer in RTL simulation with pinned official-source integration. See [native click scope](native-click.md).
+- [ ] Build that FPGA design with the licensed Gowin toolchain, verify timing/resources and recovery, and physically qualify speaker/headphone/USB feedback. The current implementation has not been installed or heard on the console.
+
 - [ ] Refine Japanese input, keyboard ergonomics, long-text layout, links, reading controls, and search relevance using the working product.
 - [ ] Optimize actual decoder, HTTPS, and rendering bottlenecks while preserving validation, content correctness, and source information. Compare target size/speed profiles on the real Xtensa build.
 - [ ] Evaluate stack/task consolidation or platform replacement only against equivalent networking, recovery, and physical E2E behavior.

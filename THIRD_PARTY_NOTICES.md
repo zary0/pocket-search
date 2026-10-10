@@ -119,6 +119,10 @@ No official firmware binary, FPGA image, commercial game, device backup, or thir
 
 ## External build and runtime prerequisites
 
+The optional native click integration follows the PCM wiring and project/version fields in [ModRetro's FPGA source at commit a01aa375147943cbcd4a41f41585220d55e0c28a](https://github.com/ModRetro/oss-chromatic-console-fpga/tree/a01aa375147943cbcd4a41f41585220d55e0c28a), under its [GNU GPL v3 license](third_party/licenses/modretro-fpga/LICENSE). The repository-authored click module and staging modifications are GPL-3.0-only. The preparer retains upstream and submodule license files in its separate local source tree. The complete official FPGA project, vendor IP and MiSTer source/binaries are external prerequisites, not bundled release assets. A distributable FPGA image would need its own complete source, licensing and build review.
+
+Icarus Verilog is an external simulation tool. The complete pinned FPGA design requires Gowin FPGA Designer 1.9.12.03 and an appropriate vendor license. Neither the tools nor vendor license credentials are bundled. See [native click build and validation boundaries](docs/native-click.md).
+
 ESP-IDF 5.3, FreeRTOS, LVGL 8.4.0, the Xtensa C toolchain, esp-rs Rust/LLVM toolchain (installed with espup 0.17.1), Rust core/compiler-builtins used by build-std, and a suitable licensed font are external prerequisites of the experimental MCU integration. Their source/binaries are not bundled in the current packages. A future native application distribution must inventory the exact linked components and assets, include their required notices, and provide corresponding source/build instructions before release. Do not treat this list as a completed firmware distribution review.
 
 Third-party GitHub Actions execute in CI and are not part of the release application. Their upstream source and pinned revisions are recorded in `.github/workflows`; dependency updates keep those pins reviewable.

@@ -21,6 +21,7 @@ cargo check --locked -p chromatic-client
 cargo bench --locked --bench performance
 python3 scripts/pipeline.py version
 python3 -m unittest discover -s tests -v
+python3 scripts/test_chromatic_click.py  # Requires Icarus Verilog; simulation only.
 cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined tests/test_band_plan.c -o /tmp/test-band-plan
 /tmp/test-band-plan
 cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -DPOCKET_BAND_ROWS=48 tests/test_band_plan.c -o /tmp/test-band-plan48

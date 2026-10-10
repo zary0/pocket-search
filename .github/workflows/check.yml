@@ -18,6 +18,24 @@ jobs:
           components: rustfmt, clippy
       - run: python3 scripts/pipeline.py version
       - run: python3 -m unittest discover -s tests -v
+      - name: Install FPGA simulation tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y iverilog
+      - name: Check out pinned official FPGA sources
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ModRetro/oss-chromatic-console-fpga
+          ref: a01aa375147943cbcd4a41f41585220d55e0c28a
+          path: target/chromatic-fpga-upstream
+          submodules: recursive
+          persist-credentials: false
+      - name: Stage and elaborate native audio integration
+        env:
+          CLICK_STAGE: ${{ runner.temp }}/chromatic-click
+        run: |
+          python3 scripts/prepare_chromatic_click.py target/chromatic-fpga-upstream "$CLICK_STAGE"
+          python3 scripts/test_chromatic_click.py --staged "$CLICK_STAGE"
       - name: Check display transfer bounds
         run: |
           cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined tests/test_band_plan.c -o /tmp/test-band-plan
