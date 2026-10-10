@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod chromatic;
+pub mod crawler;
 pub mod dom;
 pub mod server;
 
@@ -29,7 +30,20 @@ pub struct SearchHit {
     pub score: f64,
 }
 
+#[derive(Clone)]
+pub struct Collection {
+    pub sample: bool,
+    pub label: String,
+    pub generation: String,
+}
+#[derive(Clone, Serialize)]
+pub struct Provenance {
+    pub fetched_at: u64,
+    pub source_sha256: String,
+}
 pub struct SearchIndex {
+    pub(crate) collection: Collection,
+    pub(crate) provenance: BTreeMap<usize, Provenance>,
     documents: Vec<Document>,
     postings: BTreeMap<String, Vec<Posting>>,
     lengths: Vec<f64>,
@@ -106,6 +120,12 @@ impl SearchIndex {
         }
         let average_length = (lengths.iter().sum::<f64>() / documents.len().max(1) as f64).max(1.0);
         Self {
+            collection: Collection {
+                sample: true,
+                label: "Original sample collection · 2026-10-10".into(),
+                generation: "original-samples-v1".into(),
+            },
+            provenance: BTreeMap::new(),
             documents,
             postings,
             lengths,
@@ -121,6 +141,24 @@ impl SearchIndex {
     /// All normalized query terms must match. Title occurrences are weighted
     /// three times, and an exact title substring adds a small relevance bonus.
     pub fn search(&self, query: &str, limit: usize) -> Vec<SearchHit> {
+        self.hits(query, self.ranked(query, limit.min(50)))
+    }
+
+    /// Page through every match in the admitted collection. Rank IDs first;
+    /// allocate titles, URLs and snippets only for the requested window.
+    pub fn search_window(
+        &self,
+        query: &str,
+        offset: usize,
+        limit: usize,
+    ) -> (Vec<SearchHit>, usize) {
+        let ranked = self.ranked(query, self.documents.len());
+        let total = ranked.len();
+        let window = ranked.into_iter().skip(offset).take(limit).collect();
+        (self.hits(query, window), total)
+    }
+
+    fn ranked(&self, query: &str, limit: usize) -> Vec<(usize, f64)> {
         let normalized = query.trim().to_lowercase();
         let terms: BTreeSet<String> = tokenize(&normalized, true).into_iter().collect();
         if terms.is_empty() || limit == 0 {
@@ -141,7 +179,7 @@ impl SearchIndex {
             .min_by_key(|(posting, _)| posting.len())
             .unwrap()
             .0;
-        let limit = limit.min(50);
+        let limit = limit.min(self.documents.len());
         let mut best: Vec<(usize, f64)> = Vec::with_capacity(limit);
         let rank = |a: &(usize, f64), b: &(usize, f64)| {
             b.1.total_cmp(&a.1)
@@ -178,8 +216,13 @@ impl SearchIndex {
                 best.insert(position, result);
             }
         }
-        // Only the selected documents allocate output strings and snippets.
-        best.into_iter()
+        best
+    }
+
+    fn hits(&self, query: &str, ranked: Vec<(usize, f64)>) -> Vec<SearchHit> {
+        let normalized = query.trim().to_lowercase();
+        ranked
+            .into_iter()
             .map(|(id, score)| {
                 let doc = &self.documents[id];
                 SearchHit {

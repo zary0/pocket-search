@@ -11,6 +11,9 @@ use std::{
     path::{Component, Path},
 };
 use url::Url;
+pub(crate) const MAX_DOCUMENTS: usize = 256;
+pub(crate) const MANIFEST_BYTES: usize = 256 * 1024;
+pub(crate) const PREPARED_IMAGE_BYTES: usize = 8 * 1024 * 1024;
 
 pub struct ImageAsset {
     pub width: u16,
@@ -50,6 +53,8 @@ pub enum Block {
 pub struct Parsed {
     pub title: String,
     pub blocks: Vec<Block>,
+    pub noindex: bool,
+    pub nofollow: bool,
 }
 
 fn selector(value: &str) -> Selector {
@@ -316,9 +321,26 @@ pub fn parse(source: &str, url: &str) -> Result<Parsed, String> {
     if collector.blocks.len() > 256 {
         return Err("DOM block limit".into());
     }
+    let mut noindex = false;
+    let mut nofollow = false;
+    for meta in html.select(&selector("meta[name]")) {
+        if meta.value().attr("name").is_some_and(|name| {
+            name.eq_ignore_ascii_case("robots") || name.eq_ignore_ascii_case("PocketSearchBot")
+        }) {
+            let content = meta.value().attr("content").unwrap_or("");
+            for directive in content.split(|c: char| c.is_whitespace() || c == ',') {
+                noindex |= directive.eq_ignore_ascii_case("noindex")
+                    || directive.eq_ignore_ascii_case("none");
+                nofollow |= directive.eq_ignore_ascii_case("nofollow")
+                    || directive.eq_ignore_ascii_case("none");
+            }
+        }
+    }
     Ok(Parsed {
         title,
         blocks: collector.blocks,
+        noindex,
+        nofollow,
     })
 }
 pub fn prepare_image(bytes: &[u8]) -> Result<ImageAsset, String> {
@@ -456,14 +478,16 @@ pub fn append(index: SearchIndex, path: &str) -> Result<SearchIndex, String> {
     let mut bytes = Vec::new();
     std::fs::File::open(&path)
         .map_err(|_| "HTML manifest read")?
-        .take(65537)
+        .take(MANIFEST_BYTES as u64 + 1)
         .read_to_end(&mut bytes)
         .map_err(|_| "HTML manifest read")?;
-    if bytes.len() > 65536 {
+    if bytes.len() > MANIFEST_BYTES {
         return Err("HTML manifest limit".into());
     }
     let manifest: Manifest = serde_json::from_slice(&bytes).map_err(|_| "HTML manifest JSON")?;
-    if manifest.pages.len() > 16 || index.document_count() + manifest.pages.len() > 256 {
+    if manifest.pages.len() > MAX_DOCUMENTS
+        || index.document_count() + manifest.pages.len() > MAX_DOCUMENTS
+    {
         return Err("HTML collection limit".into());
     }
     let root = path
@@ -491,6 +515,8 @@ pub fn append(index: SearchIndex, path: &str) -> Result<SearchIndex, String> {
             return Err("Image registration limit".into());
         }
     }
+    let collection = index.collection;
+    let provenance = index.provenance;
     let mut docs = index.documents;
     let mut doms = index.dom_documents;
     let mut total_images = 0usize;
@@ -556,7 +582,7 @@ pub fn append(index: SearchIndex, path: &str) -> Result<SearchIndex, String> {
                         } else {
                             let image = prepare_image(&file(&root, file_name, 2 * 1024 * 1024)?)?;
                             total_images += image.pixels.len() + image.png.len();
-                            if total_images > 8 * 1024 * 1024 {
+                            if total_images > PREPARED_IMAGE_BYTES {
                                 return Err("Prepared image collection limit".into());
                             }
                             let id = dom.images.len();
@@ -586,7 +612,15 @@ pub fn append(index: SearchIndex, path: &str) -> Result<SearchIndex, String> {
                     }
                 }
             };
-            body.push_str(&text);
+            // Link destinations remain in reader scenes, but are not article
+            // prose. Avoid matching/snipping a word present only in a URL.
+            let searchable = if kind == Kind::Link {
+                text.split_once('\n')
+                    .map_or(text.as_str(), |(label, _)| label)
+            } else {
+                &text
+            };
+            body.push_str(searchable);
             body.push('\n');
             if body.len() > 65536 {
                 return Err("Extracted body limit".into());
@@ -641,6 +675,8 @@ pub fn append(index: SearchIndex, path: &str) -> Result<SearchIndex, String> {
     }
     let mut index = SearchIndex::new(docs);
     index.dom_documents = doms;
+    index.collection = collection;
+    index.provenance = provenance;
     Ok(index)
 }
 

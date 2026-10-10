@@ -108,13 +108,13 @@ pub(crate) fn encode(
 }
 
 impl SearchIndex {
-    /// One search result per screen, with at most ten results per query.
+    /// One search result per screen, including every match in the collection.
     pub fn chromatic_result(&self, query: &str, result_index: usize) -> Result<Vec<u8>, Error> {
         if query.len() > MAX_QUERY_BYTES {
             return Err(Error::QueryTooLong);
         }
-        let hits = self.search(query, 10);
-        if hits.is_empty() && result_index == 0 {
+        let (hits, total) = self.search_window(query, result_index, 1);
+        if total == 0 && result_index == 0 {
             return encode(
                 Kind::Result,
                 0,
@@ -125,7 +125,7 @@ impl SearchIndex {
                 0,
             );
         }
-        let hit = hits.get(result_index).ok_or(Error::NotFound)?;
+        let hit = hits.first().ok_or(Error::NotFound)?;
         let mut lines = wrap(&format!("{}\n{}", hit.url, hit.snippet));
         if lines.len() > TEXT_ROWS {
             lines.truncate(TEXT_ROWS);
@@ -135,7 +135,7 @@ impl SearchIndex {
             Kind::Result,
             hit.document_id,
             result_index,
-            hits.len(),
+            total,
             &hit.title,
             &lines,
             0,
@@ -243,12 +243,16 @@ mod tests {
         let first = Packet::decode(&bytes).unwrap();
         assert_eq!(first.action(Button::Left), Action::None);
         assert_eq!(first.action(Button::Right), Action::Next);
+        assert_eq!(first.action(Button::Up), Action::None);
+        assert_eq!(first.action(Button::Down), Action::Next);
         let bytes = index
             .chromatic_page(1, usize::from(first.page_count - 1))
             .unwrap();
         let last = Packet::decode(&bytes).unwrap();
         assert_eq!(last.action(Button::Right), Action::None);
         assert_eq!(last.action(Button::Left), Action::Previous);
+        assert_eq!(last.action(Button::Down), Action::None);
+        assert_eq!(last.action(Button::Up), Action::Previous);
         assert_eq!(last.action(Button::Select), Action::Home);
     }
 

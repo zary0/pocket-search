@@ -1,5 +1,7 @@
 # Physical Chromatic E2E lab
 
+> The current native experiment uses on-device collection/search. The lab contract below was designed for companion-mode fixtures and is not yet qualified for autonomous mode. Before enabling E2E, adapt the trusted driver and deterministic fixture source to test cold-start direct collection and socket-free local search/reading. A source HTTPS fixture is distinct from a companion search service. Keep the existing native transport, physical capture, exact-image and recovery gates mandatory.
+
 The lab must test the native Pocket Search MCU application through the actual display, controls, and device Wi-Fi. Host fixtures, packet unit tests, PyBoy, and streamed emulator demos cannot qualify a release.
 
 ## Current readiness

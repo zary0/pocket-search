@@ -4,7 +4,7 @@
 
 `Cargo.toml` → `[workspace.package].version` is the only package version declaration. Both Rust crates inherit it. `Cargo.lock`, compiled `--build-info`, native firmware metadata, the candidate manifest, Git tag, and release name must agree. `scripts/pipeline.py version` rejects drift.
 
-Use stable semantic versions: **`vX.Y.Z`**, for example `v0.1.0`. Development candidates use `vX.Y.Z-dev.<12-character-commit>` filenames and cannot be promoted to a release. They are not stable Git tags. Protocol version `PCS1` is a separate compatibility version.
+Use stable semantic versions: **`vX.Y.Z`**, for example `v0.1.0`. Development candidates use `vX.Y.Z-dev.<12-character-commit>` filenames and cannot be promoted to a release. They are not stable Git tags. Protocol formats `PCS1`, `PCI1` and `PSR1` have separate compatibility versions.
 
 The companion's `--build-info` reports package version, exact source commit, and protocol version. Candidate builds require `POCKET_BUILD_COMMIT` to match the clean checked-out commit. A stale binary, dirty tracked source, wrong version, or wrong tag prevents packaging.
 
