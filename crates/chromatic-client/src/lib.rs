@@ -4,6 +4,9 @@
 #![no_std]
 #![forbid(unsafe_code)]
 
+pub mod local;
+pub mod rich;
+
 pub const DISPLAY_WIDTH: usize = 160;
 pub const DISPLAY_HEIGHT: usize = 144;
 pub const TEXT_COLUMNS: usize = 24;
@@ -178,13 +181,8 @@ impl<'a> Packet<'a> {
             Button::A if self.kind == Kind::Link && self.link_target != 0 => {
                 Action::Open(self.link_target)
             }
-            Button::Up if self.kind == Kind::Result && self.page_index > 0 => Action::Previous,
-            Button::Down
-                if self.kind == Kind::Result
-                    && self.page_index.saturating_add(1) < self.page_count =>
-            {
-                Action::Next
-            }
+            Button::Up if self.page_index > 0 => Action::Previous,
+            Button::Down if self.page_index.saturating_add(1) < self.page_count => Action::Next,
             Button::Left if self.kind != Kind::Result && self.page_index > 0 => Action::Previous,
             Button::Right
                 if self.kind != Kind::Result

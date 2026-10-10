@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Wi-Fi fetches scene/image data; USB configures the origin and synthetic controls.
+// On-device HTTPS collection and Rust search. No companion service or USB proxy.
 #include "pocket_search_net.h"
-#include "pocket_search_origin.h"
 #include "chromatic_wifi.h"
 #include "network_time.h"
 #include "esp_console.h"
@@ -15,165 +14,154 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
+
+#define LOCAL_STATE_BYTES 16384
+#define HTML_LIMIT 65536
+#define ROBOTS_LIMIT 2048
+#define COLLECTION_US 90000000
+static const char base[]="https://www-formal.stanford.edu/jmc/whatisai/";
+static const char robots_url[]="https://www-formal.stanford.edu/robots.txt";
 static portMUX_TYPE lock=portMUX_INITIALIZER_UNLOCKED;
-static char origin[PS_ORIGIN_BYTES];
-static bool origin_saved;
-static esp_err_t origin_error;
-static struct {bool running,ready,cancelled,configuring;PS_Request request;PS_Reply reply;char endpoint[PS_ORIGIN_BYTES];} job;
-enum {NO_WIFI=1,NO_CLOCK,NO_MEMORY,CONNECT_FAILED,HTTP_FAILED,TOO_LARGE,INCOMPLETE,WRONG_TYPE,CANCELLED,INVALID_IMAGE,STALE_COLLECTION=PS_NET_STALE_COLLECTION};
-typedef struct {PS_Reply *reply;bool correct_type,generation_seen,sample_seen,collection_error;const char *expected;} Events;
+static _Alignas(8) uint8_t local_state[LOCAL_STATE_BYTES];
+static uint8_t robots[ROBOTS_LIMIT+1];
+static size_t robots_length;
+static unsigned robots_state,documents,requests,body_bytes;
+static bool collected;
+static struct {bool running,ready,cancelled,configuring;PS_Request request;PS_Reply reply;} job;
+enum {NO_WIFI=1,NO_CLOCK,NO_MEMORY,CONNECT_FAILED,HTTP_FAILED,TOO_LARGE,INCOMPLETE,WRONG_TYPE,CANCELLED,INVALID_IMAGE,STALE_COLLECTION,ROBOTS_DENIED,NO_DOCUMENTS};
+typedef struct {PS_Reply *reply;bool html,plain,identity;} Events;
+size_t ps_local_state_bytes(void);
+int32_t ps_local_init(uint8_t*,size_t);
+int32_t ps_local_next(uint8_t*,size_t,uint8_t*,size_t);
+int32_t ps_local_feed(uint8_t*,size_t,const uint8_t*,size_t);
+int32_t ps_local_finish(uint8_t*,size_t,int32_t);
+int32_t ps_local_count(uint8_t*,size_t);
+int32_t ps_local_packet(uint8_t*,size_t,uint32_t,uint32_t,uint32_t,const uint8_t*,size_t,uint8_t*);
+int32_t ps_local_robots(const uint8_t*,size_t,const uint8_t*,size_t);
+
+static bool media(const char *value,const char *type){size_t n=strlen(type);return value&&!strncasecmp(value,type,n)&&(value[n]==0||value[n]==';'||value[n]==' ');}
 static esp_err_t event(esp_http_client_event_t *e){
-    Events *events=e->user_data;
-    if(e->event_id==HTTP_EVENT_ON_CONNECTED)events->reply->tls_verified=true;
-    if(e->event_id==HTTP_EVENT_ON_HEADER&&e->header_key&&!strcasecmp(e->header_key,"Content-Type"))events->correct_type=e->header_value&&!strcmp(e->header_value,events->expected);
-    if(e->event_id==HTTP_EVENT_ON_HEADER&&e->header_key&&!strcasecmp(e->header_key,"X-Pocket-Collection")){
-        if(events->generation_seen||!ps_generation_valid(e->header_value))events->collection_error=true;
-        else memcpy(events->reply->generation,e->header_value,strlen(e->header_value)+1);
-        events->generation_seen=true;
-    }
-    if(e->event_id==HTTP_EVENT_ON_HEADER&&e->header_key&&!strcasecmp(e->header_key,"X-Pocket-Sample")){
-        if(events->sample_seen||!e->header_value||(strcmp(e->header_value,"0")&&strcmp(e->header_value,"1")))events->collection_error=true;
-        else events->reply->sample=!strcmp(e->header_value,"1");
-        events->sample_seen=true;
-    }
-    return ESP_OK;
+    Events *v=e->user_data;
+    if(e->event_id==HTTP_EVENT_ON_CONNECTED)v->reply->tls_verified=true;
+    if(e->event_id==HTTP_EVENT_ON_HEADER&&e->header_key){
+        if(!strcasecmp(e->header_key,"Content-Type")){v->html=media(e->header_value,"text/html");v->plain=media(e->header_value,"text/plain");}
+        if(!strcasecmp(e->header_key,"Content-Encoding")&&(!e->header_value||strcasecmp(e->header_value,"identity")))v->identity=false;
+    }return ESP_OK;
 }
-static bool cancelled(void){taskENTER_CRITICAL(&lock);bool value=job.cancelled;taskEXIT_CRITICAL(&lock);return value;}
+static bool cancelled(void){taskENTER_CRITICAL(&lock);bool v=job.cancelled;taskEXIT_CRITICAL(&lock);return v;}
 static void memory(PS_Reply *r){
-    unsigned free=(unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT);
-    unsigned block=(unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    unsigned free=(unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT),block=(unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
     if(free<r->minimum_free_heap_bytes)r->minimum_free_heap_bytes=free;
     if(block<r->largest_free_block_bytes)r->largest_free_block_bytes=block;
     r->stack_hwm=(unsigned)uxTaskGetStackHighWaterMark(NULL);
 }
-static void publish(const PS_Reply *reply,bool final){
-    taskENTER_CRITICAL(&lock);
-    if(final&&job.ready){
-        // Preserve the pending bytes and report failure if the GUI missed its deadline.
-        job.reply.error=reply->error?reply->error:INCOMPLETE;
-        job.reply.finished=true;
-        job.reply.elapsed_ms=reply->elapsed_ms;
-    }else{job.reply=*reply;job.ready=true;}
-    if(final)job.running=false;
-    taskEXIT_CRITICAL(&lock);
+static void publish(const PS_Reply *r){taskENTER_CRITICAL(&lock);job.reply=*r;job.ready=true;job.running=false;taskEXIT_CRITICAL(&lock);}
+static bool valid_url(const char *url){
+    if(strncmp(url,base,sizeof(base)-1))return false;
+    const char *s=url+sizeof(base)-1;if(strncmp(s,"node",4))return false;s+=4;
+    unsigned n=0;while(*s>='0'&&*s<='9'){++s;++n;}return n>=1&&n<=2&&!strcmp(s,".html");
 }
-static bool consumed(int64_t start){
-    while(esp_timer_get_time()-start<45000000){
-        taskENTER_CRITICAL(&lock);bool ready=job.ready;taskEXIT_CRITICAL(&lock);
-        if(!ready)return true;
-        vTaskDelay(pdMS_TO_TICKS(10));
-    }return false;
-}
-static bool exact(esp_http_client_handle_t client,uint8_t *bytes,size_t size,int64_t start){
-    size_t used=0;
-    while(used<size&&esp_timer_get_time()-start<45000000&&!cancelled()){
-        int n=esp_http_client_read(client,(char*)bytes+used,size-used);
-        if(n<=0)return false;
-        used+=(size_t)n;
-    }return used==size;
+static int fetch(const char *url,bool robot,PS_Reply *r,int64_t start){
+    Events events={.reply=r,.identity=true};int error=0;size_t total=0;esp_http_client_handle_t client=NULL;
+    const size_t limit=robot?ROBOTS_LIMIT:HTML_LIMIT;
+    esp_http_client_config_t config={.url=url,.timeout_ms=8000,.crt_bundle_attach=esp_crt_bundle_attach,.skip_cert_common_name_check=false,.disable_auto_redirect=true,.buffer_size=512,.buffer_size_tx=512,.event_handler=event,.user_data=&events};
+    client=esp_http_client_init(&config);if(!client)return NO_MEMORY;
+    esp_http_client_set_header(client,"Accept",robot?"text/plain":"text/html");esp_http_client_set_header(client,"Accept-Encoding","identity");
+    esp_http_client_set_header(client,"User-Agent","PocketSearchBot/0.1 (bounded handheld research; https://github.com/zary0/pocket-search)");
+    taskENTER_CRITICAL(&lock);++requests;taskEXIT_CRITICAL(&lock);
+    if(esp_http_client_open(client,0)!=ESP_OK){error=CONNECT_FAILED;goto done;}
+    int64_t length=esp_http_client_fetch_headers(client);r->http_status=esp_http_client_get_status_code(client);memory(r);
+    // A confirmed missing robots resource permits this bounded crawl. Other
+    // errors, redirects and unsupported/oversize policies fail closed.
+    if(robot&&(r->http_status==404||r->http_status==410)){robots_state=2;goto done;}
+    if(r->http_status!=200){error=HTTP_FAILED;goto done;}
+    if(!events.identity||(robot?!events.plain:!events.html)){error=WRONG_TYPE;goto done;}
+    if(length>(int64_t)limit){error=TOO_LARGE;goto done;}
+    while(esp_timer_get_time()-start<COLLECTION_US&&!cancelled()){
+        int n=esp_http_client_read(client,(char*)r->bytes,512);
+        if(n<0){error=INCOMPLETE;goto done;}
+        if(!n)break;
+        total+=(size_t)n;if(total>limit){error=TOO_LARGE;goto done;}
+        if(robot)memcpy(robots+total-(size_t)n,r->bytes,(size_t)n);
+        else if(ps_local_feed(local_state,sizeof(local_state),r->bytes,(size_t)n)){error=INCOMPLETE;goto done;}
+        memory(r);
+    }
+    if(cancelled()){error=CANCELLED;goto done;}
+    if(!esp_http_client_is_complete_data_received(client)){error=INCOMPLETE;goto done;}
+    if(robot){robots_length=total;robots_state=1;}
+done:
+    taskENTER_CRITICAL(&lock);body_bytes+=(unsigned)total;taskEXIT_CRITICAL(&lock);
+    r->wire_bytes+=(unsigned)total;memory(r);esp_http_client_cleanup(client);return error;
 }
 static void worker(void *arg){
-    (void)arg;PS_Reply result={.sequence=job.request.sequence};
-    result.heap_before=(unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT);result.minimum_free_heap_bytes=result.heap_before;result.largest_free_block_bytes=(unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
-    CW_Status wifi;CW_GetStatus(&wifi);int64_t start=esp_timer_get_time();esp_http_client_handle_t client=NULL;
-    char url[672],encoded[289];const char hex[]="0123456789ABCDEF";size_t at=0;
-    bool image=job.request.kind==3;
-    Events events={.reply=&result,.expected=image?"application/vnd.pocket-search.pci1":"application/vnd.pocket-search.pcs1"};
-    if(wifi.state!=CW_CONNECTED){result.error=NO_WIFI;goto done;}
-    esp_err_t clock_error;int64_t clock_deadline=esp_timer_get_time()+20000000;
-    do{
-        if(cancelled()){result.error=CANCELLED;goto done;}
-        clock_error=CW_TimeWait(200); // No SNTP restart: bounded polling of existing state.
-    }while(clock_error==ESP_ERR_TIMEOUT&&esp_timer_get_time()<clock_deadline);
-    if(clock_error!=ESP_OK){result.error=NO_CLOCK;goto done;}result.clock_synced=true;
-    if(cancelled()){result.error=CANCELLED;goto done;}
-    for(const unsigned char *s=(const unsigned char*)job.request.query;*s;++s){encoded[at++]='%';encoded[at++]=hex[*s>>4];encoded[at++]=hex[*s&15];}encoded[at]=0;
-    int written=job.request.kind==1?snprintf(url,sizeof(url),"%s/v1/chromatic/search?q=%s&result=%u",job.endpoint,encoded,job.request.page):snprintf(url,sizeof(url),"%s/v1/chromatic/%s?id=%lu&page=%u",job.endpoint,image?"image":"page",(unsigned long)job.request.document,job.request.page);
-    if(written<0||(size_t)written>=sizeof(url)){result.error=TOO_LARGE;goto done;}
-    if(job.request.generation[0]){size_t used=(size_t)written;written=snprintf(url+used,sizeof(url)-used,"&generation=%s",job.request.generation);if(written<0||(size_t)written>=sizeof(url)-used){result.error=TOO_LARGE;goto done;}}
-    esp_http_client_config_t config={.url=url,.timeout_ms=10000,.crt_bundle_attach=esp_crt_bundle_attach,.skip_cert_common_name_check=false,.disable_auto_redirect=true,.buffer_size=512,.buffer_size_tx=512,.event_handler=event,.user_data=&events};
-    client=esp_http_client_init(&config);if(!client){result.error=NO_MEMORY;goto done;}
-    esp_http_client_set_header(client,"Accept",events.expected);esp_http_client_set_header(client,"Accept-Encoding","identity");
-    if(esp_http_client_open(client,0)!=ESP_OK){result.error=CONNECT_FAILED;goto done;}
-    int64_t length=esp_http_client_fetch_headers(client);result.http_status=esp_http_client_get_status_code(client);memory(&result);
-    if(result.http_status!=200){result.error=result.http_status==409?STALE_COLLECTION:HTTP_FAILED;goto done;}
-    if(events.collection_error||!events.generation_seen||!events.sample_seen||(job.request.generation[0]&&strcmp(job.request.generation,result.generation))){result.error=STALE_COLLECTION;goto done;}
-    if(length>(image?PS_IMAGE_WIRE_BYTES:512)){result.error=TOO_LARGE;goto done;}
-    if(!events.correct_type){result.error=WRONG_TYPE;goto done;}
-    if(!image){
-        while(result.length<512&&esp_timer_get_time()-start<45000000&&!cancelled()){
-            int n=esp_http_client_read(client,(char*)result.bytes+result.length,512-result.length);
-            if(n<0){result.error=INCOMPLETE;goto done;}
-            if(!n)break;
-            result.length+=(size_t)n;
+    (void)arg;PS_Reply r={.sequence=job.request.sequence,.local=true};int64_t start=esp_timer_get_time();int crawl_error=0;
+    r.heap_before=(unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT);r.minimum_free_heap_bytes=r.heap_before;r.largest_free_block_bytes=(unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+    // Cached search/reader work never requires a socket, Wi-Fi, clock sync or
+    // another device. Verified flags describe the retained source provenance.
+    if(!collected&&job.request.kind==1){
+        CW_Status wifi;CW_GetStatus(&wifi);if(wifi.state!=CW_CONNECTED){r.error=NO_WIFI;goto done;}
+        esp_err_t clock_error;int64_t clock_deadline=start+20000000;
+        do{if(cancelled()){r.error=CANCELLED;goto done;}clock_error=CW_TimeWait(200);}while(clock_error==ESP_ERR_TIMEOUT&&esp_timer_get_time()<clock_deadline);
+        if(clock_error!=ESP_OK){r.error=NO_CLOCK;goto done;}
+        r.clock_synced=true;
+        if(!robots_state){crawl_error=fetch(robots_url,true,&r,start);if(crawl_error)robots_state=3;}
+        if(robots_state==3){r.error=ROBOTS_DENIED;goto done;}
+        char url[128];
+        while(esp_timer_get_time()-start<COLLECTION_US&&!cancelled()){
+            int next=ps_local_next(local_state,sizeof(local_state),(uint8_t*)url,sizeof(url));if(next<=0)break;
+            const char *path=strchr(url+8,'/');
+            bool allowed=valid_url(url)&&path&&(robots_state==2||ps_local_robots(robots,robots_length,(const uint8_t*)path,strlen(path))==1);
+            if(!allowed){(void)ps_local_finish(local_state,sizeof(local_state),0);crawl_error=ROBOTS_DENIED;continue;}
+            // One request at a time, at least one second between page starts.
+            for(unsigned i=0;i<10&&!cancelled();++i)vTaskDelay(pdMS_TO_TICKS(100));
+            if(cancelled()){(void)ps_local_finish(local_state,sizeof(local_state),0);break;}
+            int error=fetch(url,false,&r,start);
+            (void)ps_local_finish(local_state,sizeof(local_state),error==0);
+            taskENTER_CRITICAL(&lock);documents=(unsigned)ps_local_count(local_state,sizeof(local_state));taskEXIT_CRITICAL(&lock);
+            if(error)crawl_error=error;
         }
-        result.wire_bytes=(unsigned)result.length;
-        if(!esp_http_client_is_complete_data_received(client)){result.error=cancelled()?CANCELLED:INCOMPLETE;goto done;}
-    }else{
-        unsigned y=0,width=0,height=0;
-        while(y<height||!height){
-            if(!exact(client,result.bytes,24,start)){result.error=cancelled()?CANCELLED:INCOMPLETE;goto done;}
-            size_t payload=(size_t)result.bytes[18]|((size_t)result.bytes[19]<<8);
-            if(payload>2048){result.error=TOO_LARGE;goto done;}
-            if(!exact(client,result.bytes+24,payload,start)){result.error=cancelled()?CANCELLED:INCOMPLETE;goto done;}
-            result.length=24+payload;PS_ImageView view;
-            if(ps_image_decode(result.bytes,result.length,&view)!=0||view.document_id!=job.request.document||view.page_index!=job.request.page||view.y!=y||(height&&(view.width!=width||view.height!=height))){result.error=INVALID_IMAGE;goto done;}
-            width=view.width;height=view.height;y+=view.rows;result.wire_bytes+=(unsigned)result.length;memory(&result);
-            if(y==height){
-                uint8_t extra;
-                if(!esp_http_client_is_complete_data_received(client)){
-                    int n=esp_http_client_read(client,(char*)&extra,1);
-                    if(n!=0||!esp_http_client_is_complete_data_received(client)){result.error=INCOMPLETE;goto done;}
-                }
-                break;
-            }
-            result.finished=false;publish(&result,false);
-            if(!consumed(start)){result.error=INCOMPLETE;goto done;}
-            if(cancelled()){result.error=CANCELLED;goto done;}
-        }
+        if(cancelled()){r.error=CANCELLED;goto done;}
+        collected=true;
     }
+    if(!documents){r.error=crawl_error==ROBOTS_DENIED?ROBOTS_DENIED:NO_DOCUMENTS;goto done;}
+    r.tls_verified=true;r.clock_synced=true;r.sample=false;
+    memset(r.generation,'0',64);r.generation[64]=0;
+    int64_t search_start=esp_timer_get_time();
+    int n=ps_local_packet(local_state,sizeof(local_state),job.request.kind,job.request.document,job.request.page,(const uint8_t*)job.request.query,strlen(job.request.query),r.bytes);
+    r.compute_us=(unsigned)(esp_timer_get_time()-search_start);
+    if(n<=0){r.error=INCOMPLETE;goto done;}r.length=(size_t)n;
 done:
-    // A timeout during GUI consumption must not overwrite an unconsumed stripe.
-    (void)consumed(start);
-    memory(&result);if(client)esp_http_client_cleanup(client);
-    result.finished=true;result.elapsed_ms=(unsigned)((esp_timer_get_time()-start)/1000);
-    printf("SEARCH_NET {\"sequence\":%u,\"error\":%d,\"http_status\":%d,\"bytes\":%u,\"wire_bytes\":%u,\"tls_verified\":%s,\"clock_synced\":%s,\"elapsed_ms\":%u,\"heap_before\":%u,\"minimum_free_heap_bytes\":%u,\"minimum_largest_free_block_bytes\":%u,\"stack_hwm\":%u}\n",result.sequence,result.error,result.http_status,(unsigned)result.length,result.wire_bytes,result.tls_verified?"true":"false",result.clock_synced?"true":"false",result.elapsed_ms,result.heap_before,result.minimum_free_heap_bytes,result.largest_free_block_bytes,result.stack_hwm);
+    memory(&r);r.finished=true;r.elapsed_ms=(unsigned)((esp_timer_get_time()-start)/1000);
+    printf("SEARCH_NET {\"sequence\":%u,\"execution_mode\":\"on-device\",\"service_required\":false,\"error\":%d,\"http_status\":%d,\"bytes\":%u,\"wire_bytes\":%u,\"documents\":%u,\"compute_us\":%u,\"tls_verified\":%s,\"clock_synced\":%s,\"elapsed_ms\":%u,\"heap_before\":%u,\"minimum_free_heap_bytes\":%u,\"minimum_largest_free_block_bytes\":%u,\"stack_hwm\":%u}\n",r.sequence,r.error,r.http_status,(unsigned)r.length,r.wire_bytes,documents,r.compute_us,r.tls_verified?"true":"false",r.clock_synced?"true":"false",r.elapsed_ms,r.heap_before,r.minimum_free_heap_bytes,r.largest_free_block_bytes,r.stack_hwm);
     taskENTER_CRITICAL(&lock);memset(job.request.query,0,sizeof(job.request.query));taskEXIT_CRITICAL(&lock);
-    publish(&result,true);vTaskDelete(NULL);
+    publish(&r);vTaskDelete(NULL);
 }
-bool PS_NetConfigured(void){taskENTER_CRITICAL(&lock);bool configured=origin[0]!=0;taskEXIT_CRITICAL(&lock);return configured;}
+bool PS_NetConfigured(void){return true;}
 bool PS_NetStart(const PS_Request *request){
-    if(!request||!memchr(request->query,0,sizeof(request->query))||!memchr(request->generation,0,sizeof(request->generation))||(request->generation[0]&&!ps_generation_valid(request->generation))||request->kind<1||request->kind>3)return false;
-    taskENTER_CRITICAL(&lock);bool allowed=!job.running&&!job.ready&&!job.configuring&&origin[0];if(allowed){job.running=true;job.cancelled=false;job.request=*request;memcpy(job.endpoint,origin,sizeof(origin));}taskEXIT_CRITICAL(&lock);
+    if(!request||!memchr(request->query,0,sizeof(request->query))||request->kind<1||request->kind>2)return false;
+    taskENTER_CRITICAL(&lock);bool allowed=!job.running&&!job.ready&&!job.configuring;if(allowed){job.running=true;job.cancelled=false;job.request=*request;}taskEXIT_CRITICAL(&lock);
     if(!allowed)return false;
-    if(xTaskCreatePinnedToCore(worker,"search_https",10240,NULL,2,NULL,0)==pdPASS)return true;
+    if(xTaskCreatePinnedToCore(worker,"local_search",10240,NULL,2,NULL,0)==pdPASS)return true;
     taskENTER_CRITICAL(&lock);job.running=false;memset(job.request.query,0,sizeof(job.request.query));taskEXIT_CRITICAL(&lock);return false;
 }
 bool PS_NetPoll(PS_Reply *reply){taskENTER_CRITICAL(&lock);bool ready=job.ready;if(ready){*reply=job.reply;memset(job.reply.bytes,0,sizeof(job.reply.bytes));job.ready=false;}taskEXIT_CRITICAL(&lock);return ready;}
 void PS_NetCancel(unsigned sequence){taskENTER_CRITICAL(&lock);if(job.running&&job.request.sequence==sequence)job.cancelled=true;taskEXIT_CRITICAL(&lock);}
-static int configure(int argc,char **argv){
-    if(argc==2&&!strcmp(argv[1],"status")){
-        taskENTER_CRITICAL(&lock);bool configured=origin[0]!=0,saved=origin_saved,busy=job.configuring;esp_err_t error=origin_error;taskEXIT_CRITICAL(&lock);
-        printf("SEARCH_ENDPOINT_STATE {\"configured\":%s,\"restore_on_restart\":%s,\"saving\":%s,\"storage_error\":\"%s\"}\n",configured?"true":"false",saved?"true":"false",busy?"true":"false",esp_err_to_name(error));return 0;
-    }
-    if(argc<2||argc>3||(argc==3&&strcmp(argv[2],"--save")))return 1;
-    const char *value=argv[1];if(!PS_OriginValid(value))return 1;
-    bool save=argc==3;
+bool PS_NetRefresh(void){
     taskENTER_CRITICAL(&lock);bool allowed=!job.running&&!job.ready&&!job.configuring;if(allowed)job.configuring=true;taskEXIT_CRITICAL(&lock);
-    if(!allowed)return 1;
-    // NVS may block: reserve configuration, but never hold a spinlock during I/O.
-    esp_err_t error=save?PS_OriginSave(value):ESP_OK;
-    taskENTER_CRITICAL(&lock);
-    origin_error=error;
-    if(error==ESP_OK){memset(origin,0,sizeof(origin));memcpy(origin,value,strlen(value)+1);origin_saved=save;}
-    job.configuring=false;taskEXIT_CRITICAL(&lock);
-    if(error!=ESP_OK){printf("SEARCH_ENDPOINT_SAVE_FAILED %s\n",esp_err_to_name(error));return 1;}
-    if(allowed)printf("SEARCH_ENDPOINT_CONFIGURED\n");
-    return 0;
+    if(!allowed)return false;
+    int error=ps_local_init(local_state,sizeof(local_state));
+    taskENTER_CRITICAL(&lock);documents=requests=body_bytes=robots_state=0;robots_length=0;collected=false;job.configuring=false;taskEXIT_CRITICAL(&lock);return error==0;
 }
+static int status(int argc,char **argv){
+    if(argc==2&&!strcmp(argv[1],"refresh"))return PS_NetRefresh()?0:1;
+    if(argc!=2||strcmp(argv[1],"status"))return 1;
+    taskENTER_CRITICAL(&lock);unsigned count=documents,attempts=requests,bytes=body_bytes;bool running=job.running;taskEXIT_CRITICAL(&lock);
+    printf("SEARCH_LOCAL {\"execution_mode\":\"on-device\",\"service_required\":false,\"documents\":%u,\"requests\":%u,\"body_bytes\":%u,\"running\":%s,\"state_bytes\":%u,\"state_used_bytes\":%u,\"robots_buffer_bytes\":%u,\"maximum_documents\":4,\"text_bytes_per_document\":2560,\"persistent_index\":false,\"native_images\":false}\n",count,attempts,bytes,running?"true":"false",(unsigned)sizeof(local_state),(unsigned)ps_local_state_bytes(),(unsigned)sizeof(robots));return 0;
+}
+static int legacy(int argc,char **argv){if(argc!=2||strcmp(argv[1],"status"))return 1;printf("SEARCH_ENDPOINT_STATE {\"configured\":true,\"service_required\":false,\"execution_mode\":\"on-device\"}\n");return 0;}
 void PS_NetRegister(void){
-    char saved[PS_ORIGIN_BYTES];esp_err_t error=PS_OriginLoad(saved);
-    taskENTER_CRITICAL(&lock);origin_error=error;if(error==ESP_OK){memcpy(origin,saved,sizeof(origin));origin_saved=true;}taskEXIT_CRITICAL(&lock);
-    const esp_console_cmd_t command={.command="search_endpoint",.help="HTTPS origin [--save] or status; no origin in diagnostics",.func=configure};
-    ESP_ERROR_CHECK(esp_console_cmd_register(&command));esp_log_level_set("HTTP_CLIENT",ESP_LOG_ERROR);
+    ESP_ERROR_CHECK(ps_local_init(local_state,sizeof(local_state))?ESP_FAIL:ESP_OK);
+    const esp_console_cmd_t local={.command="search_local",.help="On-device collection status or refresh; no page data over USB",.func=status};
+    const esp_console_cmd_t old={.command="search_endpoint",.help="Legacy status only; no companion service is used",.func=legacy};
+    ESP_ERROR_CHECK(esp_console_cmd_register(&local));ESP_ERROR_CHECK(esp_console_cmd_register(&old));esp_log_level_set("HTTP_CLIENT",ESP_LOG_ERROR);
 }

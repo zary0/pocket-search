@@ -19,11 +19,11 @@ Earlier work outside this repository inspected and tested one Chromatic DevDay u
 
 The probe used USB for power, its diagnostic command, and reading the result. Wi-Fi fetched the page and clock without a host HTTP relay or supplied host clock. Battery-only operation was not tested. These observations are specific to that earlier unit and firmware, not Pocket Search measurements or guaranteed memory availability on other consoles.
 
-Device-to-computer LAN reachability was not established. An operator-authorized temporary HTTPS tunnel now verifies the experimental sample search service; see [native search evidence](../../docs/search-results.md). No permanent endpoint is provided.
+Device-to-computer LAN reachability was not established. Earlier companion experiments used an authorized temporary HTTPS tunnel. The current autonomous mode directly collects, indexes and searches pages on the MCU and requires neither that tunnel nor a companion service; see [on-device search](../../docs/on-device-search.md).
 
 ## What is portable today
 
-`crates/chromatic-client` provides a dependency-free `no_std` decoder for a single PCS1 text packet and button action mapping. It borrows at most one 512-byte buffer. It has no allocator, framebuffer, network stack, font renderer, OS bindings, or unsafe code.
+`crates/chromatic-client` provides dependency-free `no_std` text/image validation, button action mapping, and the on-device crawl frontier, streaming HTML text, fixed-capacity inverted index and local pagination. Rust owns no allocator, framebuffer, network stack, font renderer or OS bindings. The adapter reserves 16 KiB for opaque local state plus its separate robots buffer; networking and display retain separate costs.
 
 `src/chromatic.rs` prepares text on the host for the target's row and byte limits. The host example checks encoder/decoder compatibility with original fixtures. It does not connect to a console.
 

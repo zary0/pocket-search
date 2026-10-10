@@ -243,12 +243,16 @@ mod tests {
         let first = Packet::decode(&bytes).unwrap();
         assert_eq!(first.action(Button::Left), Action::None);
         assert_eq!(first.action(Button::Right), Action::Next);
+        assert_eq!(first.action(Button::Up), Action::None);
+        assert_eq!(first.action(Button::Down), Action::Next);
         let bytes = index
             .chromatic_page(1, usize::from(first.page_count - 1))
             .unwrap();
         let last = Packet::decode(&bytes).unwrap();
         assert_eq!(last.action(Button::Right), Action::None);
         assert_eq!(last.action(Button::Left), Action::Previous);
+        assert_eq!(last.action(Button::Down), Action::None);
+        assert_eq!(last.action(Button::Up), Action::Previous);
         assert_eq!(last.action(Button::Select), Action::Home);
     }
 

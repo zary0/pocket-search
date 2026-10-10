@@ -1,5 +1,7 @@
 # Search service setup and restart recovery
 
+> This document describes optional or historical companion tooling. The current native on-device mode does not require this service or a temporary tunnel; see [the main README](../README.md). Its fixed native source profile and image limitations are separate.
+
 The Chromatic fetches results through its own Wi-Fi from the Rust companion. Running the browser preview on a Mac does not configure the handheld. The device needs a reachable HTTPS origin, a valid certificate, and its native synchronized clock.
 
 An experimental device previously kept its origin only in RAM. Power cycling, firmware updates, and opening the development USB diagnostics could reset the MCU and clear that origin. The result was `Search service not configured.` even while the companion and temporary tunnel were working.
