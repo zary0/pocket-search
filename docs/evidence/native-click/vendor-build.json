@@ -1,0 +1,154 @@
+{
+  "schema_version": 1,
+  "execution_mode": "vendor-full-build",
+  "upstream_commit": "a01aa375147943cbcd4a41f41585220d55e0c28a",
+  "gameboy_mister_commit": "44f43d5797cf6e67480c156b47974d6f1ca9ce4a",
+  "custom_fpga_version": "0x1392",
+  "changed_sha256": {
+    "esp32t/src/top.v": "d4ee2ac071642fe3682eb4eaeea090a92a83651693898c18d14cddc3fad64e88",
+    "esp32t/src/rtl/BSP/system_monitor.sv": "dc0632652fa327a869926bb1da3082381e389d48db61c03b88ac919b681435f6",
+    "esp32t/evt1_x2.gprj": "7e8fdca8772fbdf9317a471a82a14ee3a6bfef2d393aba0c8ab911fe73bc1ef8",
+    "esp32t/src/rtl/BSP/pocket_ui_click.sv": "e0d6003d5068606aed7db36873088b692b816918b3f4c608b550e009ace820d8",
+    "esp32t/build_options.tcl": "8229f708923f8c058c23beca2f108cb85a4fc42cdf569521e051bccb4ed96015",
+    "esp32t/impl/evt1_x2_process_config.json": "1870aa396995562edf131720e226ec23a9e61a0326c0dbff1548fc76cf545aaf"
+  },
+  "baseline": {
+    "compiler_version": "V1.9.12.04",
+    "target": "GW5A-EV25UG256CC1/I0",
+    "device_version": "A",
+    "compiler_exit_code": 0,
+    "build_seconds": 189.84,
+    "placement_option": 0,
+    "routing_option": 1,
+    "timing_driven_routing": true,
+    "resources": {
+      "logic": {
+        "used": 16233.0,
+        "available": 23040.0
+      },
+      "register": {
+        "used": 8525.0,
+        "available": 23595.0
+      },
+      "cls": {
+        "used": 10150.0,
+        "available": 11520.0
+      },
+      "bsram": {
+        "used": 44.0,
+        "available": 56.0
+      },
+      "dsp": {
+        "used": 11.5,
+        "available": 28.0
+      }
+    },
+    "reported_setup_violated_endpoints": 0,
+    "reported_hold_violated_endpoints": 0,
+    "reported_recovery_minimum_slack_ns": 0.892,
+    "reported_recovery_violations_in_table": 0,
+    "bitstream_bytes": 928574,
+    "bitstream_sha256": "7ef8271737bf9f0581f511deb024802a3c7d85038a395722365476d8446e1034",
+    "timing_report_sha256": "4b34f3af236117d5dca1773f721437f8b9748edab07552a5c899440020299765",
+    "resource_report_sha256": "87dacff5da661bffafa0743c84d4053461c0a708fa557b8fe335f9e3ad21d2a6",
+    "constraints_sha256": {
+      "evt1_x2.cst": "6960cd31c221ea7e76add7659f5427dd178c36fd83e641faa3338eead67beee4",
+      "evt1_x2.sdc": "de50cb7b21b92c311114652b35b96d636d1c59ff41c02dde9a189d66a6216f8a"
+    }
+  },
+  "initial_click_build": {
+    "compiler_version": "V1.9.12.04",
+    "target": "GW5A-EV25UG256CC1/I0",
+    "device_version": "A",
+    "compiler_exit_code": 0,
+    "build_seconds": 107.53,
+    "placement_option": 0,
+    "routing_option": 1,
+    "timing_driven_routing": true,
+    "resources": {
+      "logic": {
+        "used": 16420.0,
+        "available": 23040.0
+      },
+      "register": {
+        "used": 8579.0,
+        "available": 23595.0
+      },
+      "cls": {
+        "used": 10113.0,
+        "available": 11520.0
+      },
+      "bsram": {
+        "used": 44.0,
+        "available": 56.0
+      },
+      "dsp": {
+        "used": 11.5,
+        "available": 28.0
+      }
+    },
+    "reported_setup_violated_endpoints": 12,
+    "reported_hold_violated_endpoints": 0,
+    "reported_recovery_minimum_slack_ns": -0.122,
+    "reported_recovery_violations_in_table": 12,
+    "bitstream_bytes": 921961,
+    "bitstream_sha256": "610a5778a7ad42cf18fa6ec013a54247ec7139bcc992f3a142e9b3a4ca11d952",
+    "timing_report_sha256": "e8b4f152c7fac36a9971732d05dc07baebf4601731d5c79e1b934fda7d184161",
+    "resource_report_sha256": "cd7410f4a1b6c29b996247b5fe4564af20d504677feb7b611e657a5830e60a83",
+    "constraints_sha256": {
+      "evt1_x2.cst": "6960cd31c221ea7e76add7659f5427dd178c36fd83e641faa3338eead67beee4",
+      "evt1_x2.sdc": "de50cb7b21b92c311114652b35b96d636d1c59ff41c02dde9a189d66a6216f8a"
+    }
+  },
+  "timing_prioritized_click_build": {
+    "compiler_version": "V1.9.12.04",
+    "target": "GW5A-EV25UG256CC1/I0",
+    "device_version": "A",
+    "compiler_exit_code": 0,
+    "build_seconds": 259.58,
+    "placement_option": 2,
+    "routing_option": 1,
+    "timing_driven_routing": true,
+    "resources": {
+      "logic": {
+        "used": 16412.0,
+        "available": 23040.0
+      },
+      "register": {
+        "used": 8579.0,
+        "available": 23595.0
+      },
+      "cls": {
+        "used": 10026.0,
+        "available": 11520.0
+      },
+      "bsram": {
+        "used": 44.0,
+        "available": 56.0
+      },
+      "dsp": {
+        "used": 11.5,
+        "available": 28.0
+      }
+    },
+    "reported_setup_violated_endpoints": 0,
+    "reported_hold_violated_endpoints": 0,
+    "reported_recovery_minimum_slack_ns": 1.162,
+    "reported_recovery_violations_in_table": 0,
+    "bitstream_bytes": 902035,
+    "bitstream_sha256": "9fc7cf1a772d18aec9e42f8f288bd79b3b93e33a40cf02c36adf836cb736cf0c",
+    "timing_report_sha256": "8d4228ccc281a818c0119ff06cc722aff9ee8230bc77a18373adfb133069f693",
+    "resource_report_sha256": "df027c784a4e51bca59ebacc69897848e7e75f166754d96a4aa254a1231d46e8",
+    "constraints_sha256": {
+      "evt1_x2.cst": "6960cd31c221ea7e76add7659f5427dd178c36fd83e641faa3338eead67beee4",
+      "evt1_x2.sdc": "de50cb7b21b92c311114652b35b96d636d1c59ff41c02dde9a189d66a6216f8a"
+    }
+  },
+  "bitstream_built": true,
+  "timing_report_has_no_violated_endpoints": true,
+  "clock_domain_qualification_complete": false,
+  "fpga_written": false,
+  "hardware_audio_tested": false,
+  "recovery_verified": false,
+  "release_qualified": false
+}

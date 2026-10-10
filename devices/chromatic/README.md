@@ -48,6 +48,10 @@ Never commit activation codes, passwords, tokens, NVS contents, device-specific 
 
 See the [protocol](../../docs/chromatic-protocol.md) and [hardware-first roadmap](../../docs/roadmap.md).
 
+## Native button audio
+
+The optional [FPGA click implementation](../../docs/native-click.md) creates physical menu-button feedback without MCU audio files or tasks. Its RTL simulation, pinned-source integration and licensed Gowin 1.9.12.04 build pass, with zero reported timing violations. Actual speaker verification and recovery qualification remain pending. It requires a separate FPGA image, not an MCU application update or a cartridge ROM.
+
 ## CPU and memory measurements
 
 The Rust client stays integer-only, dependency-free, allocation-free, and bounded. Compare the `chromatic-size` and `chromatic-speed` build profiles on the actual Xtensa toolchain before choosing a firmware setting. Hosted Rust checks are host-only; the separate experimental image has an actual Xtensa build and device execution.

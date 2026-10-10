@@ -54,6 +54,8 @@ USB diagnostics can queue synthetic input and read the MCU render buffer for dev
 
 ## Runtime and development environment
 
+An optional [native button-click implementation](docs/native-click.md) generates short feedback in the FPGA while menus are open. Its RTL simulation and licensed Gowin 1.9.12.04 build pass with zero reported timing violations; physical speaker testing, clock-domain review and recovery qualification remain pending.
+
 | Layer | Environment and validation status |
 | --- | --- |
 | Chromatic development unit | ESP32-U4WDH / Xtensa at 160 MHz, 4 MiB flash, a 2 MiB application partition, no enabled PSRAM, 160 × 144 RGB565 display |

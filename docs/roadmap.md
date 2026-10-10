@@ -101,6 +101,10 @@ Registered local PNG/JPEG resizing and two original source images have native Wi
 
 ## P3 — Quality and measured improvements
 
+- [x] Implement optional FPGA physical menu-button clicks and validate the waveform/mixer in RTL simulation with pinned official-source integration. See [native click scope](native-click.md).
+- [x] Build that FPGA design with the licensed Gowin toolchain and record resources and zero reported timing violations. See the [vendor-build evidence](evidence/native-click/vendor-build.json).
+- [ ] Review complete clock-domain behavior, verify recovery, and physically qualify speaker/headphone/USB feedback. The custom image has not been installed or heard on the console.
+
 - [ ] Refine Japanese input, keyboard ergonomics, long-text layout, links, reading controls, and search relevance using the working product.
 - [ ] Add native character-commit click feedback after a verified FPGA audio command/path is available; preserve the wheel/mute and game/USB audio. Browser input feedback is implemented separately; see [UI scope](search-ui.md#input-click-feedback).
 - [ ] Optimize actual decoder, HTTPS, and rendering bottlenecks while preserving validation, content correctness, and source information. Compare target size/speed profiles on the real Xtensa build.
