@@ -1,0 +1,40 @@
+name: Bug report
+description: Report a reproducible search, reader, build, or device problem.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For vulnerabilities, follow SECURITY.md and keep technical details private.
+        Do not attach credentials, NVS/device backups, network identifiers, or private content.
+  - type: input
+    id: revision
+    attributes:
+      label: Version or commit
+      description: Include --build-info output or the exact source commit.
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Where did this happen?
+      options:
+        - Host tools or CI
+        - Physical Chromatic
+        - Emulator
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Give a minimal public or original input and relevant OS/toolchain or firmware identity.
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: Include sanitized errors and clearly label physical versus host evidence.
+    validations:
+      required: true

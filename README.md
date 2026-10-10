@@ -104,7 +104,7 @@ See the [architecture](docs/architecture.md), [protocol](docs/chromatic-protocol
 
 ## Open-source development
 
-Repository-authored code, documentation, artwork, and original fixtures are licensed under **GPL-3.0-only**. See [LICENSE](LICENSE) and [notices](NOTICE.md). Dependencies retain their own licenses. This is an independent project, not an official ModRetro product. The repository is prepared for public development; changing GitHub visibility is a separate publishing action.
+Repository-authored code, documentation, artwork, and original fixtures are licensed under **GPL-3.0-only**. See [LICENSE](LICENSE), [project notice](NOTICE.md), and [third-party notices](THIRD_PARTY_NOTICES.md). Dependencies retain their own licenses. This is an independent project, not an official ModRetro product. The repository is prepared for public development; changing GitHub visibility is a separate publishing action.
 
 Contributions should keep the device path bounded and justify performance changes with reproducible measurements. See [contributing](CONTRIBUTING.md), [security reporting](SECURITY.md), and [performance notes](docs/performance.md). The initial optimization replaces nested posting trees, candidate intersections, and full-hit formatting with compact vectors, rarest-term planning, and bounded top-k selection. Client decoding remains allocation-free and uses a single combined text-validation pass.
 
@@ -121,6 +121,8 @@ Development integrates through **`develop`**, then promotes to **`main`**. Stabl
 Hosted CI checks versions, Rust behavior, and release-gate unit tests. Trusted branch pushes and tags invoke physical Chromatic qualification; only a real native Wi-Fi E2E result for the exact firmware/candidate permits release publication. Missing or skipped hardware tests block the release. The lab runner, native application, driver, and fixture origin are currently pending, so no physical E2E pass or firmware release is claimed.
 
 See [branches and release packages](docs/releases.md) and [physical E2E lab setup](docs/hardware-e2e.md). Packages carry source, companion and native image hashes, build identity, validated evidence, and checksums. Publication promotes tested assets without rebuilding them.
+
+See [GitHub governance](docs/github-governance.md) for review ownership, branch-protection payloads, dependency updates, and the current status of repository security controls. Configuration files describe the intended rules; GitHub settings must be enabled and read back before claiming enforcement.
 
 ## Security
 

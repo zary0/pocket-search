@@ -1,0 +1,16 @@
+# Initial maintainer; owners must have write access.
+# Add an independent owner before requiring approval of maintainer-authored PRs.
+* @zary0
+
+# Changes to governance, CI, release gates, and licensing require owner review.
+/.github/ @zary0
+/ci/ @zary0
+/scripts/ @zary0
+/LICENSE @zary0
+/NOTICE.md @zary0
+/THIRD_PARTY_NOTICES.md @zary0
+/third_party/ @zary0
+/SECURITY.md @zary0
+/CONTRIBUTING.md @zary0
+/docs/releases.md @zary0
+/docs/github-governance.md @zary0

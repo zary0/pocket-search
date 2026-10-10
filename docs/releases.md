@@ -49,7 +49,7 @@ The hosted readiness check prevents allocating a lab job when the application or
 A qualified release has:
 
 - `pocket-search-vX.Y.Z-source.zip`: source from the exact committed revision, including GPL license and build documentation.
-- `pocket-search-vX.Y.Z-<host-target>.tar.gz`: the compiled companion CLI, README with its logo, security/contribution policies, device overview, committed documentation/artwork, license, and notices. Untracked local notes are not packaged.
+- `pocket-search-vX.Y.Z-<host-target>.tar.gz`: the compiled companion CLI, README with its logo, security/contribution policies, device overview, committed documentation/artwork, license, third-party dependency inventory, and the selected dependency license/copyright texts under `third_party/licenses`. Untracked local notes are not packaged.
 - `chromatic-vX.Y.Z.bin`: the native ESP32 application image built from that same source/version.
 - `candidate.json`: the immutable tested manifest with commit, version, protocol, asset sizes, and SHA-256 hashes.
 - `release.json`: qualified status tied to the candidate digest and validated evidence digest.
@@ -64,4 +64,4 @@ The initial pipeline packages one hosted Linux companion target. Additional targ
 
 On `develop`, update the workspace version, refresh `Cargo.lock` with Cargo, update release notes, and run CI. Only merge into `main` after real physical E2E succeeds. Create and push an annotated `vX.Y.Z` tag from that main commit. The release workflow checks all identities again before publication. Existing releases/assets are not overwritten automatically.
 
-Branch protection should require `ci` on `develop` and both `ci` and `qualify / chromatic-required` for `main`, with PRs required, force pushes/deletions disabled, and administrator enforcement. The exact check names are confirmed from workflow runs. If the GitHub plan cannot enforce private-repository branch rules, document that limitation; the version/evidence gates still execute inside the release workflow.
+Branch protection must require `ci` on `develop` and both `ci` and `qualify / chromatic-required` for `main`, with PRs and owner approval required, stale approvals dismissed, force pushes/deletions disabled, and administrator enforcement. The exact check names are confirmed from workflow runs. See [GitHub governance](github-governance.md) for reviewed API payloads, activation/read-back steps, and current enforcement status. Public repositories on GitHub Free support branch protection; the current private-plan restriction must be revisited at publication. Version/evidence gates execute inside the release workflow, but they do not substitute for repository access controls.

@@ -26,7 +26,8 @@ class ReleaseGateTests(unittest.TestCase):
         (self.root / "assets").mkdir()
         (self.root / "docs").mkdir()
         (self.root / "devices/chromatic").mkdir(parents=True)
-        for name in ("LICENSE", "NOTICE.md", "README.md", "CONTRIBUTING.md", "SECURITY.md", "devices/chromatic/README.md", "docs/releases.md", "assets/README.md"):
+        (self.root / "third_party/licenses/unit-dependency").mkdir(parents=True)
+        for name in ("LICENSE", "NOTICE.md", "THIRD_PARTY_NOTICES.md", "third_party/licenses/unit-dependency/LICENSE-MIT", "README.md", "CONTRIBUTING.md", "SECURITY.md", "devices/chromatic/README.md", "docs/releases.md", "assets/README.md"):
             (self.root / name).write_text("UNIT FIXTURE, not a release or physical result\n")
         (self.root / "assets/unit-logo.png").write_bytes(b"UNIT FIXTURE artwork bytes, not a physical capture")
         (self.root / "README.md").write_text('![Unit logo](assets/unit-logo.png)\n[Security](SECURITY.md)\n[Release policy](docs/releases.md)\n')
@@ -108,19 +109,21 @@ class ReleaseGateTests(unittest.TestCase):
         self.assertIn("-dev." + self.commit[:12], p.verify_candidate(self.folder)["label"])
         with self.assertRaises(p.Invalid): p.promote(self.root, self.folder, self.frames, Path(self.temp.name) / "release")
 
-    def test_companion_includes_readme_artwork_and_security_without_private_notes(self):
+    def test_companion_includes_notices_artwork_and_security_without_private_notes(self):
         (self.root / "assets/private-note.txt").write_text("UNTRACKED UNIT FIXTURE, must not be packaged")
+        (self.root / "third_party/licenses/private-note.txt").write_text("UNTRACKED UNIT FIXTURE, must not be packaged")
         self.make()
         manifest = p.verify_candidate(self.folder)
         entry = next(asset for asset in manifest["assets"] if asset["kind"] == "companion")
         prefix = "pocket-search-" + manifest["label"] + "/"
         with tarfile.open(self.folder / entry["name"]) as archive:
             names = {item.name for item in archive.getmembers()}
-            for name in ["README.md", "SECURITY.md", "assets/unit-logo.png", "assets/README.md", "docs/releases.md"]:
+            for name in ["README.md", "SECURITY.md", "THIRD_PARTY_NOTICES.md", "third_party/licenses/unit-dependency/LICENSE-MIT", "assets/unit-logo.png", "assets/README.md", "docs/releases.md"]:
                 with self.subTest(name=name):
                     self.assertIn(prefix + name, names)
                     self.assertEqual(archive.extractfile(prefix + name).read(), (self.root / name).read_bytes())
             self.assertNotIn(prefix + "assets/private-note.txt", names)
+            self.assertNotIn(prefix + "third_party/licenses/private-note.txt", names)
             self.assertEqual(archive.getmember(prefix + "pocket-search").mode, 0o755)
 
     def test_asset_tampering_and_path_escape_are_rejected(self):

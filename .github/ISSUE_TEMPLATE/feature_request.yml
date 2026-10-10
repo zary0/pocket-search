@@ -1,0 +1,17 @@
+name: Feature request
+description: Propose a focused improvement for the Chromatic search and reader.
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Describe the task on the handheld and what currently prevents it.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior and scope
+      description: Relate it to docs/roadmap.md. For performance work, propose a comparable device workload and correctness checks.
+    validations:
+      required: true
