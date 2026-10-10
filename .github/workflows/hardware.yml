@@ -7,6 +7,23 @@ permissions:
   contents: read
   actions: read
 jobs:
+  lab-not-configured:
+    name: Lab disabled — no physical test performed
+    if: github.event_name == 'push' && github.ref == 'refs/heads/develop' && vars.CHROMATIC_E2E_READY == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Record the development lab status
+        run: |
+          cat >> "$GITHUB_STEP_SUMMARY" <<'SUMMARY'
+          ## Physical E2E not run
+
+          `CHROMATIC_E2E_READY=false` explicitly disables automatic physical qualification on develop pushes while the native application and lab are incomplete.
+
+          This status is not a hardware pass or release qualification. Hosted CI still runs. Main, release tags, and manual qualification still require the real physical gate; missing configuration or evidence fails that gate.
+          SUMMARY
   qualify:
-    if: github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
+    if: >-
+      github.ref == 'refs/heads/main' ||
+      (github.ref == 'refs/heads/develop' &&
+       (github.event_name == 'workflow_dispatch' || vars.CHROMATIC_E2E_READY != 'false'))
     uses: ./.github/workflows/qualification.yml

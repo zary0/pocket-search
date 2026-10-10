@@ -4,7 +4,9 @@ The lab must test the native Pocket Search MCU application through the actual di
 
 ## Current readiness
 
-No lab runner is registered, the Pocket Search MCU firmware project and installed lab driver are not implemented, and no reachable test HTTPS origin is configured. The workflows and release-gate validators exist. Readiness fails explicitly until those prerequisites are completed. The existing Codex Pocket firmware is a different application/version and cannot satisfy this pipeline.
+As checked on 2026-10-10, no lab runner is registered, `CHROMATIC_E2E_READY=false`, the complete Pocket Search MCU firmware project and installed lab driver are not implemented, and no reachable test HTTPS origin is configured. The workflows and release-gate validators exist. The experimental search UI/rendering images have external integration and different application/version identities; they cannot satisfy this pipeline.
+
+Automatic develop pushes record **Physical E2E not run** while the repository variable is explicitly `false`. This keeps the development status separate from a failed test or a fabricated pass. An unset/invalid value runs the strict readiness check and fails. Main pushes, manual dispatch on develop/main, and release tags always invoke qualification, whose readiness and physical evidence gates remain mandatory. Enable `true` only after the prerequisites below are verified; then develop pushes also run physical qualification automatically.
 
 ## Dedicated runner
 
