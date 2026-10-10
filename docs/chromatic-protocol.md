@@ -1,6 +1,6 @@
 # PCS1 reading-scene protocol
 
-PCS1 is the implemented host/client text format for the initial Chromatic reader. The experimental API and native adapter transport and render these packets. Kinds 3–5 add image descriptors, registered links and headings. [PCI1](dom-images.md#pci1-image-stripes) carries prepared image pixels separately. Live collected-page provenance and qualified physical E2E remain pending.
+PCS1 is the implemented host/client text format for the Chromatic reader. The optional API transports packets; the autonomous adapter generates them locally. Kinds 3–5 add image descriptors, registered links and headings for companion-mode scenes. [PCI1](dom-images.md#pci1-image-stripes) carries prepared image pixels separately. Full provenance UI and qualified physical E2E remain pending.
 
 ## Limits
 
@@ -11,7 +11,7 @@ PCS1 is the implemented host/client text format for the initial Chromatic reader
 | Title | 24 cells, at most 48 UTF-8 bytes |
 | Body | At most seven lines |
 | Each line | 24 cells, at most 48 UTF-8 bytes |
-| Search results | At most ten, one per response |
+| Search results | One per response; count bounded by the loaded collection and unsigned 16-bit metadata |
 | Page index / count | Unsigned 16-bit; count must be nonzero |
 
 ASCII uses one conservative cell; every other Unicode scalar uses two. Preserve UTF-8 boundaries. The decoder rejects control characters; the host replaces them with spaces, while body newlines delimit rows. This policy is not Unicode shaping or a font coverage guarantee.
@@ -49,7 +49,9 @@ IDs are one-based positions in the loaded collection, valid only while it is unc
 
 The caller owns and caps the receive buffer. After complete receipt, `Packet::decode` borrows it without copying text or allocating. Keep it alive during drawing/action dispatch, then discard it on the next screen. Reject malformed packets before changing the screen. The native adapter supplies bounded HTTPS receipt, loading/errors, request correlation and rendering. Its localized unsafe C ABI is separate from the safe decoder core.
 
-Result up/down and reader left/right navigate only within bounds. A opens a nonzero result ID or registered link target; B goes back, Start requests query entry, and Select requests home. The core returns actions; the native adapter turns them into Wi-Fi requests and GUI updates.
+Up/down navigate within bounds for results and reading scenes; left/right also navigate non-result scenes. A opens a nonzero result ID or registered link target; B goes back, Start requests query entry, and Select requests home. The core returns actions; the native adapter supplies the operation and GUI update.
+
+In the autonomous native reader, kind 2 positions represent overlapping seven-row text windows. `page_index` is the zero-based top wrapped line; `page_count` is the number of valid window positions, not the number of disjoint screens. It is `max(1, total_lines - 7 + 1)`, including any visible text-limit marker. Up/down changes position by one; the C adapter uses left/right to jump seven positions, clamping to `0..page_count-1`. The final window contains the end of the retained text without empty overscroll. Search-result indices retain their existing meaning. The optional companion still produces disjoint reading scenes; packet layout, validation and C ABI are unchanged. See [autonomous reader controls](on-device-search.md#controls-and-storage).
 
 ## Verification boundary
 

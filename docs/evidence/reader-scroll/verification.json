@@ -1,0 +1,226 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "scope": "Native autonomous reader scrolling; not release qualification",
+  "application": {
+    "application_version": "0.13.18-scroll",
+    "application_bytes": 1900304,
+    "application_sha256": "39482f816bafc08621205a5f88fb00f380b4b9ceec3a5b2df9900a4959c34b4d",
+    "component_source_sha256": {
+      "pocket_search_input.h": "0d167246a027d26210d40c980f77c8e8a57d006a35c9a3ec2837a48cf72a87ff",
+      "pocket_search_net.h": "654ece3541a5ca1ac870e5c928af706f0fea675d3a25148c9acd9bc2ee2ea760",
+      "CMakeLists.txt": "48f86433352c5f782b2d070b9b9ba2484a7f3b562ad9877f31b7094d3efe9469",
+      "pocket_search_origin.h": "48a70fb0e7b0dfc6a7790a8490ec80a1dbb2240fd879e9a6808375d18ff4637b",
+      "pocket_search_ui.h": "f67f6da562553c72d7488751deb5e3b80ab54fbffb3e71f6b8427104001c5076",
+      "pocket_search_net.c": "554356988260ac456e2bb5da3cbd95cb953ff103e6c75427bd47963ad2ce8625",
+      "pocket_search_origin.c": "4118e2d756347ab01818ef778696be31b76327e666b93acc9a95392768890fa3",
+      "pocket_search_collection.h": "c55fd86745f0eddad18423df20a13d9268f31311aa91053d60aee7021307ecc9",
+      "pocket_search_ui.c": "a120aaf6ab42336f4eff41318a11659b4c07103f1d42dd805a147cff0d7d7bad"
+    },
+    "rust_archive_sha256": "10d149dbdb79cb0f575edd7d42373869a4e33e9d8957ce8a2d3324bb21cac7c0",
+    "installed": true
+  },
+  "installation": {
+    "application_version": "0.13.18-scroll",
+    "application_sha256": "39482f816bafc08621205a5f88fb00f380b4b9ceec3a5b2df9900a4959c34b4d",
+    "application_bytes": 1900304,
+    "application_readback_verified": true,
+    "previous_application_verified": true,
+    "partition_table_verified_unchanged": true,
+    "nvs_preserved": true,
+    "original_recovery_backup_verified": true,
+    "bootloader_modified": false,
+    "fpga_modified": false,
+    "efuse_modified": false
+  },
+  "rust_source_sha256": {
+    "crates/chromatic-client/src/local.rs": "169f04bd4406ea6858918f71eb09d973492edafe3ab2b203fbec30fa341c3f79",
+    "crates/chromatic-client/src/lib.rs": "41c7f7d9e1e3f22412a149a5e650a8b7b54141031742f19b287c14e56ba0d1c2",
+    "crates/chromatic-ffi/src/lib.rs": "6368026ffbd657445acfa5e40d1778bb8d71b9ae432511b337f22707f2470160"
+  },
+  "runtime": {
+    "mcu": "ESP32-U4WDH",
+    "architecture": "Xtensa",
+    "cpu_mhz": 160,
+    "fpga": "18.14",
+    "esp_idf": "5.3",
+    "rust_profile": "chromatic-size"
+  },
+  "semantics": {
+    "visible_rows": 7,
+    "up_down_step_lines": 1,
+    "left_right_step_lines": 7,
+    "ends_clamped": true,
+    "progress": "percentage",
+    "pixel_animation": false,
+    "additional_text_cache_bytes": 0
+  },
+  "diagnostic_acceptance": {
+    "input": "USB queued synthetic controls",
+    "capture": "Physical MCU render-buffer readback; not LCD camera or USB-video observation",
+    "usb_page_proxy_used": false,
+    "serial_connection_closed": true,
+    "ai_results": 4,
+    "reader_document_id": 2,
+    "reader_positions": 120,
+    "navigation_sequence": [
+      {
+        "after": "start",
+        "kind": 1,
+        "document_id": 2,
+        "position": 0,
+        "positions": 4
+      },
+      {
+        "after": "a",
+        "kind": 2,
+        "document_id": 2,
+        "position": 0,
+        "positions": 120
+      },
+      {
+        "after": "down",
+        "kind": 2,
+        "document_id": 2,
+        "position": 1,
+        "positions": 120
+      },
+      {
+        "after": "up",
+        "kind": 2,
+        "document_id": 2,
+        "position": 0,
+        "positions": 120
+      },
+      {
+        "after": "up",
+        "kind": 2,
+        "document_id": 2,
+        "position": 0,
+        "positions": 120
+      },
+      {
+        "after": "right",
+        "kind": 2,
+        "document_id": 2,
+        "position": 7,
+        "positions": 120
+      },
+      {
+        "after": "down",
+        "kind": 2,
+        "document_id": 2,
+        "position": 8,
+        "positions": 120
+      },
+      {
+        "after": "left",
+        "kind": 2,
+        "document_id": 2,
+        "position": 1,
+        "positions": 120
+      },
+      {
+        "after": "left",
+        "kind": 2,
+        "document_id": 2,
+        "position": 0,
+        "positions": 120
+      },
+      {
+        "after": "right",
+        "kind": 2,
+        "document_id": 2,
+        "position": 119,
+        "positions": 120
+      },
+      {
+        "after": "down",
+        "kind": 2,
+        "document_id": 2,
+        "position": 119,
+        "positions": 120
+      },
+      {
+        "after": "right",
+        "kind": 2,
+        "document_id": 2,
+        "position": 119,
+        "positions": 120
+      },
+      {
+        "after": "up",
+        "kind": 2,
+        "document_id": 2,
+        "position": 118,
+        "positions": 120
+      },
+      {
+        "after": "b",
+        "kind": 1,
+        "document_id": 2,
+        "position": 0,
+        "positions": 4
+      },
+      {
+        "after": "down",
+        "kind": 1,
+        "document_id": 4,
+        "position": 1,
+        "positions": 4
+      },
+      {
+        "after": "up",
+        "kind": 1,
+        "document_id": 2,
+        "position": 0,
+        "positions": 4
+      },
+      {
+        "after": "a",
+        "kind": 2,
+        "document_id": 2,
+        "position": 0,
+        "positions": 120
+      }
+    ],
+    "six_shared_rows_shift_exactly_13_pixels": true,
+    "no_overscroll_at_top_and_bottom": true,
+    "last_window_text_limit_marker_visible": true,
+    "search_result_up_down_and_b_return": true,
+    "requests_after_reading": 5,
+    "state_reserved_bytes": 16384,
+    "state_used_bytes": 14816,
+    "robots_buffer_bytes": 2049
+  },
+  "collection_measurement": {
+    "elapsed_ms": 23311,
+    "compute_us": 5024,
+    "wire_bytes": 36929,
+    "minimum_free_heap_bytes": 47000,
+    "minimum_largest_free_block_bytes": 40960,
+    "stack_hwm": 3692,
+    "tls_verified": true,
+    "clock_synced": true
+  },
+  "measurement_limits": [
+    "One observed run, not worst-case timing",
+    "compute_us brackets local Rust ranking/packet generation, not network or full UI latency",
+    "Physical reader checks cover selected positions and ends; portable tests cover all adjacent windows of bounded test bodies"
+  ],
+  "operator_confirmation": {
+    "status": "not yet received",
+    "battery_only_restart_for_this_image": false
+  },
+  "release_qualification": {
+    "qualified": false,
+    "chromatic_e2e_ready": false,
+    "physical_usb_video": false
+  },
+  "excluded": [
+    "Third-party page body/capture files",
+    "Device/network identifiers and credentials",
+    "NVS/recovery backups",
+    "Vendor tools/licenses and firmware binaries"
+  ]
+}

@@ -486,25 +486,27 @@ impl LocalSearch {
             out,
         )
     }
-    pub fn reader_packet(&self, id: usize, page: usize, out: &mut [u8]) -> usize {
+    /// One seven-row viewport. The PCS1 position is its top wrapped-text line,
+    /// so adjacent positions overlap instead of skipping an entire screen.
+    pub fn reader_packet(&self, id: usize, offset: usize, out: &mut [u8]) -> usize {
         if id == 0 || id > self.count() {
             return 0;
         }
         let doc = &self.documents[id - 1];
         let count = line_count(doc.body.as_str()) + usize::from(doc.limited != 0);
-        let pages = count.div_ceil(TEXT_ROWS).max(1);
-        if page >= pages {
+        let positions = count.saturating_sub(TEXT_ROWS) + 1;
+        if offset >= positions {
             return 0;
         }
         let mut lines = [""; TEXT_ROWS];
-        let n = wrapped(doc.body.as_str(), &mut lines, page * TEXT_ROWS);
-        if doc.limited != 0 && page + 1 == pages && n < TEXT_ROWS {
+        let n = wrapped(doc.body.as_str(), &mut lines, offset);
+        if doc.limited != 0 && offset + 1 == positions && n < TEXT_ROWS {
             lines[n] = "[Text limit reached]";
             return packet(
                 2,
                 id as u32,
-                page,
-                pages,
+                offset,
+                positions,
                 doc.title.as_str(),
                 &lines[..n + 1],
                 out,
@@ -513,8 +515,8 @@ impl LocalSearch {
         packet(
             2,
             id as u32,
-            page,
-            pages,
+            offset,
+            positions,
             doc.title.as_str(),
             &lines[..n],
             out,
@@ -875,16 +877,46 @@ mod tests {
         assert!(index.documents[0].body.len as usize <= BODY_BYTES);
         assert_eq!(index.ranking("語").1, 1);
         let mut out = [0; 512];
-        let pages = (line_count(index.documents[0].body.as_str()) + 1).div_ceil(TEXT_ROWS);
-        for p in 0..pages {
+        let positions =
+            (line_count(index.documents[0].body.as_str()) + 1).saturating_sub(TEXT_ROWS) + 1;
+        for p in 0..positions {
             let n = index.reader_packet(1, p, &mut out);
             let packet = Packet::decode(&out[..n]).unwrap();
-            assert_eq!(packet.page_count as usize, pages);
-            if p + 1 == pages {
+            assert_eq!(packet.page_count as usize, positions);
+            if p + 1 == positions {
                 assert!(packet.lines.contains(&"[Text limit reached]"));
             }
         }
-        assert_eq!(index.reader_packet(1, pages, &mut out), 0);
+        assert_eq!(index.reader_packet(1, positions, &mut out), 0);
+    }
+    #[test]
+    fn adjacent_reader_windows_overlap_without_losing_text_or_leaving_the_end() {
+        let mut index = LocalSearch::new();
+        index.seed();
+        collect(&mut index, "<p>First sentence 日本語 starts the article. Second sentence moves below it. Third sentence keeps more content. Fourth sentence reaches another viewport. Last sentence ends here.</p>".as_bytes(), 1);
+        let mut first = [0; 512];
+        let mut next = [0; 512];
+        let n = index.reader_packet(1, 0, &mut first);
+        let first_view = Packet::decode(&first[..n]).unwrap();
+        assert_eq!(first_view.line_count, TEXT_ROWS);
+        assert!(first_view.page_count > 1);
+        assert_eq!(first_view.action(crate::Button::Up), crate::Action::None);
+        assert_eq!(first_view.action(crate::Button::Down), crate::Action::Next);
+        let positions = first_view.page_count as usize;
+        for offset in 1..positions {
+            let a = index.reader_packet(1, offset - 1, &mut first);
+            let b = index.reader_packet(1, offset, &mut next);
+            let previous = Packet::decode(&first[..a]).unwrap();
+            let current = Packet::decode(&next[..b]).unwrap();
+            assert_eq!(previous.lines[1..], current.lines[..TEXT_ROWS - 1]);
+            assert_eq!(current.page_index as usize, offset);
+            assert_eq!(current.action(crate::Button::Up), crate::Action::Previous);
+            if offset + 1 == positions {
+                assert_eq!(current.action(crate::Button::Down), crate::Action::None);
+                assert!(current.lines[TEXT_ROWS - 1].contains("here."));
+            }
+        }
+        assert_eq!(index.reader_packet(1, positions, &mut next), 0);
     }
     #[test]
     fn saturated_terms_fall_back_and_hash_candidates_require_exact_text() {

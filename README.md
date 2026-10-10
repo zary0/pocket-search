@@ -26,7 +26,7 @@ Rust owns the restricted link frontier, text extraction, fixed-capacity term/doc
 | Crawler | Direct verified HTTPS, same-profile link discovery, one request at a time, robots policy check | One fixed public host/path profile, eight frontier entries, four retained pages, 90-second collection deadline |
 | HTML extraction | Streaming text/title, basic entities, UTF-8-safe storage, script/style/comment exclusion | Compact parser, not HTML5 layout, JavaScript or CSS execution |
 | Index / search | Allocation-free inverted term hashes with document masks; exact matching verifies candidates; a full table falls back to bounded text scanning | 256 term slots, ASCII word matching and non-ASCII substring matching; not the host BM25/Japanese tokenizer |
-| Reader | Results, A to open, left/right text pagination and B to return, all generated on the MCU | 2,560 retained UTF-8 bytes per document; the last page visibly marks truncated text |
+| Reader | Results, A to open, up/down line scrolling, left/right screen jumps and B to return, all generated on the MCU | 2,560 retained UTF-8 bytes per document; the last viewport visibly marks truncated text |
 | Images / video | Earlier companion-mode still-image experiment remains in the host tools and evidence | Autonomous image decoding/resizing and video are not implemented |
 
 See [on-device scope and verification](docs/on-device-search.md), [architecture](docs/architecture.md), and the [product roadmap](docs/roadmap.md).
@@ -44,8 +44,8 @@ See [on-device scope and verification](docs/on-device-search.md), [architecture]
 | --- | --- | --- | --- |
 | A | Enter a query | Open selected document | Reserved |
 | Start | Submit current query | Query entry | Query entry |
-| Up / down | Reserved | Previous / next result | Reserved |
-| Left / right | Right clears collection for the next query | Reserved | Previous / next text page |
+| Up / down | Reserved | Previous / next result | Scroll up / down one text line |
+| Left / right | Right clears collection for the next query | Reserved | Jump up / down seven lines |
 | B | System menu | Home | Results |
 | Select | Wi-Fi setup | Home | Home |
 
@@ -86,7 +86,7 @@ The companion admits up to 256 pages, can prepare PNG/JPEG images, and uses a ri
 
 ## Hardware evidence and limits
 
-The current on-device application is `0.13.17-local`. With Mac services and tunnels stopped, it directly collected four public pages and returned four `AI` matches. The operator confirmed battery-only restart, query entry and A to read. One first collection took 18.241 seconds; local ranking/packet generation took 5.042 ms on the inspected console. See [measurements and acceptance limits](docs/on-device-search.md) and [sanitized evidence](docs/evidence/on-device-search/verification.json).
+The current on-device application is `0.13.18-scroll`, with up/down line scrolling and left/right screen jumps. The earlier `0.13.17-local` experiment established autonomous collection: With Mac services and tunnels stopped, it directly collected four public pages and returned four `AI` matches. The operator confirmed battery-only restart, query entry and A to read. One first collection took 18.241 seconds; local ranking/packet generation took 5.042 ms on the inspected console. See [measurements and acceptance limits](docs/on-device-search.md), [standalone evidence](docs/evidence/on-device-search/verification.json) and [scroll verification](docs/evidence/reader-scroll/verification.json).
 
 App-only installation preserves the established partition table, bootloader, FPGA and Wi-Fi settings. The index is volatile; there is no flash cache yet. The source profile, parsing and memory limits are explicit, so the application does not claim general browser support or Internet-wide search.
 

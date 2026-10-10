@@ -142,7 +142,9 @@ static void render(void) {
     } else if(u.mode==LOADING||u.mode==IMAGE_LOADING){lv_label_set_text_static(body,"On-device search\n\nCollecting if needed\nVerified HTTPS");lv_label_set_text_static(footer,"B:Cancel Start:Type");}
     else if(u.mode==RESULTS||u.mode==READER||u.mode==IMAGE_READER){
         visible(body,false);visible(status,true);lv_obj_set_pos(status,8,3);lv_obj_set_width(status,144);lv_obj_set_style_text_align(status,LV_TEXT_ALIGN_LEFT,0);
-        snprintf(text,sizeof(text),"%u/%u",u.view.page_index+1,u.view.page_count);lv_label_set_text(status,text);lv_obj_set_pos(heading,8,18);
+        if(u.mode==READER)snprintf(text,sizeof(text),"%u%%",u.view.page_count>1?(unsigned)u.view.page_index*100/(u.view.page_count-1):100);
+        else snprintf(text,sizeof(text),"%u/%u",u.view.page_index+1,u.view.page_count);
+        lv_label_set_text(status,text);lv_obj_set_pos(heading,8,18);
         memcpy(text,u.packet+u.view.title.offset,u.view.title.length);text[u.view.title.length]=0;lv_label_set_text(heading,text);lv_obj_set_style_text_color(heading,lv_color_hex(0x1a73e8),0);
         if(u.mode==IMAGE_READER){
             visible(picture,true);lv_obj_set_pos(picture,(160-u.image_width)/2,34+(80-u.image_height)/2);
@@ -152,7 +154,7 @@ static void render(void) {
             visible(rows[i],true);lv_obj_set_pos(rows[i],8,34+i*13);lv_label_set_text(rows[i],text);
             lv_obj_set_style_text_color(rows[i],lv_color_hex(u.view.kind==5||u.view.kind==4?0x1a73e8:0x202124),0);
         }
-        lv_label_set_text_static(footer,u.mode==RESULTS?"Up/Down A:Read B:Back":u.view.kind==4&&u.view.link_target?"A:Open Left/Right B":"Left/Right B:Back");
+        lv_label_set_text_static(footer,u.mode==RESULTS?"Up/Down A:Read B:Back":u.view.kind==4&&u.view.link_target?"A:Open Up/Down B":"Up/Down:Scroll B:Back");
     }
     else if(u.mode==NOTICE) { lv_label_set_text_static(body,u.notice?u.notice:""); lv_label_set_text_static(heading,u.notice_role==QUERY?"Pocket Search":"Wi-Fi"); lv_label_set_text_static(footer,u.notice_role==QUERY?"A:Type B:Back":"A:Retype B:Wi-Fi"); }
     else if(u.mode==WIFI_LIST) {
@@ -191,6 +193,7 @@ OSD_Result_t PocketUI_Button(Button_t b,ButtonState_t state,void *arg) {
         if(b==kButton_Select||(b==kButton_B&&(loading||u.mode==RESULTS))){cancel();u.back_count=0;mode(HOME);return kOSD_Result_Ok;}
         if(b==kButton_Start){cancel();u.back_count=0;keyboard(QUERY);return kOSD_Result_Ok;}
         if(loading)return kOSD_Result_Ok;
+        unsigned jump=u.mode==READER?7:1;
         if(b==kButton_B){if(u.back_count){--u.back_count;request(2,u.back[u.back_count].document,u.back[u.back_count].page);}else request(1,0,u.result_index);return kOSD_Result_Ok;}
         if(u.mode==RESULTS){
             if(b==kButton_A&&u.view.document_id){u.back_count=0;request(2,u.view.document_id,0);}
@@ -199,8 +202,10 @@ OSD_Result_t PocketUI_Button(Button_t b,ButtonState_t state,void *arg) {
         }else if(b==kButton_A&&u.view.kind==4&&u.view.link_target){
             if(u.back_count==4){message("Link depth limit.\nB: Search home",QUERY);return kOSD_Result_Ok;}
             u.back[u.back_count].document=u.view.document_id;u.back[u.back_count++].page=u.view.page_index;request(2,u.view.link_target,0);
-        }else if(b==kButton_Left&&u.view.page_index)request(2,u.view.document_id,u.view.page_index-1);
-        else if(b==kButton_Right&&u.view.page_index+1<u.view.page_count)request(2,u.view.document_id,u.view.page_index+1);
+        }else if(b==kButton_Up&&u.view.page_index)request(2,u.view.document_id,u.view.page_index-1);
+        else if(b==kButton_Down&&u.view.page_index+1<u.view.page_count)request(2,u.view.document_id,u.view.page_index+1);
+        else if(b==kButton_Left&&u.view.page_index)request(2,u.view.document_id,u.view.page_index>jump?u.view.page_index-jump:0);
+        else if(b==kButton_Right&&u.view.page_index+1<u.view.page_count)request(2,u.view.document_id,u.view.page_index+jump<u.view.page_count?u.view.page_index+jump:u.view.page_count-1);
         return kOSD_Result_Ok;
     }
     if(u.mode==HOME) {

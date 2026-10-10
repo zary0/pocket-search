@@ -1,6 +1,6 @@
 # Autonomous Chromatic search
 
-The current native application collects, indexes, searches and paginates a small public-web collection on the Chromatic itself. A Mac search service, USB page proxy and temporary HTTPS tunnel are not part of its data path. The inspected development unit runs application `0.13.17-local` with the existing FPGA `18.14` unchanged.
+The current native application collects, indexes, searches and paginates a small public-web collection on the Chromatic itself. A Mac search service, USB page proxy and temporary HTTPS tunnel are not part of its data path. The inspected development unit uses the existing FPGA `18.14`. The standalone collection measurement below belongs to `0.13.17-local`; `0.13.18-scroll` adds overlapping reader windows and updated controls. Each image has separate identity and acceptance evidence.
 
 ## Collection and search
 
@@ -18,13 +18,13 @@ After collection, searches and reader pagination use RAM without network request
 
 ## Controls and storage
 
-From the search home, A opens the keyboard and Start submits a query. Results use up/down to select a match and A to open it. The reader uses left/right for text pages and B to return. Select goes home; Select on home opens Wi-Fi setup. Right on home clears the collection; the next submitted query collects again.
+From the search home, A opens the keyboard and Start submits a query. Results use up/down to select a match and A to open it. The current reader uses up/down to scroll one wrapped line, left/right to jump seven lines and B to return. Seven rows stay visible, adjacent windows overlap, and a percentage shows scroll progress. Movement clamps at the first/last window. This is discrete line scrolling, without pixel animation. Select goes home; Select on home opens Wi-Fi setup. Right on home clears the collection; the next submitted query collects again.
 
 Queries are limited to 96 UTF-8 bytes. Results and text pages are generated locally as bounded 512-byte PCS1 packets. Each document retains at most 2,560 UTF-8 body bytes; the last reader page displays `[Text limit reached]` when text exceeds that capacity. Text beyond the limit is neither searchable nor readable. Document IDs are local to the current collection and reset with it. Empty results use document ID zero and cannot open a document.
 
 The collection is volatile. A restart discards it and the next search repeats direct collection. There are no bookmarks, history, saved reading positions or flash index writes. Existing Wi-Fi settings remain in their established native storage. Any old companion-origin setting is unused; `search_endpoint status` reports the current mode, while `search_local status` and `search_local refresh` expose local counters and reset. Autonomous image acquisition/decoding/resizing and video are not implemented. Earlier companion-prepared image evidence does not establish native image support.
 
-## Physical measurement on 2026-10-10
+## Standalone measurement for 0.13.17-local on 2026-10-10
 
 Measurements below describe one ESP32-U4WDH/Xtensa development unit at 160 MHz, without enabled PSRAM, using ESP-IDF 5.3/FreeRTOS and the size-profile Rust archive. They are one observed run, not distributions or worst-case guarantees.
 
@@ -46,7 +46,7 @@ The 5,042 µs timer brackets local Rust ranking/formatting, excludes HTTPS, and 
 
 The application SHA-256 is `8ec7c0215ec5c537387e28a4d54906eebc8765edfe352ded7e9f1b2144b8c40d`. The linked Rust archive SHA-256 is `684736ab876d8f4906a313010bdef69581cf399e7ebac62d18d919e5ca680517`. Installation verified the previous app, the recovery backup, unchanged partition table and preserved NVS, then read back the installed app. Bootloader, FPGA and eFuses were not written. Private backups, credentials, vendor tools/licenses and firmware binaries are excluded from repository evidence.
 
-## Acceptance evidence and limits
+## Standalone acceptance evidence and limits
 
 All Mac search services and their temporary tunnels were stopped before the standalone run. USB diagnostics queued synthetic controls and read status/render buffers; no pages, index or formatted results were supplied over USB. The diagnostic run observed four results, changed queries, an honest zero-result state, A/B navigation, every page index 0–17 of one retained reader document, first/last bounds and the visible truncation marker. Cached searches and reading left the request count at five.
 
@@ -55,3 +55,7 @@ After the diagnostic connection closed, the operator unplugged USB, restarted on
 See [sanitized verification](evidence/on-device-search/verification.json). This scoped standalone acceptance does not qualify a release. Complete physical controls, error/reconnection/cancellation, endurance, mixed-language font acceptance, a reproducible full firmware build and the updated trusted physical lab driver remain required. `CHROMATIC_E2E_READY` stays false; the older companion-oriented lab contract must be adapted before use. See [hardware E2E](hardware-e2e.md) and [release policy](releases.md).
 
 The next priorities are configurable bounded public source profiles, improved text extraction, measured persistent content storage and native image decoding. Memory/CPU/display changes must preserve this working standalone flow and its transport, bounds and result correctness.
+
+## Reader scrolling update
+
+`0.13.18-scroll` keeps the same collection and storage bounds and generates overlapping seven-row reading windows. Down advances the top line by one, Up moves it back by one, and left/right jumps seven lines with clamping. The header shows scroll percentage; the footer says `Up/Down:Scroll B:Back`. This replaces the earlier 18-screen disjoint pagination measurement for navigation purposes; the original measurement remains tied to its original image. See [scroll verification](evidence/reader-scroll/verification.json) for the new image identity and scoped native acceptance. The earlier battery-only operator confirmation does not automatically qualify the updated image.
