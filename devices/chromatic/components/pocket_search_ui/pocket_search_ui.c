@@ -13,7 +13,7 @@ LV_FONT_DECLARE(pocket_jp);
 typedef enum { HOME, KEYBOARD, NOTICE, WIFI_LIST, WIFI_WAIT, WIFI_CONFIRM } Mode;
 typedef enum { QUERY, SSID, PASSWORD } Role;
 static struct {
-    Mode mode; Role role; int script, group, letter, selection;
+    Mode mode; Role role, notice_role; int script, group, letter, selection;
     bool choosing, dirty;
     char query[PS_INPUT_CAPACITY], draft[PS_INPUT_CAPACITY], ssid[33];
     const char *notice; CW_Status wifi;
@@ -73,13 +73,13 @@ static void keyboard(Role role) {
     mode(KEYBOARD); u.role=role; u.script=role==QUERY?0:1; u.group=0; u.letter=0; u.choosing=false;
     memset(u.draft,0,sizeof(u.draft)); if(role==QUERY) memcpy(u.draft,u.query,sizeof(u.query));
 }
-static void message(const char *value) { mode(NOTICE); u.notice=value; }
+static void message(const char *value,Role destination) { mode(NOTICE); u.notice=value; u.notice_role=destination; }
 static void submit_query(void) {
     if(u.mode==KEYBOARD && u.role==QUERY) memcpy(u.query,u.draft,sizeof(u.query));
     bool empty=true; for(const char *s=u.query;*s;++s) if(*s!=' ') empty=false;
-    if(empty) { message("Enter a query.\n\nA: Type"); return; }
+    if(empty) { message("Enter a query.\n\nA: Type",QUERY); return; }
     // Do not open Google, contact Codex, or invent search results.
-    message("Search service\nnot connected yet.\n\nQuery is ready.\nB: Search home");
+    message("Search service\nnot connected yet.\n\nQuery is ready.\nB: Search home",QUERY);
 }
 static void modify_kana(void) {
     static const char *cycles[]={"あぁ","いぃ","うぅゔ","えぇ","おぉ","かが","きぎ","くぐ","けげ","こご","さざ","しじ","すず","せぜ","そぞ","ただ","ちぢ","つっづ","てで","とど","はばぱ","ひびぴ","ふぶぷ","へべぺ","ほぼぽ","やゃ","ゆゅ","よょ","わゎ"};
@@ -112,7 +112,7 @@ static void render(void) {
             lv_obj_set_style_text_color(o,lv_color_hex(selected?0xffffff:0x202124),0);
         }
         lv_label_set_text_static(footer,u.notice?u.notice:"Select:ABC Start:OK");
-    } else if(u.mode==NOTICE) { lv_label_set_text_static(body,u.notice?u.notice:""); lv_label_set_text_static(footer,"A:Type B:Back"); }
+    } else if(u.mode==NOTICE) { lv_label_set_text_static(body,u.notice?u.notice:""); lv_label_set_text_static(heading,u.notice_role==QUERY?"Pocket Search":"Wi-Fi"); lv_label_set_text_static(footer,u.notice_role==QUERY?"A:Type B:Back":"A:Retype B:Wi-Fi"); }
     else if(u.mode==WIFI_LIST) {
         lv_label_set_text_static(heading,"Wi-Fi"); unsigned first=u.selection>3?(unsigned)u.selection-3:0;
         for(unsigned i=0;i<4 && first+i<(unsigned)u.wifi.count+2;++i) {
@@ -152,7 +152,7 @@ OSD_Result_t PocketUI_Button(Button_t b,ButtonState_t state,void *arg) {
         if(b==kButton_Select) { u.script=(u.script+1)%4; u.choosing=false; u.notice=NULL; }
         else if(b==kButton_B) { if(u.choosing) u.choosing=false; else if(u.draft[0]) ps_erase(u.draft); else mode(u.role==QUERY?HOME:WIFI_LIST); }
         else if(u.choosing) {
-            unsigned n=count(g[u.group]); if(delta) u.letter=(u.letter+delta+(int)n)%(int)n;
+            unsigned n=count(g[u.group]); int step=b==kButton_Down?3:b==kButton_Up?-3:delta; if(step) u.letter=(int)ps_grid_move((unsigned)u.letter,n,step);
             if(b==kButton_A) { char scalar[5]; scalar_at(g[u.group],u.letter,scalar); size_t limit=u.role==QUERY?96:u.role==SSID?32:63;
                 if(!ps_append(u.draft,limit,scalar)) u.notice="Input limit reached"; else u.notice=NULL; u.choosing=false; }
         } else {
@@ -165,7 +165,7 @@ OSD_Result_t PocketUI_Button(Button_t b,ButtonState_t state,void *arg) {
             else if(u.role==SSID && u.draft[0]) { memcpy(u.ssid,u.draft,33); keyboard(PASSWORD); }
             else if(u.role==PASSWORD) mode(WIFI_CONFIRM);
         }
-    } else if(u.mode==NOTICE) { if(b==kButton_A) keyboard(QUERY); else if(b==kButton_B||b==kButton_Select) mode(HOME); }
+    } else if(u.mode==NOTICE) { if(b==kButton_A) keyboard(u.notice_role); else if(b==kButton_B||b==kButton_Select) mode(u.notice_role==QUERY?HOME:WIFI_LIST); }
     else if(u.mode==WIFI_LIST) {
         int n=(int)u.wifi.count+2; if(delta) u.selection=(u.selection+delta+n)%n;
         if(b==kButton_B) mode(HOME);
@@ -174,7 +174,7 @@ OSD_Result_t PocketUI_Button(Button_t b,ButtonState_t state,void *arg) {
             else if(u.selection-2<(int)u.wifi.count) { memcpy(u.ssid,u.wifi.networks[u.selection-2].ssid,33); keyboard(PASSWORD); } }
     } else if(u.mode==WIFI_CONFIRM) {
         if(b==kButton_B) { u.mode=KEYBOARD; u.choosing=false; }
-        if(b==kButton_A) { esp_err_t e=CW_Join(u.ssid,u.draft); memset(u.draft,0,sizeof(u.draft)); if(e==ESP_OK) mode(WIFI_WAIT); else message("Invalid Wi-Fi password.\nUse 8-63 bytes."); }
+        if(b==kButton_A) { esp_err_t e=CW_Join(u.ssid,u.draft); memset(u.draft,0,sizeof(u.draft)); if(e==ESP_OK) mode(WIFI_WAIT); else message("Invalid Wi-Fi password.\nUse 8-63 bytes.",PASSWORD); }
     } else if(u.mode==WIFI_WAIT) {
         if(b==kButton_B) mode(HOME);
         if(b==kButton_A) { if(u.wifi.state==CW_CONNECTED) mode(HOME); else if(u.wifi.state==CW_FAILED) keyboard(PASSWORD); }

@@ -2,16 +2,16 @@
   "schema_version": 1,
   "execution_mode": "physical-mcu-ui-with-synthetic-input",
   "frame_source": "physical-mcu-render-buffer-over-usb",
-  "physical_buttons_tested": false,
+  "automated_physical_buttons_tested": false,
   "panel_scanout_tested": false,
   "search_transport_connected": false,
-  "application_version": "0.13.9-search-ui",
-  "application_sha256": "3ed3d84fef988fa4c87fc0c31fad338c876c59fa8e1aac63639c91cf74c26ecf",
+  "application_version": "0.13.10-search-ui",
+  "application_sha256": "84cdd86064b09c75a9612ed53ba432d4e9d12cabcf9bc8a642ffc3fe50c6d8f0",
   "application_sha256_provenance": "installation-readback-report",
   "wifi_state": "connecting",
   "display": {
     "visible": true,
-    "heap": 126472,
+    "heap": 126208,
     "gui": true
   },
   "states": {
@@ -34,8 +34,19 @@
       "mode": 0,
       "query_bytes": 0,
       "transport_connected": false
+    },
+    "invalid_wifi_password": {
+      "mode": 2,
+      "query_bytes": 0,
+      "transport_connected": false
+    },
+    "password_retry_keyboard": {
+      "mode": 1,
+      "query_bytes": 0,
+      "transport_connected": false
     }
   },
+  "invalid_password_rejected_before_network_enqueue": true,
   "captures": [
     {
       "file": "native-home.png",
@@ -44,8 +55,8 @@
     },
     {
       "file": "native-kana.png",
-      "sha256": "b495c2e9aa8c02ae84f81b84fc6d19ad2c849f1d055832ae095668ae7a9a3a09",
-      "rgb565_sha256": "268b4abf3fe017bee19919aecbf8e3d40bce6e8ec7f7438238390affba950797"
+      "sha256": "030974191bf36409bbcd9afac4b3bfdebb7b7841099b4ca195ce4c5ad72f5199",
+      "rgb565_sha256": "8c65fd1c634c9c84612b181fa782fab615ec4ee47abf3652e292395e3c57ccd3"
     },
     {
       "file": "native-notice.png",
@@ -56,11 +67,21 @@
       "file": "native-home-final.png",
       "sha256": "bffa230c023fee5c3ea86582eacd23372024963ba91cbacbd766242d7fc8b1a6",
       "rgb565_sha256": "bb34de325f4f132d037cb9260e75457347c3847001f599850e1cc1652e8e05fb"
+    },
+    {
+      "file": "native-wifi-invalid-password.png",
+      "sha256": "6b6ec69246fc84fed8e066b4fd7aafb23683871db3265de1b166cef311b4b8cb",
+      "rgb565_sha256": "ad069fb7436552735132434612eb2bcfc6ddc4a5b712d444d0356c3370b05f3d"
+    },
+    {
+      "file": "native-wifi-password-retry.png",
+      "sha256": "16b8c4efd56087af2dfc4284fa0d7d240969d8f3327288af65f989bfe0c7168f",
+      "rgb565_sha256": "471b5e2b2462fb349c71b8ebb0bf93ab938aaca54feec8ac6b9d06e4f750344e"
     }
   ],
   "installation": {
-    "application_sha256": "3ed3d84fef988fa4c87fc0c31fad338c876c59fa8e1aac63639c91cf74c26ecf",
-    "application_bytes": 1851760,
+    "application_sha256": "84cdd86064b09c75a9612ed53ba432d4e9d12cabcf9bc8a642ffc3fe50c6d8f0",
+    "application_bytes": 1851984,
     "application_readback_verified": true,
     "previous_application_verified": true,
     "partition_table_verified_unchanged": true,
@@ -72,14 +93,18 @@
   },
   "operator_observation": {
     "source": "user-report",
+    "application_version": "0.13.9-search-ui",
+    "physical_buttons_tested": [
+      "a"
+    ],
     "white_search_home_visible": true,
     "physical_a_opens_input": true,
     "remaining_physical_controls_tested": false
   },
   "source_files": {
     "devices/chromatic/components/pocket_search_ui/CMakeLists.txt": "c4e9f80a5c6e7292dfe40018d250e6ecf22dafbece10c8aeb5111b0902cbe677",
-    "devices/chromatic/components/pocket_search_ui/pocket_search_input.h": "8f9fd9712e962b2b7da98854ad33564cac110f5110a6a90036d94fe6edac642c",
-    "devices/chromatic/components/pocket_search_ui/pocket_search_ui.c": "610409fcb7ac9eebf3bc714a98f493ed54974127d1dbf1f6f2961bfb1fce3dd0",
+    "devices/chromatic/components/pocket_search_ui/pocket_search_input.h": "0d167246a027d26210d40c980f77c8e8a57d006a35c9a3ec2837a48cf72a87ff",
+    "devices/chromatic/components/pocket_search_ui/pocket_search_ui.c": "084035efd3868984ada356b0fe34ecd75b7cb990367c905e5c5fcc47d63f5126",
     "devices/chromatic/components/pocket_search_ui/pocket_search_ui.h": "f67f6da562553c72d7488751deb5e3b80ab54fbffb3e71f6b8427104001c5076"
   }
 }

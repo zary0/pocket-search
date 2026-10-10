@@ -2,6 +2,9 @@
 #include "../devices/chromatic/components/pocket_search_ui/pocket_search_input.h"
 #include <assert.h>
 int main(void) {
+    assert(ps_grid_move(0,5,3)==3); assert(ps_grid_move(3,5,3)==0);
+    assert(ps_grid_move(0,5,-3)==3); assert(ps_grid_move(2,5,3)==2);
+    assert(ps_grid_move(2,5,-3)==2); assert(ps_grid_move(4,5,1)==0);
     char text[PS_INPUT_CAPACITY] = {0};
     for (unsigned i=0; i<32; ++i) assert(ps_append(text,96,"あ"));
     assert(strlen(text)==96); char original[PS_INPUT_CAPACITY]; memcpy(original,text,sizeof(text));

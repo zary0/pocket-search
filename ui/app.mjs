@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
-import {groups,bytes,key,QUERY_BYTES} from './input.mjs';
+import {groups,bytes,key,tail,QUERY_BYTES} from './input.mjs';
 const $=id=>document.getElementById(id),ctx=$('screen').getContext('2d');
 const state={query:'',mode:'home',script:0,group:0,letter:0,choosing:false};
 function box(x,y,w,h,r,color,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=color;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke();}}
 function text(value,x,y,color='#202124',size=12){ctx.font=`${size}px Arial, "Hiragino Sans", sans-serif`;ctx.fillStyle=color;ctx.fillText(value,x,y+size);}
-function tail(value,limit=19){const chars=[...value];while(chars.reduce((n,c)=>n+(c.codePointAt(0)<128?1:2),0)>limit)chars.shift();return chars.join('');}
 function render(){
   ctx.fillStyle='#fff';ctx.fillRect(0,0,160,144);
   if(state.mode==='home'){

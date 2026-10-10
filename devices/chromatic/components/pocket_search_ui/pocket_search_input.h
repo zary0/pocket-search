@@ -6,6 +6,16 @@
 #define PS_QUERY_BYTES 96u
 #define PS_INPUT_CAPACITY (PS_QUERY_BYTES + 1u)
 
+// Three-column picker: vertical wrapping stays in the same populated column.
+static inline unsigned ps_grid_move(unsigned index, unsigned count, int step) {
+    if (!count || count > 12) return 0;
+    if (index >= count) index = 0;
+    if (step == 3) return index + 3 < count ? index + 3 : index % 3;
+    if (step == -3) return index >= 3 ? index - 3 : index + (count - 1 - index) / 3 * 3;
+    if (step == 1 || step == -1) return ((int)index + (int)count + step) % (int)count;
+    return index;
+}
+
 static inline size_t ps_length(const char *s, size_t cap) {
     size_t n = 0;
     while (n < cap && s[n]) ++n;

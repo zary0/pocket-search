@@ -33,14 +33,18 @@ The target component was compiled in the existing Xtensa firmware. `search_ui` p
 
 ## Experimental device verification — 2026-10-10
 
-The application-only image `0.13.9-search-ui` (1,851,760 bytes; SHA-256 `3ed3d84fef988fa4c87fc0c31fad338c876c59fa8e1aac63639c91cf74c26ecf`) was installed on the previously backed-up development unit. Installation verified the previous application, new application readback, unchanged partition table, unchanged NVS, and original recovery backup. Bootloader, FPGA, and eFuses were not modified. The obsolete account/approval backend was excluded from this build.
+The application-only image `0.13.10-search-ui` (1,851,984 bytes; SHA-256 `84cdd86064b09c75a9612ed53ba432d4e9d12cabcf9bc8a642ffc3fe50c6d8f0`) was installed on the previously backed-up development unit. Installation verified the previous application, new application readback, unchanged partition table, unchanged NVS, and original recovery backup. Bootloader, FPGA, and eFuses were not modified. The obsolete account/approval backend was excluded from this build.
 
-The [sanitized report](evidence/search-ui/verification.json) records byte-identical component sources and four MCU render-buffer captures. Synthetic GUI inputs selected `あ`, submitted a three-byte query to the explicit unconnected state, and returned to an empty home. The final OSD was visible with 126,472 bytes of free heap; this is a diagnostic snapshot with capture allocations released, not a performance comparison or peak-memory result. Wi-Fi was still connecting at the initial status read; the final frame's Wi-Fi label reflects a later connected state, without establishing a search-service request.
+The [sanitized report](evidence/search-ui/verification.json) records byte-identical component sources and six MCU render-buffer captures. Synthetic GUI inputs moved down from `あ` to select `え`, submitted a three-byte query to the explicit unconnected state, and returned to an empty home. They also checked the rejected-password notice and A's return to the password keyboard, using an invented one-byte password that the existing join function rejects before enqueueing any network/settings write. The report's free-heap value is a diagnostic snapshot with capture allocations released, not a performance comparison or peak-memory result. Wi-Fi status does not establish a search-service request.
 
-The operator separately confirmed that the physical LCD showed the white search home and that the real A button opened input. Other physical controls and panel output were not independently captured. The images below are **MCU render-buffer readbacks over USB**, not USB video or browser simulations.
+The operator separately confirmed that the initial `0.13.9-search-ui` image showed the white home on the physical LCD and that the real A button opened input. That observation is recorded with its own version/source, separate from the revised image's automated synthetic-input checks. Other physical controls and panel output were not independently captured. The images below are **MCU render-buffer readbacks over USB**, not USB video or browser simulations.
 
 | Search home | Hiragana input | Unconnected service |
 | --- | --- | --- |
 | ![MCU search-home render readback](evidence/search-ui/native-home-final.png) | ![MCU hiragana-input render readback](evidence/search-ui/native-kana.png) | ![MCU unconnected-service render readback](evidence/search-ui/native-notice.png) |
+
+| Rejected password | A returns to password entry |
+| --- | --- |
+| ![MCU rejected-password render readback](evidence/search-ui/native-wifi-invalid-password.png) | ![MCU password-retry render readback](evidence/search-ui/native-wifi-password-retry.png) |
 
 The full local firmware/font integration is external, and this experimental identity does not match the Rust workspace release identity. No firmware binary, device backup, NVS dump, credentials, or raw device log is committed or distributed. This check does not satisfy the physical release gate.
