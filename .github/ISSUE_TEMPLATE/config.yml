@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security reporting
+    url: https://github.com/zary0/pocket-search/blob/develop/SECURITY.md
+    about: Follow the current confidential reporting instructions; do not file exploit details as a bug.
+  - name: Contribution and support scope
+    url: https://github.com/zary0/pocket-search/blob/develop/CONTRIBUTING.md
+    about: Read accepted contributions, maintainer decisions, and experimental support limits.

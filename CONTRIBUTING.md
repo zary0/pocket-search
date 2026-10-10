@@ -28,8 +28,16 @@ For performance work, compare the same corpus, queries, compiler, optimization p
 
 ## Pull requests
 
+The initial maintainer is **[@zary0](https://github.com/zary0)**, who decides scope, accepts changes, and coordinates releases. Review ownership is recorded in [CODEOWNERS](https://github.com/zary0/pocket-search/blob/develop/.github/CODEOWNERS); CI, release-gate, license, and security changes require owner review under the intended GitHub protection policy. Automated review does not replace a required human approval. See [GitHub governance](docs/github-governance.md) for what is currently enforced and how to activate the remaining controls.
+
+We accept reproducible bug fixes, bounded Chromatic search/reader improvements, documentation, meaningful tests, and measured performance changes consistent with the [roadmap](docs/roadmap.md). Discuss large architecture changes or new dependencies in a feature issue first. Update [third-party notices](THIRD_PARTY_NOTICES.md) and license texts when importing code or changing dependencies; keep GitHub Actions pinned to reviewed upstream commit SHAs.
+
 Explain the problem, resulting behavior, validation, and measured tradeoffs. Keep firmware, protocol, service, and documentation changes reviewable. Add meaningful boundary or regression checks when behavior changes; ordinary documentation edits do not need redundant tests. Use English in README files and contributor documentation. Japanese fixture data and input support remain welcome.
 
 Target `develop` with feature/fix PRs. `main` promotion and `vX.Y.Z` releases require the [release policy](docs/releases.md), including actual physical qualification. Release-gate unit fixtures do not satisfy the physical requirement.
 
 Do not include credentials, activation codes, NVS dumps, physical-device identifiers, full-flash backups, or private site content. Clearly label fixture tests, host benchmarks, streamed emulator demos, USB diagnostics, and actual device measurements. Hardware writes require the existing device-specific deployment workflow.
+
+## Support scope
+
+Support is best effort for the current development code and, once available, the latest qualified stable release. Provide a minimal reproduction and exact source/build identity. There is no response-time guarantee, hardware repair service, support promise for forks/older releases, or guarantee that arbitrary websites will work. Physical qualification covers only the documented device/configuration; stock firmware and unrelated third-party tools belong to their upstream maintainers. Vulnerabilities follow [SECURITY.md](SECURITY.md).
