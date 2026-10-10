@@ -270,5 +270,19 @@
     "console_errors_observed": 0,
     "screenshot": "browser-results.png",
     "screenshot_sha256": "0c0fa38cb221d383732a58ddcfcf4449becc8ceab5011dc074a143201531c983"
+  },
+  "companion_source_commit": "5f337fc2eff378ff1f91652356b7265d23900028",
+  "sample_collection_sha256": "5f4d7ad57027ae71a3076e296dcb6ea9dc131815137dad63ce761650ba2c8442",
+  "sample_collection_provenance": "examples/documents.json at companion_source_commit; sample prose subsequently revised",
+  "browser_retry_verification": {
+    "source": "Codex-in-app-browser",
+    "isolated_test_port": 8831,
+    "companion_deliberately_stopped": true,
+    "connection_error_visible": true,
+    "companion_restarted": true,
+    "retry_opened_correct_document": true,
+    "stale_error_cleared": true,
+    "screenshot": "browser-retry.png",
+    "screenshot_sha256": "9737870326f3016e237d7be9b740055e23286b2473b8559908f9a192194c452f"
   }
 }

@@ -118,6 +118,18 @@ fn packet(result: Result<Vec<u8>, chromatic::Error>) -> Response {
         Err(_) => reply(400, "Invalid request"),
     }
 }
+// Browser summaries are presentation excerpts. Complete source/body stays in the index.
+fn excerpt(value: &str, limit: usize) -> (String, bool) {
+    let mut out = String::new();
+    for c in value.chars().map(|c| if c.is_control() { ' ' } else { c }) {
+        if out.len() + c.len_utf8() > limit - 3 {
+            out.push('…');
+            return (out, true);
+        }
+        out.push(c);
+    }
+    (out, false)
+}
 pub fn route(index: &SearchIndex, method: &str, target: &str) -> Response {
     if method != "GET" {
         return reply(405, "GET required");
@@ -194,7 +206,18 @@ pub fn route(index: &SearchIndex, method: &str, target: &str) -> Response {
         };
         return packet(index.chromatic_result(q, at));
     }
-    let body = json!({"collection":COLLECTION,"sample":true,"results":index.search(q,10)})
+    let hits: Vec<_> = index
+        .search(q, 10)
+        .into_iter()
+        .map(|hit| {
+            let (title, _) = excerpt(&hit.title, 128);
+            let (url, truncated) = excerpt(&hit.url, 256);
+            let (snippet, _) = excerpt(&hit.snippet, 256);
+            json!({"document_id":hit.document_id,"title":title,"url":url,
+            "source_url_truncated":truncated,"snippet":snippet})
+        })
+        .collect();
+    let body = json!({"collection":COLLECTION,"sample":true,"results":hits})
         .to_string()
         .into_bytes();
     if body.len() > RESPONSE_BYTES {
@@ -348,6 +371,36 @@ mod tests {
         );
         assert_eq!(route(&i, "POST", "/v1/search?q=wifi").status, 405);
         assert_eq!(route(&i, "GET", "/../Cargo.toml").status, 404);
+    }
+    #[test]
+    fn maximum_browser_summaries_fit_without_unused_images_or_text_loss_in_reader() {
+        let body = format!("wifi {}", "quoted \\\" words ".repeat(100));
+        let docs = (0..10)
+            .map(|_| Document {
+                url: "\\".repeat(1024),
+                title: "\"".repeat(1024),
+                body: body.clone(),
+                image_urls: vec!["x".repeat(1024); 8],
+            })
+            .collect();
+        let index = SearchIndex::new(docs);
+        let response = route(&index, "GET", "/v1/search?q=wifi");
+        assert_eq!(response.status, 200);
+        assert!(response.body.len() <= RESPONSE_BYTES);
+        let value: serde_json::Value = serde_json::from_slice(&response.body).unwrap();
+        let hits = value["results"].as_array().unwrap();
+        assert_eq!(hits.len(), 10);
+        for hit in hits {
+            assert!(hit.get("image_urls").is_none());
+            assert_eq!(hit["source_url_truncated"], true);
+            assert!(hit["title"].as_str().unwrap().len() <= 128);
+            assert!(hit["url"].as_str().unwrap().len() <= 256);
+            assert!(hit["snippet"].as_str().unwrap().len() <= 256);
+        }
+        let packet = index.chromatic_page(1, 0).unwrap();
+        assert!(Packet::decode(&packet).unwrap().page_count > 1);
+        assert_eq!(excerpt("あいう", 8), ("あ…".into(), true));
+        assert_eq!(excerpt("a\nb", 128), ("a b".into(), false));
     }
     #[test]
     fn actual_http_response_has_bounded_body_and_no_store() {

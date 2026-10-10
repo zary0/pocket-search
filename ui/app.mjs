@@ -34,7 +34,7 @@ async function fetchBounded(url,limit,signal){
   try{while(true){const {done,value}=await reader.read();if(done)break;total+=value.length;if(total>limit)throw Error('Response limit');parts.push(value);}}finally{await reader.cancel();}
   const out=new Uint8Array(total);let at=0;for(const part of parts){out.set(part,at);at+=part.length;}return out;
 }
-async function request(work){cancel();const seq=state.seq,controller=new AbortController();state.controller=controller;state.busy=true;state.error='';render();const timer=setTimeout(()=>controller.abort(),12000);
+async function request(work){cancel();const seq=state.seq,controller=new AbortController();state.controller=controller;state.busy=true;state.error='';$('notice').textContent='';$('notice').classList.remove('error');render();const timer=setTimeout(()=>controller.abort(),12000);
   try{await work(controller.signal,seq);}catch(error){if(seq!==state.seq)return;state.error='検索サービスに接続できませんでした。再試行してください。';$('notice').textContent=state.error;$('notice').classList.add('error');if(!state.results.length)state.mode='notice';}
   finally{clearTimeout(timer);if(seq===state.seq){state.busy=false;state.controller=null;render();}}
 }

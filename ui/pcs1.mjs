@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-only
 export function decodePacket(buffer){
-  const b=new Uint8Array(buffer),v=new DataView(b.buffer,b.byteOffset,b.byteLength),decoder=new TextDecoder('utf-8',{fatal:true});
+  const b=new Uint8Array(buffer),v=new DataView(b.buffer,b.byteOffset,b.byteLength),decoder=new TextDecoder('utf-8',{fatal:true,ignoreBOM:true});
   if(b.length<20||b.length>512||String.fromCharCode(...b.slice(0,4))!=='PCS1'||b[18]||b[19]||![1,2].includes(b[4])||b[6]>7)throw Error('Invalid packet');
   const kind=b[4],id=v.getUint32(8,true),page=v.getUint16(12,true),count=v.getUint16(14,true);let at=20;
   if(!count||page>=count||(kind===2&&!id)||b[5]!==((page>0?1:0)|(page+1<count?2:0))||v.getUint16(16,true)+20!==b.length)throw Error('Invalid pagination');
