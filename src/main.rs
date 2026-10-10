@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 use pocket_search::{Document, SearchIndex};
 use serde_json::json;
-use std::{env, fs, process};
+use std::{env, fs, path::Path, process};
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().skip(1).collect();
     if args == ["--version"] {
@@ -15,6 +15,32 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             "commit":option_env!("POCKET_BUILD_COMMIT").unwrap_or("unknown"),
             "protocol_version":1})
         );
+        return Ok(());
+    }
+    if args
+        .first()
+        .is_some_and(|arg| arg == "crawl" || arg == "__crawl_worker" || arg == "serve-crawl")
+    {
+        if args.len() != 3 {
+            return Err("Usage: pocket-search crawl <config.json> <new-output-directory> | serve-crawl <output-directory> <bind-address:port>".into());
+        }
+        match args[0].as_str() {
+            "__crawl_worker" => {
+                pocket_search::crawler::worker(Path::new(&args[1]), Path::new(&args[2]))?
+            }
+            "crawl" => {
+                let report =
+                    pocket_search::crawler::crawl(Path::new(&args[1]), Path::new(&args[2]))?;
+                println!(
+                    "{}",
+                    json!({"collected_pages":report.pages.len(),"requests":report.requests,"body_bytes_read":report.body_bytes_read,"stopped":report.stopped,"pending_pages":report.pending.len()})
+                );
+            }
+            _ => pocket_search::server::serve(
+                pocket_search::crawler::load(Path::new(&args[1]))?,
+                &args[2],
+            )?,
+        }
         return Ok(());
     }
     if args.first().is_some_and(|arg| arg == "serve") {

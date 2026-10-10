@@ -2,108 +2,100 @@
 
 # Pocket Search for ModRetro Chromatic
 
-A small search and reading application designed around the **ModRetro Chromatic's 160 × 144 display, physical buttons, and ESP32 MCU**. The experimental native application searches original sample articles and reads HTML-derived text, links, and reduced images over Wi-Fi. Live public-page collection remains a next step.
+A small, experimental **on-device web collector, search engine and text reader** for the ModRetro Chromatic MCU. The current native mode fetches public HTTPS pages directly, follows a bounded set of links, builds its own Rust index in RAM, and searches and reads that retained text on the console. **A Mac, companion search service, temporary tunnel and USB page proxy are not part of the native data path.**
 
-Chromatic is the primary platform. Host tools develop the search service and verify the device protocol. The application targets the console's MCU firmware and menu interface; a Game Boy cartridge ROM is not the deployment target for this Wi-Fi reader.
+The first autonomous profile starts at Stanford's historical AI questions page and stays within its `whatisai/node*.html` pages. It admits at most four documents, not the entire Internet. The repository also retains optional host tools for broader crawling, DOM extraction, image preparation and browser development. Those tools do not expand the native profile automatically.
 
-**Status: experimental native DOM and image reader.** Implemented: Rust ranking, HTML5 DOM extraction from registered local HTML, PNG/JPEG preparation, bounded read-only API, and browser/ESP32 readers for headings, text, images and registered links. The native client runs allocation-free Rust packet/image validation through a C ABI. See [DOM/image behavior and evidence](docs/dom-images.md) and [earlier search evidence](docs/search-results.md). Live crawling, JavaScript/CSS layout, complete firmware distribution and qualified physical E2E remain pending. The measured display prototype uses a 15 KiB draw buffer; see [measured results](docs/performance.md#physical-lvgl-display-comparison).
+This is MCU/menu firmware, not a Game Boy cartridge ROM or a replacement Rust OS. Full reproducible firmware packaging and qualified physical E2E remain release requirements.
 
 ## Architecture
 
 ```text
-Public HTTPS sites
-        │
+Public HTTPS site
+        │ native DNS, clock sync, verified TLS
         ▼
-Rust companion service
-  crawl → extract text/images → index → rank → format small responses
-        │
-        │ verified HTTPS, one bounded response at a time
-        ▼
-Chromatic MCU application
-  button input → query → results → paginated text → reduced image
+Chromatic MCU
+  bounded crawl frontier → streaming HTML text → RAM inverted index
+  buttons → local Rust ranking → local reader pagination → 160 × 144 LCD
 ```
 
-The handheld owns the interaction and display. A companion service on a computer or server owns crawling, the index, and image preparation. Independent search ranks our own collected documents; it does not require storing a web-scale index on the handheld. The service must be reachable from the device. The current service searches original JSON articles and explicitly registered HTML/image files. An operator-authorized temporary HTTPS tunnel is used for development verification; no permanent public service is provided.
+Rust owns the restricted link frontier, text extraction, fixed-capacity term/document masks, ranking, PCS1 results and PSR1 styled reader formatting. The existing ESP-IDF adapter owns HTTPS, cancellation, Wi-Fi and the display. Collection happens on the first submitted query after boot or a refresh. Later searches and reader navigation open no sockets; they use the device's retained collection, even if Wi-Fi is temporarily unavailable. Restart discards that RAM index and the next search collects again.
 
-| Component | Implemented | Still needed |
+| Component | Autonomous native mode | Current limit |
 | --- | --- | --- |
-| Crawler / extractor | HTML5 DOM extraction from registered UTF-8 HTML: headings, paragraphs, lists, preformatted text, links and image references | Public HTTPS fetching, robots.txt, collection timestamps and live-page acceptance |
-| Index / ranking | In-memory inverted index, BM25-style ranking, English words and Japanese character/bigram tokens | Persistent corpus, updates, deduplication, quality evaluation |
-| Companion API | Read-only HTTP routes, immutable sample collection, bounded PCS1 and JSON responses | Persistent corpus identity, production deployment, real collected content |
-| Device client | Xtensa Rust decoder with C ABI, native HTTPS/SNTP, keyboard, results and paginated reader | Reproducible full firmware, complete physical-controls/error E2E, battery-only verification |
-| Images | Registered PNG/JPEG preparation, 128 × 80 RGB565 stripes, CRC/order validation, native/browser display and sampled native heap | Protected network fetching, interruption/error qualification and allocator peak tracing |
+| Crawler | Direct verified HTTPS, same-profile link discovery, one request at a time, robots policy check | One fixed public host/path profile, eight frontier entries, four retained pages, 90-second collection deadline |
+| HTML extraction | Streaming text/title, basic entities, UTF-8-safe storage, headings, inline weight/size and paragraph breaks; script/style/comment exclusion | Compact parser, not HTML5 layout, JavaScript or CSS execution |
+| Index / search | Allocation-free inverted term hashes with document masks; exact matching verifies candidates; a full table falls back to bounded text scanning | 256 term slots, ASCII word matching and non-ASCII substring matching; not the host BM25/Japanese tokenizer |
+| Reader | Results, A to open, up/down line scrolling, left/right screen jumps and B to return, all generated on the MCU | 2,560 retained UTF-8 bytes and 48 style transitions per document; visible text/style limit markers |
+| Images / video | Earlier companion-mode still-image experiment remains in the host tools and evidence | Autonomous image decoding/resizing and video are not implemented |
+
+See [native typography](docs/typography.md), [on-device scope and verification](docs/on-device-search.md), [architecture](docs/architecture.md), and the [product roadmap](docs/roadmap.md).
 
 ## Designed for the handheld
 
-- **160 × 144 pixels**, one screen at a time.
-- A title, **seven body rows**, and a button hint area. Each row has 24 conservative cells: one for ASCII and two for other Unicode characters.
-- One result per screen and at most ten results per query.
-- A **96-byte UTF-8 query limit** and a **512-byte text response limit**.
-- The decoder borrows the response buffer without heap allocation. Networking, the display driver, and fonts have separate memory costs.
-- One image at a time, up to 128 × 80 pixels: **2,048 pixel bytes per eight-row stripe**, a 24-byte header, and a temporary image cache of at most **20 KiB**. The cache is released when leaving the image.
-- Search, results, text, images, links, and temporary back navigation. No bookmarks, browsing history, restored reading position, or Codex approval UI.
+- **160 × 144 pixels**, a title, a 144 × 92 styled reading viewport and button hints.
+- One result per screen; every match in the admitted four-page collection is reachable.
+- Headings at **16/14 px**, body at **12 px**, annotations at **10 px**, inline bold and paragraph gaps. Up to eight variable-height rows fit each validated viewport.
+- **96-byte UTF-8 queries** and **512-byte locally generated text packets**.
+- A fixed **16 KiB opaque Rust state region**, plus a **2,049-byte robots buffer**. TLS, task stacks, fonts and the 15 KiB display band have separate costs.
+- No bookmarks, browsing history, restored reading position or Codex approval UI.
+- Source URLs are displayed in results. Unsupported active content is treated as data and never executed.
 
-| Button | Result screen | Reader screen |
-| --- | --- | --- |
-| D-pad up / down | Previous / next result | Reserved |
-| D-pad left / right | Reserved | Previous / next reading scene |
-| A | Open selected document | Open a registered link |
-| B | Back | Return from a link or return to results |
-| Start | Query entry | Query entry |
-| Select | Home | Home |
+| Button | Home | Results | Reader |
+| --- | --- | --- | --- |
+| A | Enter a query | Open selected document | Reserved |
+| Start | Submit current query | Query entry | Query entry |
+| Up / down | Reserved | Previous / next result | Scroll up / down one text line |
+| Left / right | Right clears collection for the next query | Reserved | Jump up / down seven lines |
+| B | System menu | Home | Results |
+| Select | Wi-Fi setup | Home | Home |
 
-These actions are connected to the experimental native C/LVGL adapter and Rust decoder. The handheld fetches one result or reader packet over native Wi-Fi; USB diagnostics configure the temporary service origin and queue synthetic controls for development checks. See [search UI status](docs/search-ui.md) and the [browser preview](ui/README.md).
+USB diagnostics can queue synthetic input and read the MCU render buffer for development; they do not send pages or search results to the console. Physical-controls and battery-only acceptance are recorded separately from those diagnostics.
 
 ## Runtime and development environment
 
 | Layer | Environment and validation status |
 | --- | --- |
-| Host CLI and search core | Native Rust 2024 program. Validated locally on macOS / Apple M4 / aarch64 with Rust and Cargo 1.95.0, and in hosted Ubuntu / x86_64 CI with stable Rust. Other host platforms are not verified |
-| Build and release tooling | Rust/Cargo for builds; Git and Python 3.11+ for version checks, packaging, and release-gate tests. The compiled CLI runs on its matching host OS/architecture |
-| Chromatic development hardware | One previously inspected DevDay unit: ESP32-U4WDH / Xtensa at 160 MHz, 4 MiB flash, a 2 MiB application partition, and no enabled PSRAM. Display: 160 × 144 RGB565 |
-| Native firmware integration target | ESP-IDF 5.3 with FreeRTOS, the existing Wi-Fi/network/TLS stack, and LVGL display integration. The repository-owned adapter and Rust Xtensa static library compile in an operator-local experimental firmware; complete reproducible integration remains pending |
-| Portable device core | Dependency-free `no_std` Rust with no allocator or OS bindings. It decodes bounded packets and maps buttons; networking and rendering belong to the experimental firmware adapter; complete font coverage remains pending |
-| Network/service runtime | A DNS-resolvable HTTPS service reachable from the device, with native clock synchronization and certificate/hostname validation. The HTTP API is implemented; HTTPS terminates at the development deployment origin. A permanent endpoint remains pending |
+| Chromatic development unit | ESP32-U4WDH / Xtensa at 160 MHz, 4 MiB flash, a 2 MiB application partition, no enabled PSRAM, 160 × 144 RGB565 display |
+| Native platform | ESP-IDF 5.3, FreeRTOS, LVGL, native Wi-Fi/SNTP and certificate/hostname validation; experimental operator-local integration |
+| Native Rust core | Dependency-free `no_std`, no allocator; local collection/search plus packet/image validation. Xtensa build uses the installed Espressif Rust 1.97 nightly toolchain |
+| Optional host tools | Rust 2024, Rust/Cargo 1.95 locally on macOS / Apple M4 / aarch64; hosted Ubuntu / x86_64 CI uses stable Rust |
+| Checks / packaging | Git, Python 3.11+, Node.js and Rust/Cargo; physical release evidence remains required |
 
-The manifest declares Rust 1.88 as its minimum version; that minimum is not separately checked in CI. Current validation uses the toolchains above. The hardware values describe the earlier development unit and firmware, not guaranteed resources on every Chromatic; experimental search evidence is scoped to that same development unit. See the [device profile](devices/chromatic/README.md) and [lab requirements](docs/hardware-e2e.md).
-
-The initial firmware plan keeps ESP-IDF/FreeRTOS and integrates the small Rust core. A `no_std` core does not make the complete Wi-Fi firmware bare metal. Optimize task stacks, network/TLS buffers, and incremental drawing against real-device measurements before considering a replacement platform; see the [performance trade-offs](docs/performance.md#rtos-footprint-and-bare-metal).
+The native core does not make the entire firmware bare metal. Networking, task stacks and display integration continue to use the established platform. Optimize against real target heap, stack and execution measurements; see [performance](docs/performance.md). Hardware values describe the inspected development unit and are not guarantees for every console.
 
 ## Run host checks
 
-Use stable Rust and Cargo. Host checks do not require an ESP32 toolchain.
-
 ```sh
-# Search the original fixture documents.
-cargo run -- examples/documents.json 'chromatic wifi'
-
-# Build and decode a result packet, then open its first reader page.
-cargo run --example chromatic -- examples/documents.json 'chromatic wifi'
-
-# Start the read-only sample API and browser UI.
-cargo run -- serve examples/documents.json 127.0.0.1:8828 --html examples/html-manifest.json
-
-# Run all search and protocol checks.
-cargo test --workspace
-cargo check -p chromatic-client
-cargo clippy --workspace --all-targets -- -D warnings
+cargo test --locked --workspace
+cargo clippy --locked --workspace --all-targets -- -D warnings
+cargo build --locked -p chromatic-client --profile chromatic-size
+cargo build --locked -p chromatic-client --profile chromatic-speed
 ```
 
-The Chromatic example runs entirely on the host and prints that distinction. The sample JSON and `examples/fixtures/*.html` contain original test text and nonexistent `.invalid` URLs, including Japanese fixtures. It is not a crawled corpus or evidence of hardware browsing.
+These validate the portable core, including streaming boundaries, capacity limits, honest empty results and the C boundary. They are not physical device tests.
+
+Optional companion tools remain available:
+
+```sh
+cargo run -- crawl examples/crawl-ai.json data/ai-001
+cargo run -- serve-crawl data/ai-001 127.0.0.1:8858
+cargo run -- serve examples/documents.json 127.0.0.1:8828 --html examples/html-manifest.json
+```
+
+The companion admits up to 256 pages, can prepare PNG/JPEG images, and uses a richer HTML5 parser and search model. Its browser preview shows companion behavior. The original fixtures contain invented `.invalid` URLs and are explicitly marked as samples; none are bundled into the autonomous native collection.
 
 ## Hardware evidence and limits
 
-Earlier work on one Chromatic DevDay unit verified Wi-Fi, native SNTP, and certificate-validated HTTPS fetching. That firmware and its verification artifacts are outside this repository. Those earlier checks do not verify Pocket Search; newer scoped [DOM/image evidence](docs/dom-images.md) covers the experimental reader. Battery-only operation remains unverified.
+The current on-device application is `0.13.19-type`, with semantic font sizes, inline bold, paragraph spacing and up/down line scrolling. Styles are normalized for the small screen; external CSS and web fonts are not reproduced. See [typography scope and native evidence](docs/typography.md). The earlier `0.13.17-local` experiment established autonomous collection: With Mac services and tunnels stopped, it directly collected four public pages and returned four `AI` matches. The operator confirmed battery-only restart, query entry and A to read. One first collection took 18.241 seconds; local ranking/packet generation took 5.042 ms on the inspected console. See [measurements and acceptance limits](docs/on-device-search.md), [standalone evidence](docs/evidence/on-device-search/verification.json) and [scroll verification](docs/evidence/reader-scroll/verification.json).
 
-Available heap on that earlier unit before a small HTTPS request was about 58 KiB. This is an observation of that unit and firmware, not a universal free-memory guarantee. Its hardware/software environment is summarized above; see the [device profile](devices/chromatic/README.md) for exact measurements.
+App-only installation preserves the established partition table, bootloader, FPGA and Wi-Fi settings. The index is volatile; there is no flash cache yet. The source profile, parsing and memory limits are explicit, so the application does not claim general browser support or Internet-wide search.
 
-The development Wi-Fi allowed outbound HTTPS but did not establish device-to-computer LAN reachability. Hardware testing needs a verified reachable endpoint; a running local service alone does not prove a Wi-Fi path to the device. Save a verified origin with `search_endpoint https://hostname --save` to restore it after restart; see [service setup and recovery](docs/search-service.md). A saved temporary URL still depends on the companion and tunnel staying available.
+Earlier [real-site companion evidence](docs/evidence/real-sites/verification.json) verified 13 externally collected pages, native Wi-Fi reader responses and a user-confirmed source image. That evidence describes `0.13.16-web`, whose Mac/tunnel dependency prompted the autonomous mode. It is not evidence of native image decoding or local indexing. Historical [service setup](docs/search-service.md) applies only to that older companion mode.
 
 ## Next milestone
 
-Finish reproducible firmware integration and physical-controls/error acceptance for the implemented sample query → result → text loop. Continue bounded real-page collection after the controlled DOM/image experiment. Video is deferred until text and still-image behavior is measured on the device.
-
-See the [architecture](docs/architecture.md), [protocol](docs/chromatic-protocol.md), and [roadmap](docs/roadmap.md). Device credentials, activation codes, NVS dumps, and full-flash backups are not included.
+Qualify standalone collection, search, reading and errors with physical controls and battery power, then make the complete firmware integration reproducible. Next add configurable public source profiles and measured persistent storage, followed by on-device image decoding/resizing. The priority is autonomous, bounded operation on the console.
 
 ## Open-source development
 

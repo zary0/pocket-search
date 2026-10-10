@@ -1,0 +1,20 @@
+{
+  "seeds": [
+    "https://www-formal.stanford.edu/jmc/aiintro/aiintro.html",
+    "https://www-formal.stanford.edu/jmc/whatisai/node1.html",
+    "https://www-formal.stanford.edu/jmc/whatisai/node2.html",
+    "https://www-formal.stanford.edu/jmc/whatisai/node3.html",
+    "https://www-formal.stanford.edu/jmc/whatisai/node4.html",
+    "https://www.w3.org/community/webmachinelearning/"
+  ],
+  "scope": "public_web",
+  "allowed_hosts": [],
+  "max_pages": 64,
+  "max_depth": 2,
+  "max_requests": 128,
+  "max_bytes": 8388608,
+  "max_seconds": 180,
+  "request_seconds": 10,
+  "delay_ms": 1000,
+  "images_per_page": 1
+}

@@ -1,7 +1,139 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! C boundary for the existing allocation-free Rust decoder. Offsets borrow the caller's buffer.
 #![cfg_attr(feature = "native", no_std)]
+use chromatic_client::local::LocalSearch;
 use chromatic_client::{MAX_PACKET_BYTES, Packet, TEXT_ROWS};
+
+#[unsafe(no_mangle)]
+pub extern "C" fn ps_local_state_bytes() -> usize {
+    core::mem::size_of::<LocalSearch>()
+}
+
+fn state_valid(state: *mut u8, size: usize) -> bool {
+    !state.is_null()
+        && size >= core::mem::size_of::<LocalSearch>()
+        && (state as usize) % core::mem::align_of::<LocalSearch>() == 0
+}
+/// Initialize one aligned opaque on-device state. No allocation is performed.
+/// # Safety
+/// State owns `size` writable bytes with LocalSearch alignment. Every later call
+/// uses the same initialized, exclusively owned region. No other call, ISR or
+/// thread may access it concurrently. Input/output buffers must not overlap it.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_init(state: *mut u8, size: usize) -> i32 {
+    if !state_valid(state, size) {
+        return -1;
+    }
+    // LocalSearch contains only integers and integer arrays: zero is valid.
+    unsafe {
+        core::ptr::write_bytes(state, 0, core::mem::size_of::<LocalSearch>());
+    }
+    unsafe { &mut *state.cast::<LocalSearch>() }.seed();
+    0
+}
+/// # Safety
+/// Initialized exclusive state as for ps_local_init; out owns length writable,
+/// non-overlapping bytes. A successful call begins one unpublished document.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_next(
+    state: *mut u8,
+    size: usize,
+    out: *mut u8,
+    length: usize,
+) -> i32 {
+    if !state_valid(state, size) || out.is_null() || length != 128 {
+        return -1;
+    }
+    unsafe { &mut *state.cast::<LocalSearch>() }
+        .next_url(unsafe { core::slice::from_raw_parts_mut(out, length) }) as i32
+}
+/// # Safety
+/// Initialized exclusive state; bytes owns length readable bytes, disjoint from
+/// state. Feed only body data of the current allowed, verified HTTPS document.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_feed(
+    state: *mut u8,
+    size: usize,
+    bytes: *const u8,
+    length: usize,
+) -> i32 {
+    if !state_valid(state, size) || bytes.is_null() || length > 512 {
+        return -1;
+    }
+    unsafe { &mut *state.cast::<LocalSearch>() }
+        .feed(unsafe { core::slice::from_raw_parts(bytes, length) });
+    0
+}
+/// # Safety
+/// Initialized exclusive state. Complete must be 1 only after transport, status,
+/// content type, body limit and robots checks all pass and HTTP EOF is complete.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_finish(state: *mut u8, size: usize, complete: i32) -> i32 {
+    if !state_valid(state, size) {
+        return -1;
+    }
+    i32::from(unsafe { &mut *state.cast::<LocalSearch>() }.finish(complete == 1))
+}
+/// # Safety
+/// Initialized exclusive state; out owns 512 writable bytes, query owns length
+/// readable UTF-8 bytes. All regions are disjoint. Kind 1 searches; kind 2 reads.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_packet(
+    state: *mut u8,
+    size: usize,
+    kind: u32,
+    document: u32,
+    page: u32,
+    query: *const u8,
+    length: usize,
+    out: *mut u8,
+) -> i32 {
+    if !state_valid(state, size) || query.is_null() || out.is_null() || length > 96 {
+        return -1;
+    }
+    let Ok(query) = core::str::from_utf8(unsafe { core::slice::from_raw_parts(query, length) })
+    else {
+        return -1;
+    };
+    let index = unsafe { &*state.cast::<LocalSearch>() };
+    let out = unsafe { core::slice::from_raw_parts_mut(out, 512) };
+    (match kind {
+        1 => index.search_packet(query, page as usize, out),
+        2 => index.reader_packet(document as usize, page as usize, out),
+        _ => 0,
+    }) as i32
+}
+/// # Safety
+/// Initialized exclusive state; no concurrent access, including readers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_count(state: *mut u8, size: usize) -> i32 {
+    if !state_valid(state, size) {
+        return -1;
+    }
+    unsafe { &*state.cast::<LocalSearch>() }.count() as i32
+}
+/// # Safety
+/// Bytes owns length readable bytes. Path owns path_length readable UTF-8 bytes;
+/// neither buffer is mutated. Conservative unsupported robots files deny access.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_robots(
+    bytes: *const u8,
+    length: usize,
+    path: *const u8,
+    path_length: usize,
+) -> i32 {
+    if bytes.is_null() || path.is_null() || length > 2048 || path_length > 128 {
+        return 0;
+    }
+    let Ok(path) = core::str::from_utf8(unsafe { core::slice::from_raw_parts(path, path_length) })
+    else {
+        return 0;
+    };
+    i32::from(chromatic_client::local::robots_allowed(
+        unsafe { core::slice::from_raw_parts(bytes, length) },
+        path,
+    ))
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
@@ -21,6 +153,84 @@ pub struct View {
     pub title: Text,
     pub lines: [Text; TEXT_ROWS],
     pub link_target: u32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub struct RichRow {
+    pub text: Text,
+    pub styles: Text,
+    pub y: u8,
+    pub height: u8,
+    pub glyphs: u8,
+    pub reserved: u8,
+}
+#[repr(C)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub struct RichView {
+    pub document_id: u32,
+    pub position: u16,
+    pub positions: u16,
+    pub title: Text,
+    pub row_count: u8,
+    pub reserved: [u8; 3],
+    pub rows: [RichRow; chromatic_client::rich::ROWS],
+}
+/// Validate a PSR1 viewport and borrow its text/style offsets.
+/// # Safety
+/// Input owns length readable bytes; output is aligned, writable and disjoint.
+/// Keep input unchanged while any returned offsets are in use.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_rich_decode(
+    bytes: *const u8,
+    length: usize,
+    out: *mut RichView,
+) -> i32 {
+    if bytes.is_null()
+        || out.is_null()
+        || !(20..=MAX_PACKET_BYTES).contains(&length)
+        || (out as usize) % core::mem::align_of::<RichView>() != 0
+    {
+        return -1;
+    }
+    let data = unsafe { core::slice::from_raw_parts(bytes, length) };
+    let Ok(packet) = chromatic_client::rich::Packet::decode(data) else {
+        return -2;
+    };
+    let range = |b: &[u8]| Text {
+        offset: (b.as_ptr() as usize - data.as_ptr() as usize) as u16,
+        length: b.len() as u16,
+    };
+    let mut view = RichView {
+        document_id: packet.document_id,
+        position: packet.position,
+        positions: packet.positions,
+        title: range(packet.title.as_bytes()),
+        row_count: packet.row_count as u8,
+        ..RichView::default()
+    };
+    for (i, row) in packet.rows[..packet.row_count].iter().enumerate() {
+        view.rows[i] = RichRow {
+            text: range(row.text.as_bytes()),
+            styles: range(row.styles),
+            y: row.y,
+            height: row.height,
+            glyphs: row.glyphs,
+            reserved: 0,
+        };
+    }
+    unsafe { out.write(view) };
+    0
+}
+/// Original calibration viewport; does not touch the search collection.
+/// # Safety
+/// Out owns 512 writable bytes and is not concurrently accessed.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_rich_probe(out: *mut u8) -> i32 {
+    if out.is_null() {
+        return -1;
+    }
+    chromatic_client::rich::probe(unsafe { core::slice::from_raw_parts_mut(out, 512) }) as i32
 }
 
 /// Validate a PCS1 packet and return text offsets, leaving output unchanged on failure.
@@ -125,6 +335,71 @@ fn panic(_: &core::panic::PanicInfo) -> ! {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn rich_ffi_borrows_styles_and_rejects_bad_input_without_changing_output() {
+        assert_eq!(core::mem::size_of::<RichView>(), 112);
+        let mut bytes = [0; 512];
+        let mut view = RichView::default();
+        unsafe {
+            let n = ps_rich_probe(bytes.as_mut_ptr());
+            assert!(n > 0);
+            assert_eq!(ps_rich_decode(bytes.as_ptr(), n as usize, &mut view), 0);
+            assert_eq!(view.rows[0].height, 18);
+            assert_eq!(view.rows[1].height, 14);
+            let caption = view.rows.iter().find(|r| r.height == 12).unwrap();
+            assert_eq!(
+                bytes[caption.styles.offset as usize] & 15,
+                chromatic_client::rich::CAPTION
+            );
+            let prior = view;
+            bytes[4] = 2;
+            assert_eq!(ps_rich_decode(bytes.as_ptr(), n as usize, &mut view), -2);
+            assert_eq!(view, prior);
+            assert_eq!(ps_rich_decode(core::ptr::null(), n as usize, &mut view), -1);
+        }
+    }
+    #[test]
+    fn local_opaque_state_ffi_streaming_and_refusals() {
+        #[repr(align(8))]
+        struct State([u8; chromatic_client::local::STATE_BUDGET]);
+        let mut state = State([255; chromatic_client::local::STATE_BUDGET]);
+        let ptr = state.0.as_mut_ptr();
+        let size = state.0.len();
+        let mut url = [0; 128];
+        let mut packet = [0; 512];
+        assert!(ps_local_state_bytes() <= size);
+        unsafe {
+            assert_eq!(ps_local_init(ptr.add(1), size - 1), -1);
+            assert_eq!(ps_local_init(ptr, 1), -1);
+            assert_eq!(ps_local_init(ptr, size), 0);
+            assert_eq!(ps_local_count(ptr, size), 0);
+            let len = ps_local_next(ptr, size, url.as_mut_ptr(), url.len());
+            assert_eq!(
+                &url[..len as usize],
+                chromatic_client::local::SEED.as_bytes()
+            );
+            for b in b"<title>Local AI</title><p>Real AI page text.</p>" {
+                assert_eq!(ps_local_feed(ptr, size, b, 1), 0);
+            }
+            assert_eq!(ps_local_finish(ptr, size, 1), 1);
+            assert_eq!(ps_local_count(ptr, size), 1);
+            let len = ps_local_packet(ptr, size, 1, 0, 0, b"AI".as_ptr(), 2, packet.as_mut_ptr());
+            let view = Packet::decode(&packet[..len as usize]).unwrap();
+            assert_eq!(view.document_id, 1);
+            assert_eq!(view.title, "Local AI");
+            assert_eq!(
+                ps_local_packet(ptr, size, 2, 1, 99, b"".as_ptr(), 0, packet.as_mut_ptr()),
+                0
+            );
+            assert_eq!(ps_local_feed(ptr, size, core::ptr::null(), 1), -1);
+            assert_eq!(
+                ps_local_packet(ptr, size, 1, 0, 0, [255].as_ptr(), 1, packet.as_mut_ptr()),
+                -1
+            );
+            assert_eq!(ps_local_init(ptr, size), 0);
+            assert_eq!(ps_local_count(ptr, size), 0);
+        }
+    }
     #[test]
     fn ffi_rejects_invalid_input_without_changing_output() {
         let bytes = [0u8; 20];

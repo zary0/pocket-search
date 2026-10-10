@@ -1,0 +1,248 @@
+{
+  "schema_version": 1,
+  "date_utc": "2026-10-10",
+  "scope": "Native semantic typography and row scrolling; not release qualification",
+  "application": {
+    "application_version": "0.13.19-type",
+    "application_bytes": 1915248,
+    "application_sha256": "bced5aefa74add2f6d9e266f596fb54c75d92e6110e445f4e907b4ee70077e50",
+    "component_source_sha256": {
+      "pocket_search_input.h": "0d167246a027d26210d40c980f77c8e8a57d006a35c9a3ec2837a48cf72a87ff",
+      "pocket_typography.c": "814b232cce0ea5f7a042545c8daefafe24d7f9b09ca42875e751beb14d026d69",
+      "pocket_search_net.h": "832c5978b9266578790fa3dd6f68a4a3d53207eff21312b5a4c3ad0dde21dc80",
+      "CMakeLists.txt": "311df041eecca01ff6b72b28399818cd6194764cc60372bcb3fef076ffd18716",
+      "pocket_search_origin.h": "48a70fb0e7b0dfc6a7790a8490ec80a1dbb2240fd879e9a6808375d18ff4637b",
+      "pocket_search_ui.h": "f67f6da562553c72d7488751deb5e3b80ab54fbffb3e71f6b8427104001c5076",
+      "pocket_typography.h": "9edb6c0f2dd85bf5ad82270ac9ff98e0c145a2dc97e40510f49689438385914b",
+      "pocket_search_net.c": "554356988260ac456e2bb5da3cbd95cb953ff103e6c75427bd47963ad2ce8625",
+      "pocket_search_origin.c": "4118e2d756347ab01818ef778696be31b76327e666b93acc9a95392768890fa3",
+      "pocket_search_collection.h": "c55fd86745f0eddad18423df20a13d9268f31311aa91053d60aee7021307ecc9",
+      "pocket_search_ui.c": "164df994cf9147bd2967344c76329769f55e6592387a93fb1a6be01c62bba0b4"
+    },
+    "rust_archive_sha256": "4baf3b11b7732e67a7e91c92a9c3a7763e19187a1b3b6d197e1d4b08415ad6f4",
+    "installed": true
+  },
+  "installation": {
+    "application_version": "0.13.19-type",
+    "application_sha256": "bced5aefa74add2f6d9e266f596fb54c75d92e6110e445f4e907b4ee70077e50",
+    "application_bytes": 1915248,
+    "application_readback_verified": true,
+    "previous_application_verified": true,
+    "partition_table_verified_unchanged": true,
+    "nvs_preserved": true,
+    "original_recovery_backup_verified": true,
+    "bootloader_modified": false,
+    "fpga_modified": false,
+    "efuse_modified": false
+  },
+  "rust_source_sha256": {
+    "crates/chromatic-client/src/lib.rs": "afafd2105180fa339148d1b55c470bc46488190223034a81a8309a721a56f995",
+    "crates/chromatic-client/src/local.rs": "ec4341414bdc6217d364eb9fc023f874a4e5dcbb432297e0f3d7b90352c8d96f",
+    "crates/chromatic-client/src/rich.rs": "1d5ee2e6b3830cd3e1277c0843d0dcd0506b191ae90e3f92ebda89444fb5f0db",
+    "crates/chromatic-ffi/src/lib.rs": "00c71939c551c49b869fe61fd36761841579bf8277c3dc185cd6221c8239afd3"
+  },
+  "runtime": {
+    "mcu": "ESP32-U4WDH",
+    "architecture": "Xtensa",
+    "cpu_mhz": 160,
+    "fpga": "18.14",
+    "psram_enabled": false,
+    "frameworks": [
+      "ESP-IDF 5.3",
+      "FreeRTOS",
+      "LVGL"
+    ],
+    "rust_profile": "chromatic-size"
+  },
+  "first_collection": {
+    "sequence": 2,
+    "execution_mode": "on-device",
+    "service_required": false,
+    "error": 0,
+    "http_status": 200,
+    "bytes": 171,
+    "wire_bytes": 36929,
+    "documents": 4,
+    "compute_us": 3786,
+    "tls_verified": true,
+    "clock_synced": true,
+    "elapsed_ms": 38059,
+    "heap_before": 93864,
+    "minimum_free_heap_bytes": 48084,
+    "minimum_largest_free_block_bytes": 40960,
+    "stack_hwm": 3416
+  },
+  "collection": {
+    "execution_mode": "on-device",
+    "service_required": false,
+    "documents": 4,
+    "requests": 5,
+    "body_bytes": 36929,
+    "running": false,
+    "state_bytes": 16384,
+    "state_used_bytes": 15632,
+    "robots_buffer_bytes": 2049,
+    "maximum_documents": 4,
+    "text_bytes_per_document": 2560,
+    "persistent_index": false,
+    "native_images": false
+  },
+  "typography": {
+    "normalized_sizes_px": [
+      10,
+      12,
+      14,
+      16
+    ],
+    "row_line_spacing_px": 2,
+    "paragraph_gap_px": 6,
+    "viewport_pixels": [
+      144,
+      92
+    ],
+    "viewport_origin": [
+      8,
+      34
+    ],
+    "maximum_rows": 8,
+    "maximum_style_runs_per_document": 48,
+    "maximum_style_nesting": 16,
+    "rust_state_reserved_bytes": 16384,
+    "rust_state_used_bytes": 15632,
+    "font_scratch_and_cache_bytes": 328,
+    "borrowed_rich_view_bytes": 112,
+    "additional_framebuffer": false,
+    "packet_limit_bytes": 512,
+    "style_limit_visible": true,
+    "external_css_cascade": false,
+    "web_fonts": false
+  },
+  "original_diagnostic_probe": {
+    "ui": {
+      "mode": 8,
+      "query_bytes": 2,
+      "tls_verified": true,
+      "rust_decoder": true,
+      "document_id": 1,
+      "page_index": 0,
+      "page_count": 1,
+      "kind": 2,
+      "image_bytes": 0,
+      "back_depth": 0,
+      "styled": true,
+      "typography_probe": true,
+      "largest_font_px": 16,
+      "smallest_font_px": 10,
+      "bold_glyphs": 17,
+      "paragraph_gaps": 1
+    },
+    "never_inserted_into_collection": true,
+    "requests_and_document_count_unchanged": true,
+    "B_restored_original_document_and_position": true
+  },
+  "navigation": {
+    "document_id": 2,
+    "window_positions": 134,
+    "observed_top_rows": [
+      0,
+      1,
+      0,
+      0,
+      0,
+      7,
+      133,
+      133,
+      133,
+      132,
+      0,
+      7
+    ],
+    "up_down_one_row": true,
+    "left_right_seven_rows": true,
+    "first_and_last_clamped": true,
+    "B_returned_to_selected_result": true,
+    "request_count_after_navigation": 5,
+    "shared_content_pixel_comparison": {
+      "before_top_row": 0,
+      "after_top_row": 1,
+      "vertical_shift_pixels": 14,
+      "compared_width": 144,
+      "compared_height": 70,
+      "all_pixels_equal": true
+    }
+  },
+  "captures": [
+    {
+      "file_sha256": "2269a76bc0b5aaf64fc7898b9570efcc0fc2c16640f578b27031a829c08052c0",
+      "dimensions": [
+        160,
+        144
+      ],
+      "source": "physical MCU render-buffer readback; LCD panel not observed",
+      "original_typography_calibration": false,
+      "bytes_committed": false
+    },
+    {
+      "file_sha256": "00e2e4b40f6e71aa8f2df3417b6a4b15cfe0f0f297e23a8b2999b789860d261d",
+      "dimensions": [
+        160,
+        144
+      ],
+      "source": "physical MCU render-buffer readback; LCD panel not observed",
+      "original_typography_calibration": false,
+      "bytes_committed": false
+    },
+    {
+      "file_sha256": "a6d27114cebb5cd1b22cb00208645fac3385435ed2214070b3b4b5e698d1d8dc",
+      "dimensions": [
+        160,
+        144
+      ],
+      "source": "physical MCU render-buffer readback; LCD panel not observed",
+      "original_typography_calibration": true,
+      "bytes_committed": false
+    },
+    {
+      "file_sha256": "c8a95faefad0709a35c18b96900089afeca8085b33d684b82662bcc6d75f6ccb",
+      "dimensions": [
+        160,
+        144
+      ],
+      "source": "physical MCU render-buffer readback; LCD panel not observed",
+      "original_typography_calibration": false,
+      "bytes_committed": false
+    },
+    {
+      "file_sha256": "0d403f180e978d121c21da39bee50b469bad82324579adc9f52bcf09553435e7",
+      "dimensions": [
+        160,
+        144
+      ],
+      "source": "physical MCU render-buffer readback; LCD panel not observed",
+      "original_typography_calibration": false,
+      "bytes_committed": false
+    }
+  ],
+  "validation": {
+    "workspace_tests_passed": 66,
+    "fmt_passed": true,
+    "clippy_warnings_denied_passed": true,
+    "native_rust_build_passed": true,
+    "native_application_build_passed": true,
+    "component_sources_match_installed_build": true,
+    "serial_connection_closed": true,
+    "companion_service_used": false,
+    "temporary_tunnel_used": false,
+    "usb_page_proxy_used": false,
+    "operator_LCD_observation_for_this_image": false,
+    "battery_only_acceptance_for_this_image": false,
+    "release_physical_e2e_qualified": false
+  },
+  "limits": [
+    "Supported semantic tags and selected inline size/weight only; not full HTML5/CSS layout",
+    "Font normalization and bitmap scaling; existing glyph coverage, no Unicode shaping",
+    "Retained text limited to 2560 bytes per document, volatile collection",
+    "Sampled heap/stack/timing from one run, not worst-case allocator or latency bounds",
+    "USB synthetic controls and MCU render-buffer reads do not establish physical-button/LCD/battery release qualification"
+  ]
+}

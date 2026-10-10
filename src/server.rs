@@ -92,7 +92,7 @@ fn parameters(value: &str) -> Result<BTreeMap<String, String>, ()> {
     for part in value.split('&') {
         let (key, value) = part.split_once('=').ok_or(())?;
         let key = decode(key)?;
-        if out.insert(key, decode(value)?).is_some() || out.len() > 2 {
+        if out.insert(key, decode(value)?).is_some() || out.len() > 3 {
             return Err(());
         }
     }
@@ -152,6 +152,10 @@ pub fn route(index: &SearchIndex, method: &str, target: &str) -> Response {
             "text/javascript; charset=utf-8",
             include_bytes!("../ui/input.mjs").as_slice(),
         )),
+        "/feedback.mjs" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../ui/feedback.mjs").as_slice(),
+        )),
         "/images.mjs" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../ui/images.mjs").as_slice(),
@@ -173,7 +177,7 @@ pub fn route(index: &SearchIndex, method: &str, target: &str) -> Response {
         return Response {
             status: 200,
             content_type: "application/json",
-            body: json!({"label":COLLECTION,"sample":true,"documents":index.document_count()})
+            body: json!({"label":index.collection.label,"sample":index.collection.sample,"generation":index.collection.generation,"documents":index.document_count()})
                 .to_string()
                 .into_bytes(),
         };
@@ -190,9 +194,20 @@ pub fn route(index: &SearchIndex, method: &str, target: &str) -> Response {
     {
         return reply(404, "Not found");
     }
-    let Ok(p) = parameters(query) else {
+    let Ok(mut p) = parameters(query) else {
         return reply(400, "Invalid parameters");
     };
+    let generation = p.remove("generation");
+    if generation
+        .as_ref()
+        .is_some_and(|g| g != &index.collection.generation)
+        || (!index.collection.sample
+            && path != "/v1/search"
+            && path != "/v1/chromatic/search"
+            && generation.is_none())
+    {
+        return reply(409, "Collection changed; search again");
+    }
     if [
         "/v1/chromatic/page",
         "/v1/dom",
@@ -236,9 +251,14 @@ pub fn route(index: &SearchIndex, method: &str, target: &str) -> Response {
             },
         };
     }
-    if p.keys()
-        .any(|k| k != "q" && (k != "result" || path == "/v1/search"))
-    {
+    if p.keys().any(|k| {
+        k != "q"
+            && k != if path == "/v1/search" {
+                "offset"
+            } else {
+                "result"
+            }
+    }) {
         return reply(400, "Invalid parameters");
     }
     let Some(q) = p.get("q") else {
@@ -253,8 +273,17 @@ pub fn route(index: &SearchIndex, method: &str, target: &str) -> Response {
         };
         return packet(index.chromatic_result(q, at));
     }
-    let hits: Vec<_> = index
-        .search(q, 10)
+    let Ok(offset) = number(p.get("offset"), 0) else {
+        return reply(400, "Invalid result offset");
+    };
+    if offset > 255 || offset % 10 != 0 || (offset > 0 && generation.is_none()) {
+        return reply(
+            400,
+            "Invalid result offset or missing collection generation",
+        );
+    }
+    let (hits, total) = index.search_window(q, offset, 10);
+    let hits: Vec<_> = hits
         .into_iter()
         .map(|hit| {
             let (title, _) = excerpt(&hit.title, 128);
@@ -264,7 +293,7 @@ pub fn route(index: &SearchIndex, method: &str, target: &str) -> Response {
             "source_url_truncated":truncated,"snippet":snippet})
         })
         .collect();
-    let body = json!({"collection":COLLECTION,"sample":true,"results":hits})
+    let body = json!({"collection":index.collection.label,"sample":index.collection.sample,"generation":index.collection.generation,"results":hits,"total":total,"offset":offset,"indexed_pages":index.document_count()})
         .to_string()
         .into_bytes();
     if body.len() > RESPONSE_BYTES {
@@ -296,7 +325,7 @@ fn dom_page(index: &SearchIndex, id: usize, page: usize) -> Response {
             .and_then(|at| index.dom_documents.get(&id)?.images.get(at))
     });
     let body=json!({"document_id":id,"page_index":page,"page_count":packet.page_count,"kind":packet.kind as u8,
-        "title":excerpt(&doc.title,256).0,"url":excerpt(&doc.url,1024).0,"has_dom":index.dom_documents.contains_key(&id),
+        "title":excerpt(&doc.title,256).0,"url":excerpt(&doc.url,1024).0,"generation":index.collection.generation,"provenance":index.provenance.get(&id),"has_dom":index.dom_documents.contains_key(&id),
         "style":scene.map_or("paragraph",|p|p.style),"heading_level":scene.map_or(0,|p|p.heading_level),
         "source":scene.map_or("".to_string(),|p|excerpt(&p.source,1024).0),"link_target":packet.link_target,
         "image_width":image.map_or(0,|i|i.width),"image_height":image.map_or(0,|i|i.height)
@@ -310,23 +339,26 @@ fn dom_page(index: &SearchIndex, id: usize, page: usize) -> Response {
         body,
     }
 }
-fn write_response(stream: &mut TcpStream, response: Response) {
+fn write_response(stream: &mut TcpStream, response: Response, collection: &crate::Collection) {
     let reason = match response.status {
         200 => "OK",
         400 => "Bad Request",
         404 => "Not Found",
         405 => "Method Not Allowed",
         408 => "Request Timeout",
+        409 => "Conflict",
         503 => "Service Unavailable",
         _ => "Internal Server Error",
     };
     let _ = stream.set_write_timeout(Some(Duration::from_secs(1)));
     let header = format!(
-        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nContent-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {} {}\r\nContent-Type: {}\r\nContent-Length: {}\r\nX-Pocket-Collection: {}\r\nX-Pocket-Sample: {}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nContent-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'\r\nConnection: close\r\n\r\n",
         response.status,
         reason,
         response.content_type,
-        response.body.len()
+        response.body.len(),
+        collection.generation,
+        if collection.sample { 1 } else { 0 }
     );
     if stream.write_all(header.as_bytes()).is_ok() {
         let _ = stream.write_all(&response.body);
@@ -339,16 +371,28 @@ fn connection(mut stream: TcpStream, index: &SearchIndex) {
     let mut used = 0;
     loop {
         if used == request.len() {
-            write_response(&mut stream, reply(400, "Request too large"));
+            write_response(
+                &mut stream,
+                reply(400, "Request too large"),
+                &index.collection,
+            );
             return;
         }
         if start.elapsed() > Duration::from_secs(3) {
-            write_response(&mut stream, reply(408, "Request timeout"));
+            write_response(
+                &mut stream,
+                reply(408, "Request timeout"),
+                &index.collection,
+            );
             return;
         }
         let n = match stream.read(&mut request[used..]) {
             Ok(0) | Err(_) => {
-                write_response(&mut stream, reply(408, "Incomplete request"));
+                write_response(
+                    &mut stream,
+                    reply(408, "Incomplete request"),
+                    &index.collection,
+                );
                 return;
             }
             Ok(n) => n,
@@ -359,7 +403,11 @@ fn connection(mut stream: TcpStream, index: &SearchIndex) {
         }
     }
     let Ok(text) = std::str::from_utf8(&request[..used]) else {
-        write_response(&mut stream, reply(400, "Invalid request"));
+        write_response(
+            &mut stream,
+            reply(400, "Invalid request"),
+            &index.collection,
+        );
         return;
     };
     let Some(line) = text.split("\r\n").next() else {
@@ -367,10 +415,18 @@ fn connection(mut stream: TcpStream, index: &SearchIndex) {
     };
     let parts: Vec<_> = line.split(' ').collect();
     if parts.len() != 3 || !["HTTP/1.1", "HTTP/1.0"].contains(&parts[2]) {
-        write_response(&mut stream, reply(400, "Invalid request"));
+        write_response(
+            &mut stream,
+            reply(400, "Invalid request"),
+            &index.collection,
+        );
         return;
     }
-    write_response(&mut stream, route(index, parts[0], parts[1]));
+    write_response(
+        &mut stream,
+        route(index, parts[0], parts[1]),
+        &index.collection,
+    );
 }
 pub fn serve(index: SearchIndex, address: &str) -> std::io::Result<()> {
     let listener = TcpListener::bind(address)?;
@@ -391,16 +447,18 @@ pub fn serve(index: SearchIndex, address: &str) -> std::io::Result<()> {
         });
     }
     eprintln!(
-        "Pocket Search read-only service listening on {} (original samples; no request logging)",
+        "Pocket Search read-only service listening on {} (immutable collection; no request logging)",
         listener.local_addr()?
     );
     for stream in listener.incoming() {
         let stream = stream?;
         match tx.try_send(stream) {
             Ok(()) => {}
-            Err(mpsc::TrySendError::Full(mut stream)) => {
-                write_response(&mut stream, reply(503, "Busy; retry later"))
-            }
+            Err(mpsc::TrySendError::Full(mut stream)) => write_response(
+                &mut stream,
+                reply(503, "Busy; retry later"),
+                &index.collection,
+            ),
             Err(mpsc::TrySendError::Disconnected(_)) => break,
         }
     }
@@ -418,6 +476,68 @@ mod tests {
             body: "Original wifi text. ".repeat(80),
             image_urls: vec![],
         }])
+    }
+    #[test]
+    fn result_windows_and_native_pages_reach_the_last_document() {
+        let docs = (0..256)
+            .rev()
+            .map(|id| Document {
+                url: format!("https://example.invalid/{id:03}"),
+                title: "AI original test".into(),
+                body: "AI original body".into(),
+                image_urls: vec![],
+            })
+            .collect();
+        let index = SearchIndex::new(docs);
+        let first = route(&index, "GET", "/v1/search?q=AI");
+        let first: serde_json::Value = serde_json::from_slice(&first.body).unwrap();
+        assert_eq!(first["total"], 256);
+        let generation = first["generation"].as_str().unwrap();
+        let mut seen = Vec::new();
+        for offset in (0..256).step_by(10) {
+            let response = route(
+                &index,
+                "GET",
+                &format!("/v1/search?q=AI&offset={offset}&generation={generation}"),
+            );
+            assert_eq!(response.status, 200);
+            assert!(response.body.len() <= RESPONSE_BYTES);
+            let value: serde_json::Value = serde_json::from_slice(&response.body).unwrap();
+            for (i, hit) in value["results"].as_array().unwrap().iter().enumerate() {
+                let wire = index.chromatic_result("AI", offset + i).unwrap();
+                let packet = Packet::decode(&wire).unwrap();
+                assert_eq!(packet.page_count, 256);
+                assert_eq!(packet.page_index as usize, offset + i);
+                assert_eq!(
+                    packet.document_id as u64,
+                    hit["document_id"].as_u64().unwrap()
+                );
+                seen.push(hit["url"].as_str().unwrap().to_owned());
+            }
+        }
+        assert_eq!(seen.len(), 256);
+        assert_eq!(seen[255], "https://example.invalid/255");
+        assert_eq!(
+            route(&index, "GET", "/v1/search?q=AI&offset=10").status,
+            400
+        );
+        assert_eq!(
+            route(&index, "GET", "/v1/search?q=AI&offset=10&generation=stale").status,
+            409
+        );
+        for offset in ["-1", "1", "256", "99999"] {
+            assert_eq!(
+                route(
+                    &index,
+                    "GET",
+                    &format!("/v1/search?q=AI&offset={offset}&generation={generation}")
+                )
+                .status,
+                400
+            );
+        }
+        assert!(index.chromatic_result("AI", 256).is_err());
+        assert_eq!(index.search("AI", 999).len(), 50);
     }
     #[test]
     fn route_round_trips_ranked_results_and_reader() {

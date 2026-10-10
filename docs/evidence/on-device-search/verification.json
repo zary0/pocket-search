@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "scope": "Experimental autonomous on-device crawl, index, search and retained text reader; not release qualification",
+  "application": {
+    "application_version": "0.13.17-local",
+    "application_bytes": 1900144,
+    "application_sha256": "8ec7c0215ec5c537387e28a4d54906eebc8765edfe352ded7e9f1b2144b8c40d",
+    "rust_archive_sha256": "684736ab876d8f4906a313010bdef69581cf399e7ebac62d18d919e5ca680517",
+    "component_source_sha256": {
+      "pocket_search_input.h": "0d167246a027d26210d40c980f77c8e8a57d006a35c9a3ec2837a48cf72a87ff",
+      "pocket_search_net.h": "654ece3541a5ca1ac870e5c928af706f0fea675d3a25148c9acd9bc2ee2ea760",
+      "CMakeLists.txt": "48f86433352c5f782b2d070b9b9ba2484a7f3b562ad9877f31b7094d3efe9469",
+      "pocket_search_origin.h": "48a70fb0e7b0dfc6a7790a8490ec80a1dbb2240fd879e9a6808375d18ff4637b",
+      "pocket_search_ui.h": "f67f6da562553c72d7488751deb5e3b80ab54fbffb3e71f6b8427104001c5076",
+      "pocket_search_net.c": "554356988260ac456e2bb5da3cbd95cb953ff103e6c75427bd47963ad2ce8625",
+      "pocket_search_origin.c": "4118e2d756347ab01818ef778696be31b76327e666b93acc9a95392768890fa3",
+      "pocket_search_collection.h": "c55fd86745f0eddad18423df20a13d9268f31311aa91053d60aee7021307ecc9",
+      "pocket_search_ui.c": "a25e3d63f233dce616fb38b90975de39a7d4b151eb41162448c0ce42c5262cfa"
+    }
+  },
+  "installation": {
+    "application_version": "0.13.17-local",
+    "application_sha256": "8ec7c0215ec5c537387e28a4d54906eebc8765edfe352ded7e9f1b2144b8c40d",
+    "application_bytes": 1900144,
+    "application_readback_verified": true,
+    "previous_application_verified": true,
+    "partition_table_verified_unchanged": true,
+    "nvs_preserved": true,
+    "original_recovery_backup_verified": true,
+    "bootloader_modified": false,
+    "fpga_modified": false,
+    "efuse_modified": false
+  },
+  "runtime": {
+    "mcu": "ESP32-U4WDH",
+    "architecture": "Xtensa",
+    "cpu_mhz": 160,
+    "psram_enabled": false,
+    "esp_idf": "5.3",
+    "rust_toolchain": "Espressif 1.97 nightly",
+    "rust_profile": "chromatic-size",
+    "fpga": "18.14",
+    "chromatic": "v4.6"
+  },
+  "collection": {
+    "source_seed": "https://www-formal.stanford.edu/jmc/whatisai/node1.html",
+    "documents": 4,
+    "requests": 5,
+    "response_body_bytes": 36929,
+    "mac_search_services_running": false,
+    "temporary_https_tunnels_running": false,
+    "usb_page_proxy_used": false,
+    "index_loaded_over_usb": false,
+    "persistent_index": false,
+    "native_images": false
+  },
+  "measurement": {
+    "elapsed_ms": 18241,
+    "compute_us": 5042,
+    "heap_before": 94392,
+    "minimum_free_heap_bytes": 46212,
+    "minimum_largest_free_block_bytes": 38912,
+    "stack_hwm": 3692,
+    "tls_verified": true,
+    "clock_synced": true
+  },
+  "measurement_limits": [
+    "One observed run, not a worst-case guarantee",
+    "compute_us covers local Rust ranking/packet formatting and can include scheduling/interrupt time",
+    "Heap/block samples do not bound all firmware allocations; stack_hwm is free bytes for this worker"
+  ],
+  "state": {
+    "reserved_bytes": 16384,
+    "used_bytes": 14816,
+    "robots_buffer_bytes": 2049,
+    "worker_stack_bytes": 10240,
+    "maximum_documents": 4,
+    "body_bytes_per_document": 2560,
+    "term_slots": 256,
+    "frontier_entries": 8
+  },
+  "diagnostic_acceptance": {
+    "input": "USB queued synthetic controls",
+    "capture": "Physical MCU render-buffer readback; not camera or USB-video LCD observation",
+    "ai_results": 4,
+    "changed_query_checked": true,
+    "empty_result_document_id": 0,
+    "empty_result_cannot_open": true,
+    "reader_document_id": 2,
+    "reader_page_count": 18,
+    "reader_page_indices_observed": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17
+    ],
+    "last_page_boundary_checked": true,
+    "previous_page_and_back_checked": true,
+    "visible_text_limit_marker_checked": true,
+    "requests_after_cached_search_and_reader": 5,
+    "serial_connection_closed_before_battery_test": true
+  },
+  "operator_acceptance": {
+    "source": "User confirmation in this task",
+    "usb_disconnected": true,
+    "battery_only_restart": true,
+    "cold_start_query": "AI",
+    "physical_query_submission": true,
+    "results": 4,
+    "physical_a_opens_body": true,
+    "mac_services_and_tunnels_stopped": true,
+    "repeat_telemetry_collected": false
+  },
+  "release_qualification": {
+    "qualified": false,
+    "chromatic_e2e_ready": false,
+    "remaining": [
+      "Complete physical input/error/reconnection/cancellation/endurance acceptance",
+      "Mixed-language input/font and complete text acceptance",
+      "Reproducible full firmware build and recovery acceptance",
+      "Updated trusted standalone lab driver and physical USB-video E2E"
+    ]
+  },
+  "excluded": [
+    "Wi-Fi credentials and network/device identifiers",
+    "NVS and full-flash recovery backups",
+    "Vendor licenses/tools",
+    "Third-party page bodies and captures",
+    "Firmware binaries"
+  ]
+}
