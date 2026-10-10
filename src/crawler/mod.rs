@@ -390,6 +390,28 @@ fn escape(text: &str) -> String {
         .replace('>', "&gt;")
         .replace('"', "&quot;")
 }
+fn sanitize_references(parsed: &mut dom::Parsed, config: &Config) -> bool {
+    let mut rejected = false;
+    for block in &mut parsed.blocks {
+        let (source, fallback) = match block {
+            Block::Link { source, text } => (source, text.clone()),
+            Block::Image { source, alt } => (source, format!("[Image unavailable: {alt}]")),
+            Block::Text { .. } => continue,
+        };
+        match policy::checked_url(source, &config.allowed_hosts) {
+            Ok(url) => *source = url.to_string(),
+            Err(_) => {
+                rejected = true;
+                *block = Block::Text {
+                    style: "paragraph",
+                    level: 0,
+                    text: fallback,
+                };
+            }
+        }
+    }
+    rejected
+}
 fn write_file(root: &Path, name: &str, bytes: &[u8]) -> Result<SourceFile, String> {
     fs::write(root.join(name), bytes).map_err(|_| "Snapshot write failed")?;
     Ok(SourceFile {
@@ -520,13 +542,16 @@ fn collect<F: Fetch>(config: Config, fetch: F, root: &Path) -> Result<Report, St
         };
         let fetched_at = now();
         seen.insert(url.to_string());
-        let parsed = match dom::parse(&source, url.as_str()) {
+        let mut parsed = match dom::parse(&source, url.as_str()) {
             Ok(p) => p,
             Err(_) => {
                 engine.issue(url.as_str(), "dom_limits_or_invalid");
                 continue;
             }
         };
+        if sanitize_references(&mut parsed, &config) {
+            engine.issue(url.as_str(), "reference_destination_rejected");
+        }
         let (header_noindex, header_nofollow) = directives(&reply.robots_tag);
         let noindex = parsed.noindex || header_noindex;
         let nofollow = parsed.nofollow || header_nofollow;
@@ -591,10 +616,15 @@ fn collect<F: Fetch>(config: Config, fetch: F, root: &Path) -> Result<Report, St
                     let original = policy::checked_url(source, &config.allowed_hosts)?;
                     let (final_url, reply) = engine.resource(original, IMAGE_BYTES, false)?;
                     if reply.status != 200
-                        || !matches!(
-                            reply.content_type.split(';').next().unwrap_or("").trim(),
-                            "image/png" | "image/jpeg"
-                        )
+                        || !["image/png", "image/jpeg"].iter().any(|mime| {
+                            reply
+                                .content_type
+                                .split(';')
+                                .next()
+                                .unwrap_or("")
+                                .trim()
+                                .eq_ignore_ascii_case(mime)
+                        })
                     {
                         return Err("image_type_or_status");
                     }

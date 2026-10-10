@@ -120,6 +120,50 @@
         }
       ],
       "pending_count": 77
+    },
+    {
+      "started_at": 1791609580,
+      "finished_at": 1791609586,
+      "scope": "public_web",
+      "requests": 7,
+      "body_bytes_read": 55462,
+      "stopped": "page_budget",
+      "pages": [
+        {
+          "url": "https://www.iana.org/help/example-domains",
+          "fetched_at": 1791609581,
+          "source_sha256": "044c9d1095c3abc7772dbf31eff7f75aa83b4d3c6ec2caaeac0ab170f628bb49",
+          "images": []
+        },
+        {
+          "url": "https://www.iana.org/domains/reserved",
+          "fetched_at": 1791609582,
+          "source_sha256": "e5cbcb8eafa0417efa96e0aafb525d99b75e84983b6696e48e2ffe6d1cd8b58e",
+          "images": []
+        },
+        {
+          "url": "https://www.w3.org/People/Raggett/",
+          "fetched_at": 1791609584,
+          "source_sha256": "fa4fb73ef5d9d7b5e4122414144f781ea1308cd2d786016e519d2af24a298275",
+          "images": [
+            {
+              "url": "https://www.w3.org/People/Raggett/dsr-46c.jpg",
+              "fetched_at": 1791609585,
+              "source_sha256": "1fc08854196db9098c1814a21592104e2ed6e8d8e75c03efd9b1fe743696b663",
+              "prepared_sha256": "d648aa4ded7e9b6f6d115b7e5b05778a79449f873d6488d92cee36d1350ab4b4",
+              "prepared_bytes": 6915
+            },
+            {
+              "url": "https://www.w3.org/People/Raggett/talkinghands.jpg",
+              "fetched_at": 1791609586,
+              "source_sha256": "b188f50bfbf052d2bee7713e1bb81efb8d245d9a19d2ec6f62c048ac5af996b8",
+              "prepared_sha256": "08cdfbdf47cbfcfcd4a895fc75324b5974f4de4351a9d31174936af7ec389980",
+              "prepared_bytes": 4171
+            }
+          ]
+        }
+      ],
+      "pending_count": 77
     }
   ],
   "live_images_verified": true,
@@ -133,14 +177,17 @@
   "native_adapter_build": {
     "application_version": "0.13.14-crawl",
     "application_bytes": 1874576,
-    "application_sha256": "1be1174dfc8c3ace96902da11c2fc1aeb624c1ffbd3be52b4c7c2cf0f23d4f5f",
+    "application_sha256": "035316c7989bcc0e7b44cd82c69655c14d08f5275d46ce69f8173d854b256944",
     "adapter_source_sha256": {
-      "pocket_search_ui.c": "f993c847c0be2d198f24fa922ff1ba735d2a2dc6a982c409c217481eee54578a",
-      "pocket_search_net.c": "a2ac0eb3ba491374ce96f48652f8723cfd70d8ff13d5ef7a27d7879e83a4b7f1",
-      "pocket_search_net.h": "d266359d0da2afeb00e18435f0331ff9ccd3d9d24a4c7ee675a236b3dfed73c7",
+      "pocket_search_ui.c": "2a2d16fff70e4a5214492fae44d86d44797f321fc7c777845f7bdf3cfe8cbce0",
+      "pocket_search_net.c": "87472e69084a1339bee8adf2f0675e56cbb19737af3769ef5f6cb10b995632b7",
+      "pocket_search_net.h": "9e28fffec5e603dc0f64a58f25ee530b478422dae46d5245c15cef1fcf03ef2a",
       "pocket_search_collection.h": "c55fd86745f0eddad18423df20a13d9268f31311aa91053d60aee7021307ecc9"
     },
-    "full_firmware_reproducible": false
+    "full_firmware_reproducible": false,
+    "embedded_application_version_verified": true
   },
-  "browser_generation_replacement_rejected_and_search_prompt_verified": true
+  "browser_generation_replacement_rejected_and_search_prompt_verified": true,
+  "credential_reference_non_disclosure_regression_verified": true,
+  "live_revision_scope": "Latest live run uses normalized references and expanded credential-query rejection."
 }

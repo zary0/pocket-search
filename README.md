@@ -103,7 +103,7 @@ The development Wi-Fi allowed outbound HTTPS but did not establish device-to-com
 
 Finish reproducible firmware integration and physical-controls/error acceptance for the implemented sample query → result → text loop. Extend the bounded public-page collector with durable frontier/storage after acceptance of the current immutable snapshot flow. Video is deferred until text and still-image behavior is measured on the device.
 
-To collect actual public pages, run `pocket-search crawl examples/crawl-public.json data/crawl-001`, then `pocket-search serve-crawl data/crawl-001 127.0.0.1:8838`. Public-web mode can follow links across domains, but each snapshot currently contains at most 16 indexed pages; it does not search the entire Internet. See [limits and safety boundaries](docs/crawling.md).
+To collect actual public pages, run `cargo run -- crawl examples/crawl-public.json data/crawl-001`, then `cargo run -- serve-crawl data/crawl-001 127.0.0.1:8838`. Public-web mode can follow links across domains, but each snapshot currently contains at most 16 indexed pages; it does not search the entire Internet. See [limits and safety boundaries](docs/crawling.md).
 
 See the [architecture](docs/architecture.md), [protocol](docs/chromatic-protocol.md), and [roadmap](docs/roadmap.md). Device credentials, activation codes, NVS dumps, and full-flash backups are not included.
 

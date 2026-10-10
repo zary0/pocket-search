@@ -7,6 +7,7 @@
 #define PS_IMAGE_PACKET_BYTES 2072
 #define PS_IMAGE_CACHE_BYTES 20480
 #define PS_IMAGE_WIRE_BYTES 20720
+enum { PS_NET_STALE_COLLECTION = 11 };
 
 typedef struct {uint16_t offset,length;} PS_Text;
 typedef struct {uint32_t document_id;uint16_t page_index,page_count;uint8_t kind,line_count;uint16_t reserved;PS_Text title,lines[7];uint32_t link_target;} PS_View;

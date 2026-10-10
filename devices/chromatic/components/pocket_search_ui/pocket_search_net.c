@@ -18,7 +18,7 @@
 static portMUX_TYPE lock=portMUX_INITIALIZER_UNLOCKED;
 static char origin[192];
 static struct {bool running,ready,cancelled;PS_Request request;PS_Reply reply;char endpoint[192];} job;
-enum {NO_WIFI=1,NO_CLOCK,NO_MEMORY,CONNECT_FAILED,HTTP_FAILED,TOO_LARGE,INCOMPLETE,WRONG_TYPE,CANCELLED,INVALID_IMAGE,STALE_COLLECTION};
+enum {NO_WIFI=1,NO_CLOCK,NO_MEMORY,CONNECT_FAILED,HTTP_FAILED,TOO_LARGE,INCOMPLETE,WRONG_TYPE,CANCELLED,INVALID_IMAGE,STALE_COLLECTION=PS_NET_STALE_COLLECTION};
 typedef struct {PS_Reply *reply;bool correct_type,generation_seen,sample_seen,collection_error;const char *expected;} Events;
 static esp_err_t event(esp_http_client_event_t *e){
     Events *events=e->user_data;

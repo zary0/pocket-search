@@ -30,7 +30,7 @@ Each text scene uses the existing seven-row profile. An image has one caption ro
 | Prepared image | <=128 × 80, aspect ratio retained without upscaling; alpha composited onto white; RGB565 little-endian |
 | Prepared image collection | <=8 MiB of retained pixel/preview data |
 
-Preparation occurs on the host at startup. These byte/node/dimension limits are not a parser or codec execution-time sandbox. The separate CLI crawler now applies DNS/redirect/robots safeguards and time-supervises acquisition/preparation; manually registered file loading alone is not a process sandbox.
+Preparation occurs on the host at startup. These byte/node/dimension limits are not a parser or codec execution-time sandbox. The separate CLI crawler now applies DNS/redirect/robots safeguards and time-supervises acquisition and worker-side preparation; parent-side snapshot validation and manually registered file loading still use bounded local preparation without a process sandbox.
 
 ## Read-only routes
 

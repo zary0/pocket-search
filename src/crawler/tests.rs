@@ -135,6 +135,10 @@ fn public_destination_policy_rejects_all_special_use_forms() {
         "https://alpha.example.com/a\n",
         "https://alpha.example.com/?access_token=secret",
         "https://alpha.example.com/?X-Amz-Signature=secret",
+        "https://alpha.example.com/?refresh_token=secret",
+        "https://alpha.example.com/?oauth_token=secret",
+        "https://alpha.example.com/?%63lient_secret=secret",
+        "https://alpha.example.com/?CODE=secret",
     ] {
         assert!(policy::checked_url(url, &[]).is_err(), "{url}");
     }
@@ -483,7 +487,7 @@ fn downloaded_png_is_reencoded_and_all_files_are_bound_to_snapshot() {
     mock.add(
         "https://alpha.example.com/color.png",
         200,
-        "image/png",
+        "IMAGE/PNG; charset=binary",
         raw.get_ref(),
     );
     let report = collect(config(), mock, &temp.0).unwrap();
@@ -492,6 +496,39 @@ fn downloaded_png_is_reencoded_and_all_files_are_bound_to_snapshot() {
     assert_eq!(index.dom_documents[&1].images.len(), 1);
     fs::write(temp.0.join(&report.pages[0].file.path), b"tampered").unwrap();
     assert!(load_snapshot(&temp.0).is_err());
+}
+#[test]
+fn credential_references_never_reach_fetches_snapshots_or_reader_metadata() {
+    let temp = Temp::new();
+    let mut mock = Mock::new();
+    mock.robots("alpha.example.com", "");
+    mock.html("https://alpha.example.com/", "<title>Public article</title><main><p>Keep this text.</p><a href='/auth?refresh_token=original_secret_marker'>Continue</a><img src='/picture.png?client_secret=original_secret_marker' alt='Hidden destination'><a href='/safe#part'>Safe link</a></main>");
+    let calls = mock.calls.clone();
+    let mut c = config();
+    c.max_pages = 1;
+    let report = collect(c, mock, &temp.0).unwrap();
+    assert_eq!(report.pending.len(), 1);
+    assert_eq!(report.pending[0].url, "https://alpha.example.com/safe");
+    assert_eq!(calls.lock().unwrap().len(), 2);
+    let index = load_snapshot(&temp.0).unwrap();
+    assert!(index.documents[0].body.contains("Continue"));
+    assert!(index.documents[0].body.contains("Hidden destination"));
+    for file in fs::read_dir(&temp.0).unwrap() {
+        let bytes = fs::read(file.unwrap().path()).unwrap();
+        assert!(!String::from_utf8_lossy(&bytes).contains("original_secret_marker"));
+    }
+    for page in 0..index.dom_documents[&1].pages.len() {
+        let response = crate::server::route(
+            &index,
+            "GET",
+            &format!(
+                "/v1/dom?id=1&page={page}&generation={}",
+                index.collection.generation
+            ),
+        );
+        assert_eq!(response.status, 200);
+        assert!(!String::from_utf8_lossy(&response.body).contains("original_secret_marker"));
+    }
 }
 #[test]
 fn failed_images_leave_readable_text_and_a_visible_placeholder() {

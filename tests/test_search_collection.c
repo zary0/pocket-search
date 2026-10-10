@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-#include "../devices/chromatic/components/pocket_search_ui/pocket_search_collection.h"
+#include "../devices/chromatic/components/pocket_search_ui/pocket_search_net.h"
 #include <assert.h>
 #include <string.h>
 int main(void){

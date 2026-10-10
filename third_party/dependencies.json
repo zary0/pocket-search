@@ -228,6 +228,10 @@
       {
         "path": "third_party/licenses/cfg_aliases-0.2.2/NOTICES.md",
         "sha256": "1e2b7ade3fb228130408b9990cae6a7618eb314c75aa0b164bfe485d9d9756ee"
+      },
+      {
+        "path": "third_party/licenses/cfg_aliases-0.2.2/COPYRIGHT-TECTONIC.md",
+        "sha256": "bb8b7895dcda5b03c11c719f3701c1bd6f6e9e403d4ace16379777ca652483b8"
       }
     ]
   },
@@ -1724,7 +1728,7 @@
     "version": "1.0.23",
     "checksum": "cf54715a573b99ac80df0bc206da022bcd442c974952c7b9720069370852e21f",
     "license_expression": "MIT OR Apache-2.0",
-    "selected_license": "MIT",
+    "selected_license": "Apache-2.0",
     "source": "https://crates.io/api/v1/crates/rustversion/1.0.23/download",
     "files": [
       {
@@ -1734,6 +1738,10 @@
       {
         "path": "third_party/licenses/rustversion-1.0.23/LICENSE-MIT",
         "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+      },
+      {
+        "path": "third_party/licenses/rustversion-1.0.23/ATTRIBUTION.md",
+        "sha256": "059f69c8aa47b1082d4967e72c725363908ffb9906530c208a7c085a53a11829"
       }
     ]
   },
@@ -2216,6 +2224,10 @@
       {
         "path": "third_party/licenses/tinyvec-1.13.3/LICENSE-ZLIB.md",
         "sha256": "84b34dd7608f7fb9b17bd588a6bf392bf7de504e2716f024a77d89f1b145a151"
+      },
+      {
+        "path": "third_party/licenses/tinyvec-1.13.3/COPYRIGHT.md",
+        "sha256": "f84390feaa3ab474cf2131a155b7a51597aef94e34084cb12fb4bc3c17677356"
       }
     ]
   },
