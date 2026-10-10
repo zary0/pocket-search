@@ -118,7 +118,7 @@ The Rust search and decoder timings are host-only measurements on Apple M4. A se
 
 Development integrates through **`develop`**, then promotes to **`main`**. Stable releases use annotated **`vX.Y.Z`** tags matching the single workspace version. Development package names include the base version and commit and cannot be published as stable releases.
 
-Hosted CI checks versions, Rust behavior, and release-gate unit tests. Trusted branch pushes and tags invoke physical Chromatic qualification; only a real native Wi-Fi E2E result for the exact firmware/candidate permits release publication. Missing or skipped hardware tests block the release. The lab runner, native application, driver, and fixture origin are currently pending, so no physical E2E pass or firmware release is claimed.
+Hosted CI checks versions, Rust behavior, bounded C/JavaScript input, and release-gate unit tests. Develop pushes record physical E2E as **not run** when the lab is explicitly disabled; once enabled they invoke qualification automatically. Main pushes, manual qualification, and release tags always require the real physical gate. Only a native Wi-Fi E2E result for the exact firmware/candidate permits release publication; missing or skipped hardware tests block it. The lab runner, complete native application, driver, and fixture origin are pending, so no physical E2E pass or firmware release is claimed.
 
 See [branches and release packages](docs/releases.md) and [physical E2E lab setup](docs/hardware-e2e.md). Packages carry source, companion and native image hashes, build identity, validated evidence, and checksums. Publication promotes tested assets without rebuilding them.
 

@@ -23,7 +23,8 @@ flowchart LR
 
 - `develop` is the default branch and development integration branch.
 - Feature and fix branches target `develop`; hosted CI checks PRs. Fork PR code never runs on the physical lab runner.
-- Pushes to `develop` and `main` invoke physical qualification. Missing firmware, runner configuration, or physical evidence is a failure rather than a simulated pass.
+- Pushes to `develop` invoke physical qualification unless `CHROMATIC_E2E_READY` is explicitly `false`; that development-only state records **not run** in the workflow summary without allocating a lab runner. An unset or invalid value is not an opt-out and fails readiness. Hosted CI still runs on every push.
+- Pushes to `main`, manual qualification on `develop`/`main`, and release tags always require physical qualification. Missing firmware, runner configuration, or physical evidence fails the gate. A development **not run** status carries no physical evidence; promotion still requires a successful, executed physical result for the exact head.
 - Promotion is a PR from `develop` to `main`, requiring hosted CI and the physical qualification result for that head. Put urgent fixes through the same path to keep branches aligned.
 - A stable tag is annotated, matches the workspace version exactly, and points to a commit in `main` history. Tag updates and deletions should be prohibited.
 - The tag pipeline builds and physically qualifies a fresh release candidate, then publishes exactly those tested files. It never promotes a development candidate or rebuilds after E2E.
@@ -36,13 +37,15 @@ flowchart LR
 | Workflow | Trigger | Purpose |
 | --- | --- | --- |
 | CI | PRs and pushes for `develop` / `main` | Version/lock agreement, Python release-gate tests, Rust checks and host profile checks |
-| Hardware E2E | Trusted pushes to `develop` / `main`, or manual branch dispatch | Build candidate, require real lab readiness, run physical native Wi-Fi scenarios |
+| Hardware E2E | Trusted pushes to `develop` / `main`, or manual branch dispatch | Record explicitly disabled develop lab status, otherwise require real qualification; main/manual runs remain strict |
 | Chromatic qualification | Reusable workflow | Same build/physical-gate implementation for development and tags |
 | Release | Push of `v*` tag | Validate strict version and main provenance, qualify candidate, publish exact tested assets |
 
 Physical jobs share one concurrency group and do not cancel an in-progress flash/test when another commit arrives. They use the protected `chromatic-lab` environment and a dedicated self-hosted runner labeled `chromatic`. Third-party Actions are pinned to verified upstream commit SHAs. Hosted tests have read-only permissions; only the publish job receives release write access.
 
-The hosted readiness check prevents allocating a lab job when the application or configuration is absent. `chromatic-required` explicitly fails when build, readiness, or the physical job is missing, failed, or skipped. It is not a host-test fallback. See the [lab setup](hardware-e2e.md).
+When qualification runs, the hosted readiness check prevents allocating a lab job when the application or configuration is absent. `chromatic-required` explicitly fails when build, readiness, or the physical job is missing, failed, or skipped. Its reusable workflow and release invocation have no disabled-lab bypass. See the [lab setup](hardware-e2e.md).
+
+GitHub can [report a skipped job as Success](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-jobs-with-conditions). That scheduling status is not physical evidence. Main and tag runs therefore invoke the full gate rather than conditionally skipping it when the lab is disabled.
 
 ## Package contents
 
