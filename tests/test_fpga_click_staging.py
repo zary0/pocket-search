@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Staging refusal cases, not FPGA build or physical deployment tests."""
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -56,6 +57,36 @@ class FPGAStagingBoundaries(unittest.TestCase):
                         with self.assertRaises(ValueError):
                             staging.prepare(self.source, self.output)
         self.assertFalse(self.output.exists())
+
+    def test_dirty_submodule_refused_even_when_git_configuration_hides_it(self):
+        def git(path, *args):
+            return subprocess.check_output([
+                "git", "-C", str(path), "-c", "user.name=Fixture",
+                "-c", "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false",
+                "-c", "core.hooksPath=/dev/null", *args,
+            ], text=True, stderr=subprocess.PIPE).strip()
+
+        module = self.root / "module"
+        module.mkdir()
+        git(module, "init", "-q")
+        (module / "core.v").write_text("original pinned source\n")
+        git(module, "add", "core.v")
+        git(module, "commit", "-qm", "Original fixture")
+        git(self.source, "init", "-q")
+        git(self.source, "-c", "protocol.file.allow=always", "submodule", "add",
+            "--quiet", str(module), "core")
+        git(self.source, "commit", "-qm", "Pin fixture submodule")
+        commit = git(self.source, "rev-parse", "HEAD")
+        (self.source / "core/core.v").write_text("modified tracked source\n")
+        for mode in ("all", "dirty"):
+            with self.subTest(ignore_mode=mode):
+                git(self.source, "config", "submodule.core.ignore", mode)
+                # Establish that the ordinary check hides this real change.
+                self.assertEqual(git(self.source, "status", "--porcelain", "--untracked-files=no"), "")
+                with patch.dict(staging.PIN, {"commit": commit}):
+                    with self.assertRaisesRegex(ValueError, "tracked modifications"):
+                        staging.prepare(self.source, self.output)
+                self.assertFalse(self.output.exists())
 
 
 if __name__ == "__main__":

@@ -50,7 +50,7 @@ See the [protocol](../../docs/chromatic-protocol.md) and [hardware-first roadmap
 
 ## Native button audio
 
-The optional [FPGA click implementation](../../docs/native-click.md) creates physical menu-button feedback without MCU audio files or tasks. Its RTL simulation and pinned-source integration pass; a licensed Gowin build and actual speaker verification remain pending. It requires a separate FPGA image, not an MCU application update or a cartridge ROM.
+The optional [FPGA click implementation](../../docs/native-click.md) creates physical menu-button feedback without MCU audio files or tasks. Its RTL simulation, pinned-source integration and licensed Gowin 1.9.12.04 build pass, with zero reported timing violations. Actual speaker verification and recovery qualification remain pending. It requires a separate FPGA image, not an MCU application update or a cartridge ROM.
 
 ## CPU and memory measurements
 

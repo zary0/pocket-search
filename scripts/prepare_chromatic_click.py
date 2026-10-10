@@ -74,7 +74,7 @@ def prepare(source, output):
         raise ValueError("Source and output must be separate trees")
     if git(source, "rev-parse", "HEAD") != PIN["commit"]:
         raise ValueError("Source commit does not match the pinned official FPGA revision")
-    if git(source, "status", "--porcelain", "--untracked-files=no"):
+    if git(source, "status", "--porcelain", "--untracked-files=no", "--ignore-submodules=none"):
         raise ValueError("Official source or a submodule has tracked modifications")
     modules = git(source, "submodule", "status", "--recursive")
     # git() strips leading whitespace, so inspect raw submodule status here.
