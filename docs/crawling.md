@@ -14,11 +14,22 @@ Use a new output directory for every run. It contains a `snapshot/` subtree with
 
 `scope: "public_web"` follows discovered links across public domains. `scope: "hosts"` instead requires exact `allowed_hosts`; subdomains are not implicitly included. Both modes start from operator-selected seeds and retain the same destination, robots, and resource protections. No search-provider API is used.
 
+## Search actual AI pages
+
+```sh
+./target/debug/pocket-search crawl examples/crawl-ai.json data/ai-001
+./target/debug/pocket-search serve-crawl data/ai-001 127.0.0.1:8858
+```
+
+The AI profile contains source URLs, not bundled website content. Stanford's John McCarthy pages are historical educational material; W3C pages cover web machine learning. Their availability, robots rules and contents may change. The original `serve examples/documents.json ...` command serves samples only; the deployed origin must point to `serve-crawl` to search collected sites. A successful query never invents a missing article.
+
+The browser returns ten results per window, with previous/next controls and the total number of matches plus indexed pages. Native Up/Down reaches every match in the admitted collection, one bounded packet at a time. Search ranks document IDs first and copies only the requested window's text. `/v1/search?q=AI&offset=10&generation=...` selects the next browser window; later windows require the search generation. Collected reader/image requests retain the same generation checks. Up to 256 admitted documents are supported; this is collection coverage, not all Internet pages. The native decoder and PCS1 ABI are unchanged, but older adapters enforcing ten results must be updated.
+
 ## Limits
 
 | Resource | Default | Hard maximum / policy |
 | --- | --- | --- |
-| Indexed pages per snapshot | 8 | 16, matching the current HTML-reader registration limit |
+| Indexed pages per snapshot | 8 | 256; companion memory and all other budgets still apply |
 | Link depth | 1 | 8 |
 | Network attempts, including robots/redirects/images | 64 | 256 |
 | Body bytes actually read across the run | 8 MiB | 32 MiB; headers/socket buffering are not included |
@@ -29,8 +40,9 @@ Use a new output directory for every run. It contains a `snapshot/` subtree with
 | HTML | 64 KiB UTF-8 | Existing node/depth/block/body limits also apply |
 | Source image | 2 MiB | PNG/JPEG only; existing dimensions/pixel/allocation limits apply |
 | Images downloaded per page | 2 | 8; unavailable images retain an alt-text placeholder |
+| Prepared images retained in a collection | — | 8 MiB total pixels + encoded PNG; excess images become placeholders |
 | Pending URLs | 512 | Bounded discovery queue; not an unbounded persistent frontier |
-| Report / manifest | 2 MiB / 64 KiB | Collection admission stops before the manifest bound |
+| Report / manifest | 2 MiB / 256 KiB | Collection admission stops before the manifest bound |
 
 The configured page budget counts successfully indexed pages. Attempts, bytes, depth and time also bound skipped/duplicate/noindex pages. Response bodies with unsupported compression are rejected; automatic decompression is disabled by the dependency feature set and `Accept-Encoding: identity` is requested. This avoids silently expanding compressed payloads. Unsupported MIME types, non-UTF-8 text, invalid/oversized DOM/images, and empty bodies are skipped with a reason rather than replaced with sample text.
 
@@ -51,7 +63,7 @@ Standards/design references: [RFC 9309](https://www.rfc-editor.org/rfc/rfc9309.h
 
 `/v1/collection` and search JSON distinguish original samples from collected public pages and return a collection generation. HTTP replies include `X-Pocket-Collection` and `X-Pocket-Sample`. Collected reader, DOM and image requests must include `generation=...`; stale/missing tokens return HTTP 409. Browser navigation and the updated native adapter bind results, reader pages and image stripes to that generation. Start submits a new native search and clears the previous generation. PCS1/PCI1 and the allocation-free Rust decoder ABI remain unchanged.
 
-The original fixture routes retain initial legacy access for their historical experiments. Older native adapters cannot open the protected collected reader; build the updated C adapter. A generation is scoped to one immutable loaded snapshot. There is no hot reload, live index replacement, cross-snapshot search, automatic resumption, deletion/update policy or background scheduler yet. `pending` records allow inspecting the next work, but subsequent seeds and collection management currently require the operator.
+The original fixture routes retain initial legacy access for their historical experiments. Older native adapters cannot open the protected collected reader; build the updated C adapter. A request generation combines the immutable snapshot identity with the reader preparation revision. URL destinations remain visible in reader link scenes but are excluded from searchable prose and snippets. There is no hot reload, live index replacement, cross-snapshot search, automatic resumption, deletion/update policy or background scheduler yet. `pending` records allow inspecting the next work, but subsequent seeds and collection management currently require the operator.
 
 Public-web scope describes where the crawler may follow links; it does **not** mean the whole Internet has been indexed. Broad coverage requires a durable frontier, global deduplication, incremental/partitioned storage, update scheduling, provenance/source inspection, and a scalable index. Those are separate next steps. The first implementation deliberately fits the existing Chromatic collection contract.
 
@@ -62,3 +74,12 @@ Fetched third-party content stays under ignored `data/`, is not repository-autho
 Hosted tests use original mocked replies to exercise public-address/URL checks, mixed DNS sets, redirect destination policy and robots checks, noindex/nofollow, MIME/UTF-8/size failures, duplicates, image reencoding, snapshot tamper detection, generation mismatch and existing-output preservation. A Unix subprocess test verifies stalled-worker termination/reaping. These mocks are not actual network/DNS-rebinding or physical-device tests.
 
 Live verification separately collected Example Domain, two IANA pages and one W3C page with certificate-verified HTTPS. A three-page IANA/W3C snapshot required seven requests and 55,462 body bytes, produced two reduced source images, and left 77 discovered URLs pending at its configured page budget. The browser searched/read actual text and displayed the prepared images. See the sanitized run evidence and current native build/verification status in [crawler evidence](evidence/crawler/verification.json). Website text/image bytes remain local; no corpus or native binary is committed. Physical qualification and `CHROMATIC_E2E_READY` remain unchanged.
+
+
+## Real-site development verification (2026-10-10)
+
+A separate, operator-authorized live run collected 13 Stanford/W3C pages and three reduced PNG images. The 31 requests read 419,275 body bytes. Searching `AI` returns nine matches from the collected corpus; searching `the` returns all 13, including a second browser window and native result 11. These are fetched source pages, not generated answers, Google results or Internet-wide coverage.
+
+Experimental MCU image `0.13.16-web` combines the collection-generation adapter with the saved-origin repair. Its 1,875,664-byte application was verified after an application-only update, preserving NVS and the partition table. Native Wi-Fi requests verified certificates and synchronized time, opened text scenes and decoded an 80 × 80 RGB565 source image in stripes. The operator confirmed the source image on the LCD. Synthetic commands only control the UI; USB did not proxy page data. Full physical-button, battery-only, endurance and release E2E acceptance are still pending.
+
+See [sanitized evidence](evidence/real-sites/verification.json). The third-party corpus, render-buffer captures, native image, temporary origin and private identifiers remain outside Git and release packages. The temporary development origin requires the host service and tunnel to keep running.

@@ -178,9 +178,9 @@ fn configuration_requires_explicit_scope_and_enforces_hard_caps() {
     assert!(c.validate().is_err());
     c.scope = Scope::Hosts;
     assert!(c.validate().is_ok());
-    c.max_pages = 17;
+    c.max_pages = 257;
     assert!(c.validate().is_err());
-    c.max_pages = 16;
+    c.max_pages = 256;
     c.delay_ms = 0;
     assert!(c.validate().is_err());
     assert!(serde_json::from_str::<Config>("{\"ignore_robots\":true}").is_err());
@@ -570,4 +570,57 @@ fn wall_supervisor_terminates_and_reaps_a_stalled_worker() {
     assert!(supervise(&mut child, Duration::from_millis(100)).is_err());
     assert!(start.elapsed() < Duration::from_secs(2));
     assert!(child.try_wait().unwrap().is_some());
+}
+
+#[test]
+fn collected_pages_beyond_old_limit_are_searchable_and_readable() {
+    let temp = Temp::new();
+    let mut mock = Mock::new();
+    mock.robots("alpha.example.com", "User-agent: *\nAllow: /\n");
+    let links = (1..=20)
+        .map(|id| format!("<a href='/page-{id}'>AI article {id}</a>"))
+        .collect::<String>();
+    mock.html(
+        "https://alpha.example.com/",
+        &format!("<title>AI collection</title><main>{links}</main>"),
+    );
+    for id in 1..=20 {
+        mock.html(
+            &format!("https://alpha.example.com/page-{id}"),
+            &page(&format!("AI original article number {id}")),
+        );
+    }
+    let mut c = config();
+    c.max_pages = 21;
+    let report = collect(c, mock, &temp.0).unwrap();
+    assert_eq!(report.pages.len(), 21);
+    let index = load_snapshot(&temp.0).unwrap();
+    let (hits, total) = index.search_window("AI", 20, 10);
+    assert_eq!(total, 21);
+    assert_eq!(hits.len(), 1);
+    let wire = index.chromatic_result("AI", 20).unwrap();
+    let packet = chromatic_client::Packet::decode(&wire).unwrap();
+    assert_eq!(packet.page_count, 21);
+    assert_eq!(packet.document_id as usize, hits[0].document_id);
+    assert!(index.chromatic_page(hits[0].document_id, 0).is_ok());
+}
+
+#[test]
+fn source_link_paths_are_not_indexed_as_article_prose() {
+    let temp = Temp::new();
+    let mut mock = Mock::new();
+    mock.robots("alpha.example.com", "User-agent: *\nAllow: /\n");
+    mock.html("https://alpha.example.com/", "<title>Original reading</title><main><p>Visible explanations.</p><a href='/AI-reference'>Further reading</a></main>");
+    let mut c = config();
+    c.max_depth = 0;
+    collect(c, mock, &temp.0).unwrap();
+    let index = load_snapshot(&temp.0).unwrap();
+    assert!(index.search("AI", 10).is_empty());
+    assert_eq!(index.search("further", 10).len(), 1);
+    assert!(
+        index.dom_documents[&1]
+            .pages
+            .iter()
+            .any(|p| p.source.ends_with("/AI-reference"))
+    );
 }

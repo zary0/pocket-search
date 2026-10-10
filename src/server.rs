@@ -251,9 +251,14 @@ pub fn route(index: &SearchIndex, method: &str, target: &str) -> Response {
             },
         };
     }
-    if p.keys()
-        .any(|k| k != "q" && (k != "result" || path == "/v1/search"))
-    {
+    if p.keys().any(|k| {
+        k != "q"
+            && k != if path == "/v1/search" {
+                "offset"
+            } else {
+                "result"
+            }
+    }) {
         return reply(400, "Invalid parameters");
     }
     let Some(q) = p.get("q") else {
@@ -268,8 +273,17 @@ pub fn route(index: &SearchIndex, method: &str, target: &str) -> Response {
         };
         return packet(index.chromatic_result(q, at));
     }
-    let hits: Vec<_> = index
-        .search(q, 10)
+    let Ok(offset) = number(p.get("offset"), 0) else {
+        return reply(400, "Invalid result offset");
+    };
+    if offset > 255 || offset % 10 != 0 || (offset > 0 && generation.is_none()) {
+        return reply(
+            400,
+            "Invalid result offset or missing collection generation",
+        );
+    }
+    let (hits, total) = index.search_window(q, offset, 10);
+    let hits: Vec<_> = hits
         .into_iter()
         .map(|hit| {
             let (title, _) = excerpt(&hit.title, 128);
@@ -279,7 +293,7 @@ pub fn route(index: &SearchIndex, method: &str, target: &str) -> Response {
             "source_url_truncated":truncated,"snippet":snippet})
         })
         .collect();
-    let body = json!({"collection":index.collection.label,"sample":index.collection.sample,"generation":index.collection.generation,"results":hits})
+    let body = json!({"collection":index.collection.label,"sample":index.collection.sample,"generation":index.collection.generation,"results":hits,"total":total,"offset":offset,"indexed_pages":index.document_count()})
         .to_string()
         .into_bytes();
     if body.len() > RESPONSE_BYTES {
@@ -462,6 +476,68 @@ mod tests {
             body: "Original wifi text. ".repeat(80),
             image_urls: vec![],
         }])
+    }
+    #[test]
+    fn result_windows_and_native_pages_reach_the_last_document() {
+        let docs = (0..256)
+            .rev()
+            .map(|id| Document {
+                url: format!("https://example.invalid/{id:03}"),
+                title: "AI original test".into(),
+                body: "AI original body".into(),
+                image_urls: vec![],
+            })
+            .collect();
+        let index = SearchIndex::new(docs);
+        let first = route(&index, "GET", "/v1/search?q=AI");
+        let first: serde_json::Value = serde_json::from_slice(&first.body).unwrap();
+        assert_eq!(first["total"], 256);
+        let generation = first["generation"].as_str().unwrap();
+        let mut seen = Vec::new();
+        for offset in (0..256).step_by(10) {
+            let response = route(
+                &index,
+                "GET",
+                &format!("/v1/search?q=AI&offset={offset}&generation={generation}"),
+            );
+            assert_eq!(response.status, 200);
+            assert!(response.body.len() <= RESPONSE_BYTES);
+            let value: serde_json::Value = serde_json::from_slice(&response.body).unwrap();
+            for (i, hit) in value["results"].as_array().unwrap().iter().enumerate() {
+                let wire = index.chromatic_result("AI", offset + i).unwrap();
+                let packet = Packet::decode(&wire).unwrap();
+                assert_eq!(packet.page_count, 256);
+                assert_eq!(packet.page_index as usize, offset + i);
+                assert_eq!(
+                    packet.document_id as u64,
+                    hit["document_id"].as_u64().unwrap()
+                );
+                seen.push(hit["url"].as_str().unwrap().to_owned());
+            }
+        }
+        assert_eq!(seen.len(), 256);
+        assert_eq!(seen[255], "https://example.invalid/255");
+        assert_eq!(
+            route(&index, "GET", "/v1/search?q=AI&offset=10").status,
+            400
+        );
+        assert_eq!(
+            route(&index, "GET", "/v1/search?q=AI&offset=10&generation=stale").status,
+            409
+        );
+        for offset in ["-1", "1", "256", "99999"] {
+            assert_eq!(
+                route(
+                    &index,
+                    "GET",
+                    &format!("/v1/search?q=AI&offset={offset}&generation={generation}")
+                )
+                .status,
+                400
+            );
+        }
+        assert!(index.chromatic_result("AI", 256).is_err());
+        assert_eq!(index.search("AI", 999).len(), 50);
     }
     #[test]
     fn route_round_trips_ranked_results_and_reader() {

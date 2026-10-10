@@ -1,0 +1,69 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-10",
+  "installation": {
+    "application_version": "0.13.16-web",
+    "application_sha256": "418c452f6a73185b12e631007032b651b88c991b922cfcf71d0920edcf74d555",
+    "application_bytes": 1875664,
+    "application_readback_verified": true,
+    "previous_application_verified": true,
+    "partition_table_verified_unchanged": true,
+    "nvs_preserved": true,
+    "original_recovery_backup_verified": true,
+    "bootloader_modified": false,
+    "fpga_modified": false,
+    "efuse_modified": false
+  },
+  "companion_collection": {
+    "pages": 13,
+    "reduced_images": 3,
+    "requests": 31,
+    "body_bytes_read": 419275,
+    "source_hosts": [
+      "www-formal.stanford.edu",
+      "www.w3.org"
+    ],
+    "sample": false,
+    "queries": {
+      "AI": 9,
+      "the": 13
+    },
+    "internet_wide": false
+  },
+  "native_verification": {
+    "transport": "device-native Wi-Fi HTTPS",
+    "usb_page_proxy_used": false,
+    "synthetic_ui_controls": true,
+    "search_beyond_tenth_result_verified": true,
+    "reader_navigation_verified": true,
+    "source_image_width": 80,
+    "source_image_height": 80,
+    "source_image_rgb565_bytes": 12800,
+    "operator_confirmed_source_image_on_lcd": true,
+    "saved_origin_restored_after_mcu_restart": true,
+    "https_requests_verified": 36,
+    "elapsed_ms_min": 2501,
+    "elapsed_ms_max": 4571,
+    "elapsed_ms_median": 2592.0,
+    "minimum_free_heap_bytes": 54960,
+    "minimum_largest_free_block_bytes": 49152,
+    "memory_scope": "request telemetry, not CPU-only benchmark or endurance acceptance",
+    "render_buffer_readbacks": true,
+    "render_buffer_is_usb_video": false,
+    "battery_only_verified": false,
+    "all_physical_buttons_verified": false,
+    "release_e2e_qualified": false
+  },
+  "browser_verification": {
+    "real_search": true,
+    "result_window_11_through_13": true,
+    "last_result_reader": true
+  },
+  "privacy": {
+    "corpus_bundled": false,
+    "private_identifiers_or_configuration_in_evidence": false,
+    "native_binary_committed": false,
+    "captures_with_third_party_content_committed": false
+  },
+  "serial_diagnostic_sessions_closed": true
+}

@@ -78,7 +78,7 @@ impl Config {
         if self.seeds.is_empty()
             || self.seeds.len() > 16
             || self.allowed_hosts.len() > 32
-            || !(1..=16).contains(&self.max_pages)
+            || !(1..=dom::MAX_DOCUMENTS).contains(&self.max_pages)
             || self.max_depth > 8
             || !(1..=256).contains(&self.max_requests)
             || !(1024 * 1024..=32 * 1024 * 1024).contains(&self.max_bytes)
@@ -517,6 +517,7 @@ fn collect<F: Fetch>(config: Config, fetch: F, root: &Path) -> Result<Report, St
     let mut fingerprints = BTreeSet::new();
     let mut pages = Vec::new();
     let mut registrations = Vec::new();
+    let mut prepared_image_bytes = 0usize;
     while pages.len() < config.max_pages && !queue.is_empty() && engine.remaining().is_ok() {
         let job = queue.pop_front().ok_or("Empty crawl frontier")?;
         let url = policy::checked_url(&job.url, &config.allowed_hosts).map_err(str::to_owned)?;
@@ -630,16 +631,22 @@ fn collect<F: Fetch>(config: Config, fetch: F, root: &Path) -> Result<Report, St
                     }
                     let asset =
                         dom::prepare_image(&reply.bytes).map_err(|_| "image_limits_or_invalid")?;
-                    Ok((final_url, reply.bytes, asset.png))
+                    Ok((final_url, reply.bytes, asset))
                 })();
                 match image {
-                    Ok((final_url, bytes, png)) => {
+                    Ok((final_url, bytes, asset)) => {
+                        let size = asset.pixels.len() + asset.png.len();
+                        if prepared_image_bytes + size > dom::PREPARED_IMAGE_BYTES {
+                            engine.issue(source, "prepared_image_budget");
+                            continue;
+                        }
                         let file = write_file(
                             root,
                             &format!("image-{id}-{}.png", images.len() + 1),
-                            &png,
+                            &asset.png,
                         )?;
                         mapping.insert(source.clone(), file.path.clone());
+                        prepared_image_bytes += size;
                         images.push(ImageSource {
                             url: final_url.to_string(),
                             requested_url: source.clone(),
@@ -682,7 +689,7 @@ fn collect<F: Fetch>(config: Config, fetch: F, root: &Path) -> Result<Report, St
         if serde_json::to_vec_pretty(&serde_json::json!({"root":".","pages":candidates}))
             .map_err(|_| "Manifest JSON")?
             .len()
-            > HTML_BYTES
+            > dom::MANIFEST_BYTES
         {
             engine.issue(url.as_str(), "manifest_budget");
             engine.stop = Some("manifest_budget");
@@ -862,7 +869,7 @@ fn load_snapshot(root: &Path) -> Result<SearchIndex, String> {
     let root = root.canonicalize().map_err(|_| "Snapshot missing")?;
     let ready: Ready = serde_json::from_slice(&read_file(&root.join("ready.json"), 1024)?)
         .map_err(|_| "Snapshot ready metadata")?;
-    let manifest = read_file(&root.join("manifest.json"), 65536)?;
+    let manifest = read_file(&root.join("manifest.json"), dom::MANIFEST_BYTES)?;
     let report_bytes = read_file(&root.join("report.json"), 2 * 1024 * 1024)?;
     if ready.schema_version != 1
         || ready.manifest_sha256 != hash(&manifest)
@@ -873,7 +880,7 @@ fn load_snapshot(root: &Path) -> Result<SearchIndex, String> {
     }
     let report: Report = serde_json::from_slice(&report_bytes).map_err(|_| "Snapshot report")?;
     if report.schema_version != 1
-        || report.pages.len() > 16
+        || report.pages.len() > dom::MAX_DOCUMENTS
         || report.issues.len() > 256
         || report.pending.len() > FRONTIER
     {
@@ -923,7 +930,9 @@ fn load_snapshot(root: &Path) -> Result<SearchIndex, String> {
     index.collection = crate::Collection {
         sample: false,
         label: format!("Collected public pages · {}", report.finished_at),
-        generation: ready.generation,
+        // Preparation changes can alter ranking/scene interpretation even for
+        // identical source files. Bind requests to both corpus and reader rules.
+        generation: hash(&[ready.generation.as_bytes(), b"article-prose-v2"].concat()),
     };
     index.provenance = report
         .pages
