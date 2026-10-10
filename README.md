@@ -23,7 +23,7 @@ Chromatic MCU application
   button input → query → results → paginated text → reduced image
 ```
 
-The handheld owns the interaction and display. A companion service on a computer or server owns crawling, the index, and image preparation. Independent search ranks our own collected documents; it does not require storing a web-scale index on the handheld. The service must be reachable from the device. The current service searches original JSON articles, explicitly registered HTML/image files, or a validated collected snapshot. An operator-authorized temporary HTTPS tunnel is used for development verification; no permanent public service is provided.
+The handheld owns the interaction and display. A companion service on a computer or server owns crawling, the index, and image preparation. Independent search ranks our own collected documents; it does not require storing a web-scale index on the handheld. The service must be reachable from the device. Search covers admitted pages only; every match in a collection of up to 256 documents can be reached on the handheld, and the browser uses ten-result windows. The current service searches original JSON articles, explicitly registered HTML/image files, or a validated collected snapshot. An operator-authorized temporary HTTPS tunnel is used for development verification; no permanent public service is provided.
 
 | Component | Implemented | Still needed |
 | --- | --- | --- |
@@ -83,6 +83,10 @@ cargo run --example chromatic -- examples/documents.json 'chromatic wifi'
 # Start the read-only sample API and browser UI.
 cargo run -- serve examples/documents.json 127.0.0.1:8828 --html examples/html-manifest.json
 
+# Collect actual public pages, then serve the immutable search/reader collection.
+cargo run -- crawl examples/crawl-ai.json data/ai-001
+cargo run -- serve-crawl data/ai-001 127.0.0.1:8858
+
 # Run all search and protocol checks.
 cargo test --workspace
 cargo check -p chromatic-client
@@ -97,7 +101,7 @@ Earlier work on one Chromatic DevDay unit verified Wi-Fi, native SNTP, and certi
 
 Available heap on that earlier unit before a small HTTPS request was about 58 KiB. This is an observation of that unit and firmware, not a universal free-memory guarantee. Its hardware/software environment is summarized above; see the [device profile](devices/chromatic/README.md) for exact measurements.
 
-The development Wi-Fi allowed outbound HTTPS but did not establish device-to-computer LAN reachability. Hardware testing needs a verified reachable endpoint; a running local service alone does not prove a Wi-Fi path to the device.
+The development Wi-Fi allowed outbound HTTPS but did not establish device-to-computer LAN reachability. Hardware testing needs a verified reachable endpoint; a running local service alone does not prove a Wi-Fi path to the device. Save a verified origin with `search_endpoint https://hostname --save` to restore it after restart; see [service setup and recovery](docs/search-service.md). A saved temporary URL still depends on the companion and tunnel staying available.
 
 ## Next milestone
 

@@ -11,6 +11,9 @@ use std::{
     path::{Component, Path},
 };
 use url::Url;
+pub(crate) const MAX_DOCUMENTS: usize = 256;
+pub(crate) const MANIFEST_BYTES: usize = 256 * 1024;
+pub(crate) const PREPARED_IMAGE_BYTES: usize = 8 * 1024 * 1024;
 
 pub struct ImageAsset {
     pub width: u16,
@@ -475,14 +478,16 @@ pub fn append(index: SearchIndex, path: &str) -> Result<SearchIndex, String> {
     let mut bytes = Vec::new();
     std::fs::File::open(&path)
         .map_err(|_| "HTML manifest read")?
-        .take(65537)
+        .take(MANIFEST_BYTES as u64 + 1)
         .read_to_end(&mut bytes)
         .map_err(|_| "HTML manifest read")?;
-    if bytes.len() > 65536 {
+    if bytes.len() > MANIFEST_BYTES {
         return Err("HTML manifest limit".into());
     }
     let manifest: Manifest = serde_json::from_slice(&bytes).map_err(|_| "HTML manifest JSON")?;
-    if manifest.pages.len() > 16 || index.document_count() + manifest.pages.len() > 256 {
+    if manifest.pages.len() > MAX_DOCUMENTS
+        || index.document_count() + manifest.pages.len() > MAX_DOCUMENTS
+    {
         return Err("HTML collection limit".into());
     }
     let root = path
@@ -577,7 +582,7 @@ pub fn append(index: SearchIndex, path: &str) -> Result<SearchIndex, String> {
                         } else {
                             let image = prepare_image(&file(&root, file_name, 2 * 1024 * 1024)?)?;
                             total_images += image.pixels.len() + image.png.len();
-                            if total_images > 8 * 1024 * 1024 {
+                            if total_images > PREPARED_IMAGE_BYTES {
                                 return Err("Prepared image collection limit".into());
                             }
                             let id = dom.images.len();
@@ -607,7 +612,15 @@ pub fn append(index: SearchIndex, path: &str) -> Result<SearchIndex, String> {
                     }
                 }
             };
-            body.push_str(&text);
+            // Link destinations remain in reader scenes, but are not article
+            // prose. Avoid matching/snipping a word present only in a URL.
+            let searchable = if kind == Kind::Link {
+                text.split_once('\n')
+                    .map_or(text.as_str(), |(label, _)| label)
+            } else {
+                &text
+            };
+            body.push_str(searchable);
             body.push('\n');
             if body.len() > 65536 {
                 return Err("Extracted body limit".into());

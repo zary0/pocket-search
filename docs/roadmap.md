@@ -64,11 +64,12 @@ P0 uses controlled fixtures to prove integration. It must not be presented as se
 - [x] Add a bounded public-HTTPS crawler/extractor for explicit seeds with public-web or exact-domain scope. Respect robots.txt; bound page count, depth, bytes, parsing time, redirects, and per-host request rate; validate destinations before fetching.
 - [x] Collect bounded public pages with source URL, collection time, SHA-256 records, extracted text/links and protected PNG/JPEG preparation. Live host acquisition is verified on Example Domain, IANA and W3C, including two prepared source images; physical real-page acceptance remains pending. Do not execute fetched scripts or substitute invented content for unsupported sites.
 - [x] Add within-run deduplication, immutable snapshot persistence and generation checks so collected reader IDs fail on a mismatched collection.
-- [ ] Add a durable cross-domain frontier, cross-run deduplication, partitioned corpus/index storage, automatic resumption and incremental updates; current snapshots are capped at 16 pages and never hot-reloaded.
+- [ ] Add a durable cross-domain frontier, cross-run deduplication, partitioned corpus/index storage, automatic resumption and incremental updates; current snapshots are capped at 256 pages and never hot-reloaded.
 - [ ] Add a bounded source/details view for complete URLs and collection information that do not fit a result screen.
 - [ ] Import user-provided or redistributable plain-text books into the companion, with bounded file/page sizes and source metadata. Reuse the reader; device requests refer to registered document IDs rather than arbitrary filesystem paths.
 - [ ] Make Japanese query entry usable and verify input, wrapping, glyph fallback, and complete reading against actual Japanese content.
-- [ ] Search actual indexed pages and open imported book text on the handheld; verify query-dependent ranking, honest zero results, provenance, and complete pagination.
+- [x] Search actual indexed public pages on the handheld over certificate-verified HTTPS; reach results beyond the first ten and open reading scenes. Scoped synthetic-input/render-buffer evidence is recorded separately from operator LCD observations and release E2E.
+- [ ] Open imported book text on the handheld; complete physical-control, provenance, first/last body page, zero-result and mixed-language acceptance.
 
 **Completion:** physical searches return actual collected content, and the same handheld reader opens real web text and imported book text with inspectable source information. Collection scope stays explicit; this is independent search, not Google's results or a web-scale index.
 
