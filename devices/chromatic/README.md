@@ -19,7 +19,7 @@ Earlier work outside this repository inspected and tested one Chromatic DevDay u
 
 The probe used USB for power, its diagnostic command, and reading the result. Wi-Fi fetched the page and clock without a host HTTP relay or supplied host clock. Battery-only operation was not tested. These observations are specific to that earlier unit and firmware, not Pocket Search measurements or guaranteed memory availability on other consoles.
 
-Device-to-computer LAN reachability was not established. An externally reachable HTTPS service is a candidate for testing; none is deployed by this repository.
+Device-to-computer LAN reachability was not established. An operator-authorized temporary HTTPS tunnel now verifies the experimental sample search service; see [native search evidence](../../docs/search-results.md). No permanent endpoint is provided.
 
 ## What is portable today
 
@@ -27,10 +27,10 @@ Device-to-computer LAN reachability was not established. An externally reachable
 
 `src/chromatic.rs` prepares text on the host for the target's row and byte limits. The host example checks encoder/decoder compatibility with original fixtures. It does not connect to a console.
 
-## Firmware integration still required
+## Experimental firmware integration
 
-1. Build the core for the actual ESP32 Xtensa toolchain.
-2. Connect existing display, button, and font drivers through a defined C ABI or native Rust integration.
+1. Build the core and C ABI for the actual ESP32 Xtensa toolchain; this now succeeds in the local experimental image.
+2. The repository UI/HTTPS adapter links the Rust C ABI to the existing display/button/font drivers. Complete reproducible upstream/font integration is still required.
 3. Preserve Wi-Fi settings, native SNTP, and certificate verification.
 4. Use a capped receive buffer; reject oversized HTTP bodies before decoding.
 5. Translate actions into requests and UI state changes.
@@ -50,7 +50,7 @@ See the [protocol](../../docs/chromatic-protocol.md) and [hardware-first roadmap
 
 ## CPU and memory measurements
 
-The Rust client stays integer-only, dependency-free, allocation-free, and bounded. Compare the `chromatic-size` and `chromatic-speed` build profiles on the actual Xtensa toolchain before choosing a firmware setting. The current Rust build checks are host-only.
+The Rust client stays integer-only, dependency-free, allocation-free, and bounded. Compare the `chromatic-size` and `chromatic-speed` build profiles on the actual Xtensa toolchain before choosing a firmware setting. Hosted Rust checks are host-only; the separate experimental image has an actual Xtensa build and device execution.
 
 `components/pocket_perf_probe` provides an ESP-IDF CPU-cycle and heap probe for the ESP32 configuration. It was cross-compiled with the existing target C compiler and SDK, but has not been linked or executed physically. Use a pinned task and fixed frequency with a bounded synchronous callback. Its measurements include interrupts; network and display tests need separate end-to-end timing. See [performance notes](../../docs/performance.md) for the exact scope and reproducible host results.
 
@@ -58,6 +58,10 @@ The Rust client stays integer-only, dependency-free, allocation-free, and bounde
 
 `components/pocket_render_probe` measures idle, counter, text-page, and full-background updates in the existing native LVGL platform. `components/pocket_band_display` replaces the full framebuffer with a single 16-row or 48-row DMA buffer and retires completed SPI transactions before descriptor reuse. The portable transfer-boundary test runs in hosted CI; actual target builds and physical measurements are separate evidence.
 
-This is a platform-level C integration. It does not connect the Rust decoder, implement images/search, or satisfy the physical release gate. The collector uses USB diagnostics and native Wi-Fi status; its screenshots are actual MCU render-buffer readbacks rather than USB-video captures. See [integration and measurement details](../../docs/chromatic-rendering.md).
+This is a platform-level C integration. The standalone rendering probe does not connect the Rust decoder or satisfy the physical release gate; the newer search component integrates the decoder and sample service. Images remain pending. The collector uses USB diagnostics and native Wi-Fi status; its screenshots are actual MCU render-buffer readbacks rather than USB-video captures. See [integration and measurement details](../../docs/chromatic-rendering.md).
 
 The measured text prototype uses 48 rows and an opt-in graphics-only `-O2` build: 15 KiB of draw-buffer storage, 8.97 ms counter updates, and 24.68 ms full-background updates. Stock was 45 KiB and 20.87/20.88 ms respectively. The smaller buffer improves memory and small counter updates; page replacement and full updates remain slower. These are medians of three window means on one development unit, not complete reader or panel-scanout performance. See [raw-backed results](../../docs/performance.md#physical-lvgl-display-comparison).
+
+## Native sample search
+
+`components/pocket_search_ui` now provides a bounded native HTTPS worker, results and reader screens. `crates/chromatic-ffi` is an allocation-free 44-byte C view of the Rust decoder, compiled for `xtensa-esp32-none-elf` and linked into experimental image `0.13.11-results`. See [commands, build identity and physical evidence](../../docs/search-results.md). Full firmware reproducibility, native distribution notices, complete failure/mixed-language acceptance and release qualification remain pending.

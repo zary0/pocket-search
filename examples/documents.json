@@ -1,5 +1,40 @@
 [
-  {"url":"https://example.invalid/gameboy","title":"ゲームボーイと小さな画面","body":"ゲームボーイの画面で文章と画像を読むための、オリジナルの検索テスト文です。","image_urls":[]},
-  {"url":"https://example.invalid/chromatic","title":"Chromatic WiFi guide","body":"Original fixture for a handheld reader. Search terms are matched by the Rust engine, without a remote search provider.","image_urls":["https://example.invalid/chromatic-photo.jpg"]},
-  {"url":"https://example.invalid/books","title":"本を読む","body":"検索で見つけたサイトから本文を読む。しおりと閲覧履歴の機能は設けない。","image_urls":[]}
+  {
+    "url": "https://example.invalid/gameboy",
+    "title": "ゲームボーイと小さな画面",
+    "body": "ゲームボーイの画面で文章と画像を読むための、オリジナルの検索テスト文です。",
+    "image_urls": []
+  },
+  {
+    "url": "https://example.invalid/chromatic",
+    "title": "Chromatic WiFi guide",
+    "body": "Original fixture for a handheld reader. Search terms are matched by the Rust engine, without a remote search provider.",
+    "image_urls": [
+      "https://example.invalid/chromatic-photo.jpg"
+    ]
+  },
+  {
+    "url": "https://example.invalid/books",
+    "title": "本を読む",
+    "body": "検索で見つけたサイトから本文を読む。しおりと閲覧履歴の機能は設けない。",
+    "image_urls": []
+  },
+  {
+    "url": "https://example.invalid/wifi-search",
+    "title": "Native WiFi search on Chromatic",
+    "body": "This original sample explains the handheld search flow. Type wifi, then press Start. The device contacts the companion over verified HTTPS and receives one ranked result per screen. Up and Down change the selected result. A opens the stored article, Left and Right change its text page, and B returns to the result. The Rust engine ranks this collection independently. These are sample documents, not crawled web pages. No bookmarks or browsing history are stored. A small display can show a complete article through bounded pages. The title stays above seven text rows, with navigation hints below. Each response is checked before its text reaches the screen. The full article remains on the companion; the handheld keeps only its current page. If no article matches, the device shows an empty result instead of an invented answer.",
+    "image_urls": []
+  },
+  {
+    "url": "https://example.invalid/rust-reader",
+    "title": "Rust reader and memory bounds",
+    "body": "This original sample describes an allocation-free Rust packet decoder. It validates UTF-8, line widths, pagination, and the 512-byte packet boundary before the screen changes. WiFi and HTTPS buffers belong to the firmware adapter. A host benchmark is different from a physical device measurement.",
+    "image_urls": []
+  },
+  {
+    "url": "https://example.invalid/books-reader",
+    "title": "ほんをよむ",
+    "body": "ほんをよむ。けんさくして、みつけたぶんしょうをよむ。これはオリジナルのサンプルです。しおりとりれきはありません。",
+    "image_urls": []
+  }
 ]

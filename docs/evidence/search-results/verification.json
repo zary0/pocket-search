@@ -1,0 +1,288 @@
+{
+  "schema_version": 1,
+  "execution_mode": "physical-mcu-native-wifi-with-synthetic-input",
+  "application_version": "0.13.11-results",
+  "application_sha256": "9426b4a3f72523659ed25b5e2aa4f123a657c16bcaed5d8c95a74d203b7b0d5b",
+  "application_sha256_provenance": "installation-readback-report",
+  "sample_collection": true,
+  "transport": "device-native-wifi-https",
+  "native_clock_synced": true,
+  "tls_certificate_and_hostname_validation_enabled": true,
+  "rust_xtensa_decoder_executed": true,
+  "usb_page_proxy_used": false,
+  "automated_physical_buttons_tested": false,
+  "panel_scanout_tested": false,
+  "frame_source": "physical-mcu-render-buffer-over-usb",
+  "temporary_https_origin_used": true,
+  "battery_only_tested": false,
+  "release_qualification_passed": false,
+  "display": {
+    "visible": true,
+    "heap": 125284,
+    "gui": true
+  },
+  "states": {
+    "wifi-result-first": {
+      "mode": 7,
+      "query_bytes": 4,
+      "tls_verified": true,
+      "rust_decoder": true,
+      "document_id": 2,
+      "page_index": 0,
+      "page_count": 3
+    },
+    "wifi-result-second": {
+      "mode": 7,
+      "query_bytes": 4,
+      "tls_verified": true,
+      "rust_decoder": true,
+      "document_id": 4,
+      "page_index": 1,
+      "page_count": 3
+    },
+    "reader-first": {
+      "mode": 8,
+      "query_bytes": 4,
+      "tls_verified": true,
+      "rust_decoder": true,
+      "document_id": 4,
+      "page_index": 0,
+      "page_count": 6
+    },
+    "reader-next": {
+      "mode": 8,
+      "query_bytes": 4,
+      "tls_verified": true,
+      "rust_decoder": true,
+      "document_id": 4,
+      "page_index": 1,
+      "page_count": 6
+    },
+    "reader-previous": {
+      "mode": 8,
+      "query_bytes": 4,
+      "tls_verified": true,
+      "rust_decoder": true,
+      "document_id": 4,
+      "page_index": 0,
+      "page_count": 6
+    },
+    "return-results": {
+      "mode": 7,
+      "query_bytes": 4,
+      "tls_verified": true,
+      "rust_decoder": true,
+      "document_id": 4,
+      "page_index": 1,
+      "page_count": 3
+    },
+    "changed-query": {
+      "mode": 7,
+      "query_bytes": 4,
+      "tls_verified": true,
+      "rust_decoder": true,
+      "document_id": 5,
+      "page_index": 0,
+      "page_count": 3
+    },
+    "empty-results": {
+      "mode": 7,
+      "query_bytes": 14,
+      "tls_verified": true,
+      "rust_decoder": true,
+      "document_id": 0,
+      "page_index": 0,
+      "page_count": 1
+    },
+    "empty-cannot-open": {
+      "mode": 7,
+      "query_bytes": 14,
+      "tls_verified": true,
+      "rust_decoder": true,
+      "document_id": 0,
+      "page_index": 0,
+      "page_count": 1
+    },
+    "final-results": {
+      "mode": 7,
+      "query_bytes": 4,
+      "tls_verified": true,
+      "rust_decoder": true,
+      "document_id": 2,
+      "page_index": 0,
+      "page_count": 3
+    }
+  },
+  "transfers": [
+    {
+      "sequence": 2,
+      "error": 0,
+      "http_status": 200,
+      "bytes": 182,
+      "tls_verified": true,
+      "clock_synced": true,
+      "elapsed_ms": 5410
+    },
+    {
+      "sequence": 3,
+      "error": 0,
+      "http_status": 200,
+      "bytes": 190,
+      "tls_verified": true,
+      "clock_synced": true,
+      "elapsed_ms": 2211
+    },
+    {
+      "sequence": 4,
+      "error": 0,
+      "http_status": 200,
+      "bytes": 208,
+      "tls_verified": true,
+      "clock_synced": true,
+      "elapsed_ms": 2445
+    },
+    {
+      "sequence": 5,
+      "error": 0,
+      "http_status": 200,
+      "bytes": 189,
+      "tls_verified": true,
+      "clock_synced": true,
+      "elapsed_ms": 2212
+    },
+    {
+      "sequence": 6,
+      "error": 0,
+      "http_status": 200,
+      "bytes": 208,
+      "tls_verified": true,
+      "clock_synced": true,
+      "elapsed_ms": 1944
+    },
+    {
+      "sequence": 7,
+      "error": 0,
+      "http_status": 200,
+      "bytes": 190,
+      "tls_verified": true,
+      "clock_synced": true,
+      "elapsed_ms": 1980
+    },
+    {
+      "sequence": 9,
+      "error": 0,
+      "http_status": 200,
+      "bytes": 178,
+      "tls_verified": true,
+      "clock_synced": true,
+      "elapsed_ms": 2137
+    },
+    {
+      "sequence": 11,
+      "error": 0,
+      "http_status": 200,
+      "bytes": 44,
+      "tls_verified": true,
+      "clock_synced": true,
+      "elapsed_ms": 2307
+    },
+    {
+      "sequence": 13,
+      "error": 0,
+      "http_status": 200,
+      "bytes": 182,
+      "tls_verified": true,
+      "clock_synced": true,
+      "elapsed_ms": 1963
+    }
+  ],
+  "captures": [
+    {
+      "file": "native-results.png",
+      "sha256": "91c5d2920f10fea469f07d8526e9ce32ed7c8f7579fd4bf78cf0a79698d7317e",
+      "rgb565_sha256": "85122a1d0b7197476354cdaff1d8fa7130899aa6a5352cdaea1eacd452b10364"
+    },
+    {
+      "file": "native-reader-first.png",
+      "sha256": "4dc480a7a039d1df07ede8371d36fe2d10fa944ea19023efa6d51e02b9e2dc05",
+      "rgb565_sha256": "9bbf6f6e36cbbc420a245383ef1cb70930987dcc9447c402edd7f4e35d6be4d6"
+    },
+    {
+      "file": "native-reader-next.png",
+      "sha256": "101ad4b793aa287a4ddc3943791ad170b8aff7041d5a35fa86c84e1196c99df8",
+      "rgb565_sha256": "e7d891c87255cc77c4884d9b69ea280648500eac61f8bae66f79395b699effee"
+    },
+    {
+      "file": "native-empty.png",
+      "sha256": "adcd72758182b6432fe6ad424ea2b4ddf5de12d499657dbb0b222f5c00601863",
+      "rgb565_sha256": "23880864794b06436800153fa9048312077243baf33e803332578d055762d7ae"
+    }
+  ],
+  "installation": {
+    "application_sha256": "9426b4a3f72523659ed25b5e2aa4f123a657c16bcaed5d8c95a74d203b7b0d5b",
+    "application_bytes": 1870560,
+    "application_readback_verified": true,
+    "previous_application_verified": true,
+    "partition_table_verified_unchanged": true,
+    "nvs_preserved": true,
+    "original_recovery_backup_verified": true,
+    "bootloader_modified": false,
+    "fpga_modified": false,
+    "efuse_modified": false
+  },
+  "native_component_sources": {
+    "devices/chromatic/components/pocket_search_ui/pocket_search_ui.c": "16118bccedc5f0280b044589416f0995de664fce8fc8f1b5bd28aaf783427106",
+    "devices/chromatic/components/pocket_search_ui/pocket_search_ui.h": "f67f6da562553c72d7488751deb5e3b80ab54fbffb3e71f6b8427104001c5076",
+    "devices/chromatic/components/pocket_search_ui/pocket_search_net.c": "1129d37beedf949c009d80bff3bf5107849c75c6572f5aeab8dfda51ed27175c",
+    "devices/chromatic/components/pocket_search_ui/pocket_search_net.h": "d6c4cce67fcf2c8a55a046d43b06f093f39b9880cba651e96b657f060dd9ae9d",
+    "devices/chromatic/components/pocket_search_ui/pocket_search_input.h": "0d167246a027d26210d40c980f77c8e8a57d006a35c9a3ec2837a48cf72a87ff",
+    "devices/chromatic/components/pocket_search_ui/CMakeLists.txt": "7b6caa8d1b7d35054f1b12bc0822476229d45473e1af0fcde1fd4f6caeaad351"
+  },
+  "rust_sources": {
+    "crates/chromatic-ffi/src/lib.rs": "e833575e31f0c0527b2953adada64bf669e6bc9520df78f4270a7e4d4004af13",
+    "crates/chromatic-client/src/lib.rs": "905bc450904b95f99bcbeb7d8e9308d661e648d786861c00ac20eecfb9245f83",
+    "crates/chromatic-ffi/Cargo.toml": "d35def87890d72d0021498a4b9b81003190745577acf68ab4f0665648c66f1d4"
+  },
+  "rust_static_library_sha256": "35e757553907e090b2223e89d6cf0f5e3613b0f30fc30615402f2e3bde0591f1",
+  "rust_target": "xtensa-esp32-none-elf",
+  "rust_profile": "chromatic-size",
+  "parent_commit": "d5ddc0b16f9d08dd2dcbcf614403c1655bd44268",
+  "native_component_hashes_verified_against_build_tree": true,
+  "free_heap_snapshot_is_peak_measurement": false,
+  "operator_confirmation": {
+    "source": "direct-user-response-in-this-task",
+    "application_version": "0.13.11-results",
+    "physical_lcd_result_visible": true,
+    "real_a_opens_reader": true,
+    "real_left_right_page_navigation": true,
+    "real_b_returns_to_results": true,
+    "usb_video_captured": false
+  },
+  "browser_verification": {
+    "source": "Codex-in-app-browser",
+    "physical_device_feed": false,
+    "checked": [
+      "wifi-three-results",
+      "open-selected-document",
+      "reader-next-page",
+      "zero-results"
+    ],
+    "console_errors_observed": 0,
+    "screenshot": "browser-results.png",
+    "screenshot_sha256": "0c0fa38cb221d383732a58ddcfcf4449becc8ceab5011dc074a143201531c983"
+  },
+  "companion_source_commit": "5f337fc2eff378ff1f91652356b7265d23900028",
+  "sample_collection_sha256": "5f4d7ad57027ae71a3076e296dcb6ea9dc131815137dad63ce761650ba2c8442",
+  "sample_collection_provenance": "examples/documents.json at companion_source_commit; sample prose subsequently revised",
+  "browser_retry_verification": {
+    "source": "Codex-in-app-browser",
+    "isolated_test_port": 8831,
+    "companion_deliberately_stopped": true,
+    "connection_error_visible": true,
+    "companion_restarted": true,
+    "retry_opened_correct_document": true,
+    "stale_error_cleared": true,
+    "screenshot": "browser-retry.png",
+    "screenshot_sha256": "9737870326f3016e237d7be9b740055e23286b2473b8559908f9a192194c452f"
+  }
+}

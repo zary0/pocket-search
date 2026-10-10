@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod chromatic;
+pub mod server;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Document {
