@@ -96,11 +96,31 @@ def prepare(source, output):
         (source / "esp32t/src/top.v").read_text(),
         (source / "esp32t/src/rtl/BSP/system_monitor.sv").read_text(),
         (source / "esp32t/evt1_x2.gprj").read_text())
+    # SUG1220-2.1 removed this reporting switch from set_option. The pinned
+    # IDE config disables it; retain that choice and fail if it is enabled.
+    options = (source / "esp32t/build_options.tcl").read_text()
+    options = replace_once(options,
+        "    Generate_Plain_Text_Timing_Report gen_text_timing_rpt\n", "")
+    options = replace_once(options,
+        "# The GW5A CLI rejects gen_ibis even when disabled.",
+        "# SUG1220-2.1 removed gen_text_timing_rpt. Preserve the disabled IDE\n"
+        "# choice without issuing an obsolete option; fail if a text report is requested.\n"
+        "if {[ide_option Generate_Plain_Text_Timing_Report]} {\n"
+        "    error \"Standalone text timing reports require a supported reporting command\"\n"
+        "}\n# The GW5A CLI rejects gen_ibis even when disabled.")
+    # SUG1220-2.1 defines placement option 2 as timing-prioritized. The
+    # original option 0 prioritizes compiler speed. Keep routing and all
+    # clocks/pins unchanged while fitting the extra audio logic.
+    process_config = (source / "esp32t/impl/evt1_x2_process_config.json").read_text()
+    process_config = replace_once(process_config,
+        '"Place_Option": "0"', '"Place_Option": "2"')
     changed = {
         "esp32t/src/top.v": top.encode(),
         "esp32t/src/rtl/BSP/system_monitor.sv": monitor.encode(),
         "esp32t/evt1_x2.gprj": project.encode(),
         MODULE: (FPGA / "pocket_ui_click.sv").read_bytes(),
+        "esp32t/build_options.tcl": options.encode(),
+        "esp32t/impl/evt1_x2_process_config.json": process_config.encode(),
     }
     for entry in ET.fromstring(project).findall("./FileList/File"):
         if entry.attrib.get("enable") == "1":

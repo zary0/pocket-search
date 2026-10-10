@@ -56,7 +56,7 @@ These actions are connected to the experimental native C/LVGL adapter and Rust d
 
 ## Runtime and development environment
 
-An optional [native button-click implementation](docs/native-click.md) generates short feedback in the FPGA while menus are open. Its RTL simulation and pinned-source integration pass; the required licensed Gowin build and physical speaker test remain pending.
+An optional [native button-click implementation](docs/native-click.md) generates short feedback in the FPGA while menus are open. Its RTL simulation and licensed Gowin 1.9.12.04 build pass with zero reported timing violations; physical speaker testing, clock-domain review and recovery qualification remain pending.
 
 | Layer | Environment and validation status |
 | --- | --- |

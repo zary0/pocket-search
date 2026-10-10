@@ -1,6 +1,6 @@
 # Native physical-button click
 
-**Status: implemented RTL, passing leaf simulation and pinned-source staging. No custom bitstream has been built or installed; no physical speaker test has passed.** This work does not satisfy the native release gate.
+**Status: implemented RTL, passing leaf simulation and a licensed full Gowin build with zero reported timing violations. The custom bitstream has not been installed, and no physical speaker or recovery test has passed.** This work does not satisfy the native release gate.
 
 The sound is generated on the Chromatic FPGA. The MCU firmware's named I2S pins do not provide an audio receiver in the pinned FPGA design: `I2S_BCLK` carries menu state. Do not drive those pins to try to play audio. The codec and USB audio already receive 16-bit stereo PCM from the FPGA's emulator; the integration adds a short click before both existing consumers.
 
@@ -17,7 +17,7 @@ The existing codec remains responsible for the volume wheel, headphone detection
 
 ## Resource scope
 
-The source declares 56 state bits: 8 previous-button bits, one arming bit, a 17-bit burst counter, an 18-bit cooldown counter, an 11-bit phase counter and one polarity bit. It uses integer logic and two saturating PCM adders. There is no waveform ROM, sample buffer, heap allocation, MCU task, audio-file asset or new UART command. This is a source-level count, not a fitted FPGA resource or power measurement. Gowin synthesis, placement, routing and timing reports are still required to establish actual LUT/FF use and timing closure.
+The source declares 56 state bits: 8 previous-button bits, one arming bit, a 17-bit burst counter, an 18-bit cooldown counter, an 11-bit phase counter and one polarity bit. It uses integer logic and two saturating PCM adders. There is no waveform ROM, sample buffer, heap allocation, MCU task, audio-file asset or new UART command. This is a source-level count, not a fitted FPGA resource or power measurement. The measured full-project fit is recorded below; physical power and clock-domain qualification remain unverified.
 
 ## Simulate
 
@@ -42,13 +42,29 @@ python3 scripts/prepare_chromatic_click.py /tmp/chromatic-fpga-upstream /tmp/chr
 python3 scripts/test_chromatic_click.py --staged /tmp/chromatic-fpga-click
 ```
 
-The preparer refuses a different revision, modified tracked source, uninitialized/mismatched submodules, missing project files or an existing destination. It copies only tracked sources into a separate tree; it preserves upstream license files and does not copy Git metadata, untracked local files or license credentials. It modifies four files: `top.v`, `system_monitor.sv`, `evt1_x2.gprj` and the added `pocket_ui_click.sv`.
+The preparer refuses a different revision, modified tracked source, uninitialized/mismatched submodules, missing project files or an existing destination. It copies only tracked sources into a separate tree; it preserves upstream license files and does not copy Git metadata, untracked local files or license credentials. It modifies six files: `top.v`, `system_monitor.sv`, `evt1_x2.gprj`, the added `pocket_ui_click.sv`, `build_options.tcl` and `evt1_x2_process_config.json`. The last two changes remove the obsolete disabled `gen_text_timing_rpt` option (SUG1220-2.1) and use the documented timing-prioritized placement algorithm (`Place_Option: "2"`). The upstream timing-driven routing setting stays enabled, with route option 1; pin, clock and timing constraints are unchanged. Enabling the unsupported standalone text report remains an error.
 
 The custom version is `0x1392`: upstream major 18/minor 14 with the debug/version bit set. This distinguishes the modified 14-bit identity, as requested by the upstream custom-modification instructions. It is not an official ModRetro release or a Pocket Search `vX.Y.Z` release. The generated source manifest records exact output hashes and explicitly reports `bitstream_built: false` and `hardware_tested: false`; it is not a build or release qualification manifest.
 
+## Licensed build evidence
+
+The [sanitized vendor-build evidence](evidence/native-click/vendor-build.json) records three complete builds with Gowin 1.9.12.04 on macOS arm64, using the same target, routing setting, pins and timing constraints. The unmodified upstream baseline has zero reported violations. Adding clicks with the original placement algorithm caused 12 reset-recovery violations in the PSRAM interface, with worst recovery slack of -0.122 ns; these appear in the vendor's setup-violation summary. Timing-prioritized placement removes those violations without changing the audio RTL or relaxing constraints. The final report has zero setup/hold violation endpoints and minimum reported recovery slack of +1.162 ns.
+
+| Full-project resource | Upstream baseline | Click build, timing placement |
+| --- | ---: | ---: |
+| Logic | 16,233 / 23,040 | 16,412 / 23,040 |
+| Registers | 8,525 / 23,595 | 8,579 / 23,595 |
+| CLS | 10,150 / 11,520 | 10,026 / 11,520 |
+| BSRAM | 44 / 56 | 44 / 56 |
+| DSP | 11.5 / 28 | 11.5 / 28 |
+
+These are whole-project results with different placement settings, not isolated mixer cost or console RAM measurements. The final build took 259.58 seconds and produced a 902,035-byte bitstream with SHA-256 `9fc7cf1a772d18aec9e42f8f288bd79b3b93e33a40cf02c36adf836cb736cf0c`. The private vendor license, proprietary tools, complete vendor reports and bitstream are not bundled in this repository. Source and report hashes are retained for comparison.
+
+A successful compiler exit and positive frequency summary alone do not qualify a build. Clock-relationship warnings and complete clock-domain behavior still require review; recovery and physical speaker/headphone/USB tests remain open. This evidence is a local vendor build, not hosted CI, a console recording, or release E2E acceptance.
+
 ## Complete the target build and physical test
 
-The pinned upstream design specifies **Gowin FPGA Designer 1.9.12.03 with a valid vendor license**. That compiler/license is not installed in the current development environment. Icarus and open-source generic synthesis do not replace the complete Gowin build or its proprietary IP. In an appropriately licensed environment, run the upstream project build:
+The pinned upstream design specifies **Gowin FPGA Designer 1.9.12.03 with a valid vendor license**. This development machine now has the official **Gowin 1.9.12.04 macOS arm64** tool and a working machine-bound license. The tested compiler version is recorded separately from the upstream recommendation. Icarus and open-source generic synthesis do not replace the complete Gowin build or its proprietary IP. In an appropriately licensed environment, run the staged project build:
 
 ```sh
 cd /tmp/chromatic-fpga-click/esp32t
