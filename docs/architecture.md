@@ -22,7 +22,7 @@ The 24-cell row profile treats ASCII as one cell and other Unicode as two. It is
 
 ## Companion responsibilities
 
-The companion owns collection, HTML extraction, ranking, source metadata, and image preparation. The current host code implements an in-memory inverted index, Japanese/English tokenization, BM25-style scoring, and packet formatting. It reads JSON fixtures; it exposes bounded read-only HTTP routes but does not fetch websites.
+The companion owns collection, HTML extraction, ranking, source metadata, and image preparation. The current host code implements an in-memory inverted index, Japanese/English tokenization, BM25-style scoring, and packet formatting. It reads JSON fixtures and registered local HTML/PNG/JPEG files. HTML5 parsing produces semantic reading scenes; it exposes bounded read-only HTTP routes but does not fetch websites.
 
 The device receives one result per response, up to ten ranked results. Each result references a document through a numeric ID. IDs are currently one-based positions in the loaded corpus. A service must keep that corpus immutable while a client uses its IDs. Persistent storage and a corpus-generation token must be added before live index replacement, preventing an ID from opening an unrelated document after a rebuild.
 
@@ -36,7 +36,9 @@ Bodies are split into seven-row pages. Titles can be shortened with an ellipsis;
 - `GET /v1/chromatic/page?id=...&page=0`: one PCS1 reader packet.
 - `GET /v1/search?q=...`: up to ten JSON results for the companion browser.
 - `GET /v1/collection`: the sample collection label and count.
-- A later registered-image route: bounded RGB565 stripes for an image referenced by a collected document.
+- `GET /v1/dom?id=...&page=...`: bounded semantic scene metadata.
+- `GET /v1/chromatic/image?id=...&page=...`: validated RGB565 stripes for a registered image scene.
+- `GET /v1/image?id=...&page=...`: the same quantized pixels as a prepared PNG.
 
 Reject queries longer than 96 UTF-8 bytes and unknown document/page IDs. Use explicit content lengths, bounded request/response times, and no query/body logging. A zero-result packet has document ID zero and cannot open an invented document. Collection metadata is currently a fixed sample label. Corpus generation and collected-page provenance must be added before live updates. See [API limits](search-results.md). This protocol is not Google search or a general-purpose HTML browser.
 
@@ -48,7 +50,7 @@ Extract title, source URL, body, links, image references, and collection time. R
 
 ## Image path
 
-Resize an actual site's image on the companion to fit within 128 × 80 pixels and send RGB565 stripes. Eight rows cost 2,048 bytes, avoiding a second 46,080-byte full-display buffer. Stripe headers, ordering, interrupted transfers, and display integration need implementation. Peak memory with TLS active must be measured before treating this budget as viable. Use actual source images, not generated photos presented as web content.
+The companion decodes registered PNG/JPEG sources with byte/dimension/allocation limits and resizes to 128 × 80. PCI1 sends RGB565 little-endian stripes of at most eight rows, with per-stripe CRC. Native Rust validates each stripe; the transport/UI enforce document/page identity, dimensions, order and complete receipt. A temporary cache of at most 20 KiB keeps the selected image visible in LVGL, in addition to the 15 KiB display band. It is freed on page change, cancellation, error or menu transition. This is a measured development path with original images, not arbitrary URL fetching or complete TLS peak tracing. See [DOM/image limits and native evidence](dom-images.md).
 
 ## Connectivity and acceptance
 

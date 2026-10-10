@@ -1,0 +1,3 @@
+The unmodified fdeflate 0.3.7 registry archive supplies LICENSE-MIT without a copyright-holder/year line. The bundled copy is verbatim; no unverified attribution is inserted.
+Source: https://crates.io/api/v1/crates/fdeflate/0.3.7/download
+Registry checksum: 1e6853b52649d4ac5c0bd02320cddc5ba956bdb407c4b75a2c6b75bf51500f8c

@@ -20,6 +20,7 @@ pub struct View {
     pub reserved: u16,
     pub title: Text,
     pub lines: [Text; TEXT_ROWS],
+    pub link_target: u32,
 }
 
 /// Validate a PCS1 packet and return text offsets, leaving output unchanged on failure.
@@ -53,11 +54,61 @@ pub unsafe extern "C" fn ps_packet_decode(bytes: *const u8, length: usize, out: 
         kind: packet.kind as u8,
         line_count: packet.line_count as u8,
         title: text(packet.title),
+        link_target: packet.link_target,
         ..View::default()
     };
     for (i, line) in packet.lines[..packet.line_count].iter().enumerate() {
         view.lines[i] = text(line);
     }
+    unsafe { out.write(view) };
+    0
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Default)]
+pub struct ImageView {
+    pub document_id: u32,
+    pub page_index: u16,
+    pub width: u16,
+    pub height: u16,
+    pub y: u16,
+    pub rows: u16,
+    pub pixels_offset: u16,
+    pub pixels_length: u16,
+    pub reserved: u16,
+}
+/// Validate one PCI1 stripe without changing output on failure.
+/// # Safety
+/// Input is readable for length bytes; output is aligned, writable, non-overlapping.
+/// The caller retains the input unchanged while using the returned pixel offset.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_image_decode(
+    bytes: *const u8,
+    length: usize,
+    out: *mut ImageView,
+) -> i32 {
+    if bytes.is_null()
+        || out.is_null()
+        || !(24..=chromatic_client::MAX_IMAGE_PACKET_BYTES).contains(&length)
+        || (out as usize) % core::mem::align_of::<ImageView>() != 0
+    {
+        return -1;
+    }
+    let input = unsafe { core::slice::from_raw_parts(bytes, length) };
+    let Ok(stripe) = chromatic_client::ImageStripe::decode(input) else {
+        return -2;
+    };
+    let view = ImageView {
+        document_id: stripe.document_id,
+        page_index: stripe.page_index,
+        width: stripe.width,
+        height: stripe.height,
+        y: stripe.y,
+        rows: stripe.rows,
+        pixels_offset: 24,
+        pixels_length: stripe.pixels.len() as u16,
+        reserved: 0,
+    };
     unsafe { out.write(view) };
     0
 }
@@ -94,7 +145,8 @@ mod tests {
     }
     #[test]
     fn ffi_layout_and_borrowed_text_match_c() {
-        assert_eq!(core::mem::size_of::<View>(), 44);
+        assert_eq!(core::mem::size_of::<View>(), 48);
+        assert_eq!(core::mem::size_of::<ImageView>(), 20);
         let mut bytes =
             b"PCS1\x01\x00\x01\x01\x01\x00\x00\x00\x00\x00\x01\x00\x03\x00\x00\x00X\x01Y".to_vec();
         let mut view = View::default();

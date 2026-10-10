@@ -152,6 +152,10 @@ pub fn route(index: &SearchIndex, method: &str, target: &str) -> Response {
             "text/javascript; charset=utf-8",
             include_bytes!("../ui/input.mjs").as_slice(),
         )),
+        "/images.mjs" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../ui/images.mjs").as_slice(),
+        )),
         "/pcs1.mjs" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../ui/pcs1.mjs").as_slice(),
@@ -174,20 +178,63 @@ pub fn route(index: &SearchIndex, method: &str, target: &str) -> Response {
                 .into_bytes(),
         };
     }
-    if !["/v1/search", "/v1/chromatic/search", "/v1/chromatic/page"].contains(&path) {
+    if ![
+        "/v1/search",
+        "/v1/chromatic/search",
+        "/v1/chromatic/page",
+        "/v1/dom",
+        "/v1/image",
+        "/v1/chromatic/image",
+    ]
+    .contains(&path)
+    {
         return reply(404, "Not found");
     }
     let Ok(p) = parameters(query) else {
         return reply(400, "Invalid parameters");
     };
-    if path == "/v1/chromatic/page" {
+    if [
+        "/v1/chromatic/page",
+        "/v1/dom",
+        "/v1/image",
+        "/v1/chromatic/image",
+    ]
+    .contains(&path)
+    {
         if p.keys().any(|k| k != "id" && k != "page") || !p.contains_key("id") {
             return reply(400, "Invalid parameters");
         }
         let (Ok(id), Ok(page)) = (number(p.get("id"), 0), number(p.get("page"), 0)) else {
             return reply(400, "Invalid parameters");
         };
-        return packet(index.chromatic_page(id, page));
+        if path == "/v1/chromatic/page" {
+            return packet(index.chromatic_page(id, page));
+        }
+        if path == "/v1/dom" {
+            return dom_page(index, id, page);
+        }
+        let Some(dom) = index.dom_documents.get(&id) else {
+            return reply(404, "Image not found");
+        };
+        let Some(scene) = dom.pages.get(page) else {
+            return reply(404, "Page not found");
+        };
+        let Some(image) = scene.asset.and_then(|at| dom.images.get(at)) else {
+            return reply(404, "Image unavailable");
+        };
+        return Response {
+            status: 200,
+            content_type: if path == "/v1/image" {
+                "image/png"
+            } else {
+                "application/vnd.pocket-search.pci1"
+            },
+            body: if path == "/v1/image" {
+                image.png.clone()
+            } else {
+                image.stream(id, page)
+            },
+        };
     }
     if p.keys()
         .any(|k| k != "q" && (k != "result" || path == "/v1/search"))
@@ -213,7 +260,7 @@ pub fn route(index: &SearchIndex, method: &str, target: &str) -> Response {
             let (title, _) = excerpt(&hit.title, 128);
             let (url, truncated) = excerpt(&hit.url, 256);
             let (snippet, _) = excerpt(&hit.snippet, 256);
-            json!({"document_id":hit.document_id,"title":title,"url":url,
+            json!({"document_id":hit.document_id,"title":title,"url":url,"has_dom":index.dom_documents.contains_key(&hit.document_id),
             "source_url_truncated":truncated,"snippet":snippet})
         })
         .collect();
@@ -222,6 +269,40 @@ pub fn route(index: &SearchIndex, method: &str, target: &str) -> Response {
         .into_bytes();
     if body.len() > RESPONSE_BYTES {
         return reply(500, "Response limit exceeded");
+    }
+    Response {
+        status: 200,
+        content_type: "application/json",
+        body,
+    }
+}
+fn dom_page(index: &SearchIndex, id: usize, page: usize) -> Response {
+    let Some(doc) = id.checked_sub(1).and_then(|at| index.documents.get(at)) else {
+        return reply(404, "Document not found");
+    };
+    let Ok(encoded) = index.chromatic_page(id, page) else {
+        return reply(404, "Page not found");
+    };
+    let Ok(packet) = chromatic_client::Packet::decode(&encoded) else {
+        return reply(500, "Invalid stored page");
+    };
+    let scene = index
+        .dom_documents
+        .get(&id)
+        .and_then(|dom| dom.pages.get(page));
+    let image = scene.and_then(|scene| {
+        scene
+            .asset
+            .and_then(|at| index.dom_documents.get(&id)?.images.get(at))
+    });
+    let body=json!({"document_id":id,"page_index":page,"page_count":packet.page_count,"kind":packet.kind as u8,
+        "title":excerpt(&doc.title,256).0,"url":excerpt(&doc.url,1024).0,"has_dom":index.dom_documents.contains_key(&id),
+        "style":scene.map_or("paragraph",|p|p.style),"heading_level":scene.map_or(0,|p|p.heading_level),
+        "source":scene.map_or("".to_string(),|p|excerpt(&p.source,1024).0),"link_target":packet.link_target,
+        "image_width":image.map_or(0,|i|i.width),"image_height":image.map_or(0,|i|i.height)
+    }).to_string().into_bytes();
+    if body.len() > 8192 {
+        return reply(500, "Metadata limit");
     }
     Response {
         status: 200,
@@ -350,6 +431,63 @@ mod tests {
         assert_eq!(route(&i, "GET", "/v1/chromatic/page?id=0").status, 404);
         let r = route(&i, "GET", "/v1/chromatic/search?q=missing");
         assert_eq!(Packet::decode(&r.body).unwrap().document_id, 0);
+    }
+    #[test]
+    fn dom_metadata_images_and_links_only_serve_registered_scenes() {
+        let index =
+            crate::dom::append(SearchIndex::new(vec![]), "examples/html-manifest.json").unwrap();
+        let dom = &index.dom_documents[&1];
+        for (page, scene) in dom.pages.iter().enumerate() {
+            let response = route(&index, "GET", &format!("/v1/dom?id=1&page={page}"));
+            assert_eq!(response.status, 200);
+            let meta: serde_json::Value = serde_json::from_slice(&response.body).unwrap();
+            assert_eq!(meta["page_index"], page);
+            assert_eq!(meta["kind"], scene.kind as u8);
+            let image = route(
+                &index,
+                "GET",
+                &format!("/v1/chromatic/image?id=1&page={page}"),
+            );
+            if scene.asset.is_some() {
+                assert_eq!(image.status, 200);
+                assert!(image.body.len() <= chromatic_client::MAX_IMAGE_WIRE_BYTES);
+                let first = 24 + usize::from(u16::from_le_bytes([image.body[18], image.body[19]]));
+                assert_eq!(
+                    chromatic_client::ImageStripe::decode(&image.body[..first])
+                        .unwrap()
+                        .page_index,
+                    page as u16
+                );
+                let png = route(&index, "GET", &format!("/v1/image?id=1&page={page}"));
+                assert_eq!(png.content_type, "image/png");
+                assert_eq!(&png.body[..8], b"\x89PNG\r\n\x1a\n");
+            } else {
+                assert_eq!(image.status, 404);
+            }
+        }
+        for route_name in ["dom", "image", "chromatic/image"] {
+            assert_eq!(
+                route(&index, "GET", &format!("/v1/{route_name}?id=0")).status,
+                404
+            );
+            assert_eq!(
+                route(&index, "GET", &format!("/v1/{route_name}?id=1&page=65535")).status,
+                404
+            );
+            assert_eq!(
+                route(
+                    &index,
+                    "GET",
+                    &format!("/v1/{route_name}?id=1&url=https%3A%2F%2Fexample.com")
+                )
+                .status,
+                400
+            );
+        }
+        assert_eq!(
+            route(&index, "GET", "/examples/fixtures/dom.html").status,
+            404
+        );
     }
     #[test]
     fn rejects_ambiguous_invalid_and_oversized_queries() {

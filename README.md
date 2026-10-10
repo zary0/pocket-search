@@ -2,11 +2,11 @@
 
 # Pocket Search for ModRetro Chromatic
 
-A small search and reading application designed around the **ModRetro Chromatic's 160 × 144 display, physical buttons, and ESP32 MCU**. The experimental native application searches sample articles and reads their text over Wi-Fi. Collecting real web pages and showing source images are next steps.
+A small search and reading application designed around the **ModRetro Chromatic's 160 × 144 display, physical buttons, and ESP32 MCU**. The experimental native application searches original sample articles and reads HTML-derived text, links, and reduced images over Wi-Fi. Live public-page collection remains a next step.
 
 Chromatic is the primary platform. Host tools develop the search service and verify the device protocol. The application targets the console's MCU firmware and menu interface; a Game Boy cartridge ROM is not the deployment target for this Wi-Fi reader.
 
-**Status: experimental native sample search and reader.** Implemented: Rust ranking, a bounded read-only HTTP API, browser results/reader, and an ESP32 HTTPS adapter that runs the allocation-free Rust decoder through a C ABI. The development image is tested separately from the future release gate; see [search results and evidence](docs/search-results.md). Crawling real web pages, images, a reproducible complete firmware distribution, and qualified physical E2E remain pending. The measured display prototype uses a 15 KiB draw buffer; see [measured results](docs/performance.md#physical-lvgl-display-comparison).
+**Status: experimental native DOM and image reader.** Implemented: Rust ranking, HTML5 DOM extraction from registered local HTML, PNG/JPEG preparation, bounded read-only API, and browser/ESP32 readers for headings, text, images and registered links. The native client runs allocation-free Rust packet/image validation through a C ABI. See [DOM/image behavior and evidence](docs/dom-images.md) and [earlier search evidence](docs/search-results.md). Live crawling, JavaScript/CSS layout, complete firmware distribution and qualified physical E2E remain pending. The measured display prototype uses a 15 KiB draw buffer; see [measured results](docs/performance.md#physical-lvgl-display-comparison).
 
 ## Architecture
 
@@ -23,15 +23,15 @@ Chromatic MCU application
   button input → query → results → paginated text → reduced image
 ```
 
-The handheld owns the interaction and display. A companion service on a computer or server owns crawling, the index, and image preparation. Independent search ranks our own collected documents; it does not require storing a web-scale index on the handheld. The service must be reachable from the device. The current service searches original sample articles. An operator-authorized temporary HTTPS tunnel is used for development verification; no permanent public service is provided.
+The handheld owns the interaction and display. A companion service on a computer or server owns crawling, the index, and image preparation. Independent search ranks our own collected documents; it does not require storing a web-scale index on the handheld. The service must be reachable from the device. The current service searches original JSON articles and explicitly registered HTML/image files. An operator-authorized temporary HTTPS tunnel is used for development verification; no permanent public service is provided.
 
 | Component | Implemented | Still needed |
 | --- | --- | --- |
-| Crawler / extractor | None | Bounded HTTPS fetching, robots.txt, HTML extraction, collection timestamps |
+| Crawler / extractor | HTML5 DOM extraction from registered UTF-8 HTML: headings, paragraphs, lists, preformatted text, links and image references | Public HTTPS fetching, robots.txt, collection timestamps and live-page acceptance |
 | Index / ranking | In-memory inverted index, BM25-style ranking, English words and Japanese character/bigram tokens | Persistent corpus, updates, deduplication, quality evaluation |
 | Companion API | Read-only HTTP routes, immutable sample collection, bounded PCS1 and JSON responses | Persistent corpus identity, production deployment, real collected content |
 | Device client | Xtensa Rust decoder with C ABI, native HTTPS/SNTP, keyboard, results and paginated reader | Reproducible full firmware, complete physical-controls/error E2E, battery-only verification |
-| Images | Proposed 128 × 80 RGB565 stripe budget | Fetching, resizing, stripe protocol, display and heap measurements |
+| Images | Registered PNG/JPEG preparation, 128 × 80 RGB565 stripes, CRC/order validation, native/browser display and sampled native heap | Protected network fetching, interruption/error qualification and allocator peak tracing |
 
 ## Designed for the handheld
 
@@ -40,15 +40,15 @@ The handheld owns the interaction and display. A companion service on a computer
 - One result per screen and at most ten results per query.
 - A **96-byte UTF-8 query limit** and a **512-byte text response limit**.
 - The decoder borrows the response buffer without heap allocation. Networking, the display driver, and fonts have separate memory costs.
-- One proposed image at a time, up to 128 × 80 pixels. An eight-row RGB565 stripe would need **2,048 bytes**; image transport is not implemented yet.
+- One image at a time, up to 128 × 80 pixels: **2,048 pixel bytes per eight-row stripe**, a 24-byte header, and a temporary image cache of at most **20 KiB**. The cache is released when leaving the image.
 - Search, results, text, images, links, and temporary back navigation. No bookmarks, browsing history, restored reading position, or Codex approval UI.
 
 | Button | Result screen | Reader screen |
 | --- | --- | --- |
 | D-pad up / down | Previous / next result | Reserved |
-| D-pad left / right | Reserved | Previous / next text page |
-| A | Open selected document | Reserved for later link/image actions |
-| B | Back | Back to results |
+| D-pad left / right | Reserved | Previous / next reading scene |
+| A | Open selected document | Open a registered link |
+| B | Back | Return from a link or return to results |
 | Start | Query entry | Query entry |
 | Select | Home | Home |
 
@@ -65,7 +65,7 @@ These actions are connected to the experimental native C/LVGL adapter and Rust d
 | Portable device core | Dependency-free `no_std` Rust with no allocator or OS bindings. It decodes bounded packets and maps buttons; networking and rendering belong to the experimental firmware adapter; complete font coverage remains pending |
 | Network/service runtime | A DNS-resolvable HTTPS service reachable from the device, with native clock synchronization and certificate/hostname validation. The HTTP API is implemented; HTTPS terminates at the development deployment origin. A permanent endpoint remains pending |
 
-The manifest declares Rust 1.85 as its minimum version; that minimum is not separately checked in CI. Current validation uses the toolchains above. The hardware values describe the earlier development unit and firmware, not guaranteed resources on every Chromatic; experimental search evidence is scoped to that same development unit. See the [device profile](devices/chromatic/README.md) and [lab requirements](docs/hardware-e2e.md).
+The manifest declares Rust 1.88 as its minimum version; that minimum is not separately checked in CI. Current validation uses the toolchains above. The hardware values describe the earlier development unit and firmware, not guaranteed resources on every Chromatic; experimental search evidence is scoped to that same development unit. See the [device profile](devices/chromatic/README.md) and [lab requirements](docs/hardware-e2e.md).
 
 The initial firmware plan keeps ESP-IDF/FreeRTOS and integrates the small Rust core. A `no_std` core does not make the complete Wi-Fi firmware bare metal. Optimize task stacks, network/TLS buffers, and incremental drawing against real-device measurements before considering a replacement platform; see the [performance trade-offs](docs/performance.md#rtos-footprint-and-bare-metal).
 
@@ -81,7 +81,7 @@ cargo run -- examples/documents.json 'chromatic wifi'
 cargo run --example chromatic -- examples/documents.json 'chromatic wifi'
 
 # Start the read-only sample API and browser UI.
-cargo run -- serve examples/documents.json 127.0.0.1:8828
+cargo run -- serve examples/documents.json 127.0.0.1:8828 --html examples/html-manifest.json
 
 # Run all search and protocol checks.
 cargo test --workspace
@@ -89,11 +89,11 @@ cargo check -p chromatic-client
 cargo clippy --workspace --all-targets -- -D warnings
 ```
 
-The Chromatic example runs entirely on the host and prints that distinction. `examples/documents.json` contains original test text and nonexistent `.invalid` URLs, including Japanese fixtures. It is not a crawled corpus or evidence of hardware browsing.
+The Chromatic example runs entirely on the host and prints that distinction. The sample JSON and `examples/fixtures/*.html` contain original test text and nonexistent `.invalid` URLs, including Japanese fixtures. It is not a crawled corpus or evidence of hardware browsing.
 
 ## Hardware evidence and limits
 
-Earlier work on one Chromatic DevDay unit verified Wi-Fi, native SNTP, and certificate-validated HTTPS fetching. That firmware and its verification artifacts are outside this repository. Those checks do not verify Pocket Search, image display, or battery-only operation.
+Earlier work on one Chromatic DevDay unit verified Wi-Fi, native SNTP, and certificate-validated HTTPS fetching. That firmware and its verification artifacts are outside this repository. Those earlier checks do not verify Pocket Search; newer scoped [DOM/image evidence](docs/dom-images.md) covers the experimental reader. Battery-only operation remains unverified.
 
 Available heap on that earlier unit before a small HTTPS request was about 58 KiB. This is an observation of that unit and firmware, not a universal free-memory guarantee. Its hardware/software environment is summarized above; see the [device profile](devices/chromatic/README.md) for exact measurements.
 
@@ -101,7 +101,7 @@ The development Wi-Fi allowed outbound HTTPS but did not establish device-to-com
 
 ## Next milestone
 
-Finish reproducible firmware integration and physical-controls/error acceptance for the implemented sample query → result → text loop. Then add collected pages and reduced images. Video is deferred until text and still-image behavior is measured on the device.
+Finish reproducible firmware integration and physical-controls/error acceptance for the implemented sample query → result → text loop. Continue bounded real-page collection after the controlled DOM/image experiment. Video is deferred until text and still-image behavior is measured on the device.
 
 See the [architecture](docs/architecture.md), [protocol](docs/chromatic-protocol.md), and [roadmap](docs/roadmap.md). Device credentials, activation codes, NVS dumps, and full-flash backups are not included.
 

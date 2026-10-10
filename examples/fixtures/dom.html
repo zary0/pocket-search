@@ -1,0 +1,16 @@
+<!doctype html>
+<!-- SPDX-License-Identifier: GPL-3.0-only -->
+<html lang="en"><head><meta charset="utf-8"><title>Pocket DOM: text, links and images</title></head>
+<body><nav>Navigation is outside the reading surface.</nav><main>
+<h1>Pocket DOM</h1>
+<p>This original HTML article is parsed by the Rust companion. The reader preserves headings, paragraphs, images and links in document order.</p>
+<figure><img src="/logo.png" alt="Pocket Search project logo"><figcaption>The project logo is a registered source image, resized for the handheld.</figcaption></figure>
+<h2>Small screen, real pixels</h2>
+<p>The next image is an original RGB color grid. It exercises the full 128 by 80 pixel limit and makes color-channel errors visible.</p>
+<figure><img src="/rgb.png" alt="Original RGB color grid"><figcaption>Only the current image is cached on the handheld. It is released when you leave the image page.</figcaption></figure>
+<ul><li>Left and Right move through reading scenes.</li><li>A follows a link to another registered document.</li><li>B returns to the previous document or results.</li></ul>
+<a href="/reading">Read the small-screen guide</a>
+<p>Headings and text do not require the complete HTML tree on the device.</p>
+<script>throw new Error('This source script must never execute in the reader');</script>
+<p hidden>This hidden text must not enter the search index.</p>
+</main></body></html>

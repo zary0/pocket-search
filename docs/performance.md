@@ -89,7 +89,7 @@ The initial target remains ESP-IDF 5.3/FreeRTOS with existing device drivers. Es
 
 - Consolidate application work where practical and size stacks from worst-case high-water measurements with headroom.
 - Bound concurrent requests and network/TLS buffers; measure both memory and throughput rather than assuming smaller buffers are faster.
-- Use incremental drawing and the proposed image stripes to avoid another full framebuffer; the experimental native band display driver is measured separately from the pending reader/image transport.
+- Use incremental drawing and bounded image stripes to avoid another permanent full framebuffer. The registered DOM/image experiment uses a temporary <=20 KiB image cache plus the measured 15 KiB draw band; see [native image transport samples](dom-images.md). Full TLS peak tracing and interruption qualification remain pending.
 - Keep certificate checks, UTF-8 validation, and recovery behavior intact.
 
 Compare linked image size, peak/free heap, largest free block, task stack use, decoder cycles, verified HTTPS latency, and visible rendering under identical scenarios. Neither a complete bare-metal counterpart nor an ESP-IDF-versus-bare-metal physical comparison exists yet. Replacing the platform requires a supported Wi-Fi/TLS integration and equivalent physical E2E, not just a smaller core binary.

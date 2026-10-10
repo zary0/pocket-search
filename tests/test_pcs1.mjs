@@ -27,11 +27,17 @@ test('decoder rejects every truncation and an oversized response',()=>{
   assert.throws(()=>decodePacket(new Uint8Array(513).buffer));
 });
 test('decoder rejects invalid header, pagination, text and trailing bytes',()=>{
-  for(const [at,value] of [[0,0],[4,3],[5,0],[6,8],[7,49],[12,3],[14,0],[16,0],[18,1],[20,0],[20,128],[20,255]]){
+  for(const [at,value] of [[0,0],[4,6],[5,0],[6,8],[7,49],[12,3],[14,0],[16,0],[18,1],[20,0],[20,128],[20,255]]){
     const b=golden();b[at]=value;assert.throws(()=>decodePacket(b.buffer));
   }
   const trailing=new Uint8Array(golden().length+1);trailing.set(golden());trailing[16]++;
   assert.throws(()=>decodePacket(trailing.buffer));
   const invalidReader=golden();invalidReader[4]=2;invalidReader[8]=0;
   assert.throws(()=>decodePacket(invalidReader.buffer));
+});
+
+test('DOM scene kinds and bounded link targets preserve the base protocol',()=>{
+ for(const kind of [2,3,5]){const b=golden();b[4]=kind;assert.equal(decodePacket(b.buffer).kind,kind);}
+ const old=golden(),b=new Uint8Array(old.length+4);b.set(old.subarray(0,20));b.set(old.subarray(20),24);b[4]=4;b[16]+=4;b[20]=8;assert.equal(decodePacket(b.buffer).target,8);
+ b[21]=1;assert.throws(()=>decodePacket(b.buffer));
 });
