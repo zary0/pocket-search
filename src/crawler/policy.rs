@@ -117,6 +117,21 @@ pub fn checked_url(value: &str, allowed: &[String]) -> Result<Url, &'static str>
             "jwt",
         ]
         .contains(&key.as_str())
+            || key.split(['_', '-']).any(|part| {
+                matches!(
+                    part,
+                    "token"
+                        | "secret"
+                        | "password"
+                        | "passwd"
+                        | "credential"
+                        | "session"
+                        | "signature"
+                )
+            })
+            || ["token", "secret", "password", "apikey"]
+                .iter()
+                .any(|suffix| key.ends_with(suffix))
             || key.starts_with("x-amz-")
             || key.starts_with("x-goog-")
     }) {

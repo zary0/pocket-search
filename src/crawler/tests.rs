@@ -139,6 +139,9 @@ fn public_destination_policy_rejects_all_special_use_forms() {
         "https://alpha.example.com/?oauth_token=secret",
         "https://alpha.example.com/?%63lient_secret=secret",
         "https://alpha.example.com/?CODE=secret",
+        "https://alpha.example.com/?csrf_token=secret",
+        "https://alpha.example.com/?clientSecret=secret",
+        "https://alpha.example.com/?session-id=secret",
     ] {
         assert!(policy::checked_url(url, &[]).is_err(), "{url}");
     }
