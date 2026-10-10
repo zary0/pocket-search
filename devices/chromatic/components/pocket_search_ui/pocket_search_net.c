@@ -68,7 +68,12 @@ static void worker(void *arg){
     bool image=job.request.kind==3;
     Events events={.reply=&result,.expected=image?"application/vnd.pocket-search.pci1":"application/vnd.pocket-search.pcs1"};
     if(wifi.state!=CW_CONNECTED){result.error=NO_WIFI;goto done;}
-    if(CW_TimeWait(20000)!=ESP_OK){result.error=NO_CLOCK;goto done;}result.clock_synced=true;
+    esp_err_t clock_error;int64_t clock_deadline=esp_timer_get_time()+20000000;
+    do{
+        if(cancelled()){result.error=CANCELLED;goto done;}
+        clock_error=CW_TimeWait(200); // No SNTP restart: bounded polling of existing state.
+    }while(clock_error==ESP_ERR_TIMEOUT&&esp_timer_get_time()<clock_deadline);
+    if(clock_error!=ESP_OK){result.error=NO_CLOCK;goto done;}result.clock_synced=true;
     if(cancelled()){result.error=CANCELLED;goto done;}
     for(const unsigned char *s=(const unsigned char*)job.request.query;*s;++s){encoded[at++]='%';encoded[at++]=hex[*s>>4];encoded[at++]=hex[*s&15];}encoded[at]=0;
     int written=job.request.kind==1?snprintf(url,sizeof(url),"%s/v1/chromatic/search?q=%s&result=%u",job.endpoint,encoded,job.request.page):snprintf(url,sizeof(url),"%s/v1/chromatic/%s?id=%lu&page=%u",job.endpoint,image?"image":"page",(unsigned long)job.request.document,job.request.page);

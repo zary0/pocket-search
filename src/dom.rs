@@ -2,7 +2,7 @@
 //! HTML5 DOM to immutable, bounded reading scenes. No scripts or URL fetching.
 use crate::{Document, SearchIndex, chromatic};
 use chromatic_client::{IMAGE_HEIGHT, IMAGE_STRIPE_ROWS, IMAGE_WIDTH, Kind, TEXT_ROWS, image_crc};
-use image::{ImageFormat, ImageReader, Limits, RgbImage};
+use image::{DynamicImage, ImageDecoder, ImageFormat, ImageReader, Limits, RgbImage};
 use scraper::{ElementRef, Html, Node, Selector};
 use serde::Deserialize;
 use std::{
@@ -129,7 +129,11 @@ impl Collector<'_> {
             self.blocks.push(Block::Text {
                 style: self.style,
                 level: self.level,
-                text: value,
+                text: if self.style == "list" {
+                    format!("- {value}")
+                } else {
+                    value
+                },
             });
         }
         if self.blocks.len() > 256 {
@@ -241,6 +245,7 @@ impl Collector<'_> {
                 "pre" => "pre",
                 "blockquote" => "quote",
                 "figcaption" => "caption",
+                _ if matches!(previous.0, "list" | "quote") => previous.0,
                 _ => "paragraph",
             };
             self.level = if self.style == "heading" {
@@ -248,9 +253,6 @@ impl Collector<'_> {
             } else {
                 0
             };
-            if name == "li" {
-                self.text.push_str("- ");
-            }
         }
         for child in el.children() {
             match child.value() {
@@ -329,23 +331,22 @@ pub fn prepare_image(bytes: &[u8]) -> Result<ImageAsset, String> {
     if !matches!(reader.format(), Some(ImageFormat::Png | ImageFormat::Jpeg)) {
         return Err("PNG or JPEG required".into());
     }
-    let (w, h) = ImageReader::new(Cursor::new(bytes))
-        .with_guessed_format()
-        .map_err(|_| "Image format")?
-        .into_dimensions()
-        .map_err(|_| "Image dimensions")?;
-    if w == 0 || h == 0 || w > 4096 || h > 4096 || u64::from(w) * u64::from(h) > 4 * 1024 * 1024 {
-        return Err("Image dimension limit".into());
-    }
     let mut limits = Limits::default();
     limits.max_image_width = Some(4096);
     limits.max_image_height = Some(4096);
     limits.max_alloc = Some(32 * 1024 * 1024);
+    // Apply limits before metadata parsing and reuse the same decoder for pixels.
     reader.limits(limits);
-    let thumbnail = reader
-        .decode()
+    let decoder = reader
+        .into_decoder()
+        .map_err(|_| "Image dimensions/limits")?;
+    let (w, h) = decoder.dimensions();
+    if w == 0 || h == 0 || w > 4096 || h > 4096 || u64::from(w) * u64::from(h) > 4 * 1024 * 1024 {
+        return Err("Image dimension limit".into());
+    }
+    let thumbnail = DynamicImage::from_decoder(decoder)
         .map_err(|_| "Image decode/limits")?
-        .thumbnail(IMAGE_WIDTH as u32, IMAGE_HEIGHT as u32)
+        .thumbnail(w.min(IMAGE_WIDTH as u32), h.min(IMAGE_HEIGHT as u32))
         .to_rgba8();
     let (w, h) = thumbnail.dimensions();
     let mut pixels = Vec::with_capacity((w * h * 2) as usize);
@@ -660,6 +661,17 @@ mod tests {
         );
     }
     #[test]
+    fn nested_list_and_quote_paragraphs_keep_context_without_orphan_markers() {
+        let p=parse("<main><ul><li><p>Item</p></li></ul><blockquote><p>Quoted</p><p>Again</p></blockquote></main>","https://example.invalid/").unwrap();
+        assert_eq!(p.blocks.len(), 3);
+        assert!(matches!(&p.blocks[0],Block::Text{style:"list",text,..} if text=="- Item"));
+        assert!(
+            p.blocks[1..]
+                .iter()
+                .all(|b| matches!(b, Block::Text { style: "quote", .. }))
+        );
+    }
+    #[test]
     fn preformatted_first_line_keeps_indentation() {
         let parsed = parse(
             "<main><pre>  first\n    second</pre></main>",
@@ -720,6 +732,21 @@ mod tests {
         assert!(prepare_image(b"not an image").is_err());
         assert!(prepare_image(b"GIF89a").is_err());
         assert!(prepare_image(&vec![0; 2 * 1024 * 1024 + 1]).is_err());
+    }
+    #[test]
+    fn transparent_png_and_jpeg_prepare_with_correct_dimensions() {
+        let mut png = Cursor::new(Vec::new());
+        image::RgbaImage::from_pixel(1, 1, image::Rgba([10, 20, 30, 0]))
+            .write_to(&mut png, ImageFormat::Png)
+            .unwrap();
+        assert_eq!(prepare_image(png.get_ref()).unwrap().pixels, [255, 255]);
+        let mut jpeg = Cursor::new(Vec::new());
+        RgbImage::from_pixel(2, 2, image::Rgb([255, 0, 0]))
+            .write_to(&mut jpeg, ImageFormat::Jpeg)
+            .unwrap();
+        let image = prepare_image(jpeg.get_ref()).unwrap();
+        assert_eq!((image.width, image.height, image.pixels.len()), (2, 2, 8));
+        assert!(chromatic_client::ImageStripe::decode(&image.stream(1, 0)).is_ok());
     }
     #[test]
     fn actual_html_fixture_round_trips_image_stripes_and_registered_link() {

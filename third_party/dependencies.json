@@ -10,6 +10,10 @@
       {
         "path": "third_party/licenses/adler2-2.0.1/LICENSE-MIT",
         "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+      },
+      {
+        "path": "third_party/licenses/adler2-2.0.1/LICENSE-0BSD",
+        "sha256": "861399f8c21c042b110517e76dc6b63a2b334276c8cf17412fc3c8908ca8dc17"
       }
     ]
   },
@@ -234,6 +238,10 @@
       {
         "path": "third_party/licenses/fdeflate-0.3.7/LICENSE-MIT",
         "sha256": "c77a4cf9da729987d0fe7ccd811e3bd27393914ddf3d23467c18cc22954513b3"
+      },
+      {
+        "path": "third_party/licenses/fdeflate-0.3.7/SOURCE-NOTICE.txt",
+        "sha256": "0270e419e2f01b38faf3623c85650f53e5ca8658e26a8c532bb41632f8f89a90"
       }
     ]
   },
@@ -952,6 +960,10 @@
       {
         "path": "third_party/licenses/servo_arc-0.4.3/LICENSE-MIT",
         "sha256": "23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3"
+      },
+      {
+        "path": "third_party/licenses/servo_arc-0.4.3/SOURCE-NOTICE.txt",
+        "sha256": "157b78d348a72a2844ba520248588b8934317c9909e668bc3b28b36d7bd82541"
       }
     ]
   },
@@ -980,6 +992,10 @@
       {
         "path": "third_party/licenses/siphasher-1.0.4/LICENSE-MIT",
         "sha256": "f9c4c77baa3828004ee54b8a4f2db2e88ed44a6237a493965bf551fac0fcb62d"
+      },
+      {
+        "path": "third_party/licenses/siphasher-1.0.4/COPYING",
+        "sha256": "c962ee4d1d05ddc138b202b2540219ebc57893fcf97b364852094a9a94ce1365"
       }
     ]
   },

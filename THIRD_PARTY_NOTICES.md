@@ -10,7 +10,7 @@ Exact locked package archives (including MPL source) are available from the vers
 
 | Package / source | Locked version | Upstream license expression | Selected terms | Included text |
 | --- | --- | --- | --- | --- |
-| [adler2](https://crates.io/crates/adler2/2.0.1) | 2.0.1 | `0BSD OR MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/adler2-2.0.1/LICENSE-MIT) |
+| [adler2](https://crates.io/crates/adler2/2.0.1) | 2.0.1 | `0BSD OR MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/adler2-2.0.1/LICENSE-MIT) + [LICENSE-0BSD](third_party/licenses/adler2-2.0.1/LICENSE-0BSD) |
 | [autocfg](https://crates.io/crates/autocfg/1.5.1) | 1.5.1 | `Apache-2.0 OR MIT` | `MIT` | [LICENSE-MIT](third_party/licenses/autocfg-1.5.1/LICENSE-MIT) |
 | [bitflags](https://crates.io/crates/bitflags/2.13.2) | 2.13.2 | `MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/bitflags-2.13.2/LICENSE-MIT) |
 | [bytemuck](https://crates.io/crates/bytemuck/1.25.2) | 1.25.2 | `Zlib OR Apache-2.0 OR MIT` | `MIT` | [LICENSE-MIT](third_party/licenses/bytemuck-1.25.2/LICENSE-MIT) |
@@ -26,7 +26,7 @@ Exact locked package archives (including MPL source) are available from the vers
 | [dtoa-short](https://crates.io/crates/dtoa-short/0.3.5) | 0.3.5 | `MPL-2.0` | `MPL-2.0` | [LICENSE](third_party/licenses/dtoa-short-0.3.5/LICENSE) |
 | [ego-tree](https://crates.io/crates/ego-tree/0.11.0) | 0.11.0 | `ISC` | `ISC` | [LICENSE](third_party/licenses/ego-tree-0.11.0/LICENSE) |
 | [fastrand](https://crates.io/crates/fastrand/2.5.0) | 2.5.0 | `Apache-2.0 OR MIT` | `MIT` | [LICENSE-MIT](third_party/licenses/fastrand-2.5.0/LICENSE-MIT) |
-| [fdeflate](https://crates.io/crates/fdeflate/0.3.7) | 0.3.7 | `MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/fdeflate-0.3.7/LICENSE-MIT) |
+| [fdeflate](https://crates.io/crates/fdeflate/0.3.7) | 0.3.7 | `MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/fdeflate-0.3.7/LICENSE-MIT) + [SOURCE-NOTICE.txt](third_party/licenses/fdeflate-0.3.7/SOURCE-NOTICE.txt) |
 | [flate2](https://crates.io/crates/flate2/1.1.10) | 1.1.10 | `MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/flate2-1.1.10/LICENSE-MIT) |
 | [form_urlencoded](https://crates.io/crates/form_urlencoded/1.2.2) | 1.2.2 | `MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/form_urlencoded-1.2.2/LICENSE-MIT) |
 | [html5ever](https://crates.io/crates/html5ever/0.39.0) | 0.39.0 | `MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/html5ever-0.39.0/LICENSE-MIT) |
@@ -77,9 +77,9 @@ Exact locked package archives (including MPL source) are available from the vers
 | [serde_core](https://crates.io/crates/serde_core/1.0.229) | 1.0.229 | `MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/serde_core-1.0.229/LICENSE-MIT) |
 | [serde_derive](https://crates.io/crates/serde_derive/1.0.229) | 1.0.229 | `MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/serde_derive-1.0.229/LICENSE-MIT) |
 | [serde_json](https://crates.io/crates/serde_json/1.0.151) | 1.0.151 | `MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/serde_json-1.0.151/LICENSE-MIT) |
-| [servo_arc](https://crates.io/crates/servo_arc/0.4.3) | 0.4.3 | `MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/servo_arc-0.4.3/LICENSE-MIT) |
+| [servo_arc](https://crates.io/crates/servo_arc/0.4.3) | 0.4.3 | `MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/servo_arc-0.4.3/LICENSE-MIT) + [SOURCE-NOTICE.txt](third_party/licenses/servo_arc-0.4.3/SOURCE-NOTICE.txt) |
 | [simd-adler32](https://crates.io/crates/simd-adler32/0.3.10) | 0.3.10 | `MIT` | `MIT` | [LICENSE.md](third_party/licenses/simd-adler32-0.3.10/LICENSE.md) |
-| [siphasher](https://crates.io/crates/siphasher/1.0.4) | 1.0.4 | `MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/siphasher-1.0.4/LICENSE-MIT) |
+| [siphasher](https://crates.io/crates/siphasher/1.0.4) | 1.0.4 | `MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/siphasher-1.0.4/LICENSE-MIT) + [COPYING](third_party/licenses/siphasher-1.0.4/COPYING) |
 | [smallvec](https://crates.io/crates/smallvec/1.16.3) | 1.16.3 | `MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/smallvec-1.16.3/LICENSE-MIT) |
 | [stable_deref_trait](https://crates.io/crates/stable_deref_trait/1.2.1) | 1.2.1 | `MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/stable_deref_trait-1.2.1/LICENSE-MIT) |
 | [string_cache](https://crates.io/crates/string_cache/0.9.0) | 0.9.0 | `MIT OR Apache-2.0` | `MIT` | [LICENSE-MIT](third_party/licenses/string_cache-0.9.0/LICENSE-MIT) |
@@ -106,6 +106,8 @@ Exact locked package archives (including MPL source) are available from the vers
 | [zmij](https://crates.io/crates/zmij/1.0.23) | 1.0.23 | `MIT` | `MIT` | [LICENSE-MIT](third_party/licenses/zmij-1.0.23/LICENSE-MIT) |
 | [zune-core](https://crates.io/crates/zune-core/0.5.3) | 0.5.3 | `MIT OR Apache-2.0 OR Zlib` | `MIT` | [LICENSE-MIT](third_party/licenses/zune-core-0.5.3/LICENSE-MIT) |
 | [zune-jpeg](https://crates.io/crates/zune-jpeg/0.5.15) | 0.5.15 | `MIT OR Apache-2.0 OR Zlib` | `MIT` | [LICENSE-MIT](third_party/licenses/zune-jpeg-0.5.15/LICENSE-MIT) |
+
+Additional source attribution is preserved in `servo_arc`'s source notice, `siphasher`'s COPYING and `adler2`'s 0BSD notice alongside their unmodified MIT texts. The locked `fdeflate` and Serde packages supply MIT grants without copyright-holder/year lines; their bundled grants are verbatim, with versioned source available above. Do not invent copyright statements absent from the upstream archive.
 
 `chromatic-client` has no external crate dependencies. `chromatic-ffi` depends only on that project crate. Both are project-authored and licensed GPL-3.0-only.
 

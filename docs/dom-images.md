@@ -13,7 +13,7 @@ Search `dom`, open **Pocket DOM: text, links and images**, then move through its
 
 The manifest declares a corpus root relative to the manifest and registers each HTTPS source URL, local HTML filename and referenced image-to-file mapping. Paths must be relative without parent traversal; canonical files must remain inside the declared root. Files are loaded only at startup. Document IDs remain stable for that immutable process corpus. The API never accepts a client-provided file path or destination URL.
 
-Active elements and hidden content are ignored. HTML entities and inline spacing are preserved; headings, paragraphs, lists, `pre`, quotations and image captions become ordered scenes. Links preserve their label and complete resolved URL; A opens a target only when that URL is registered in the same collection. Other links are shown as uncollected sources. Navigation keeps at most four temporary back entries, cleared when starting a new search or leaving the reader. No bookmarks, persisted history or restored reading position are added.
+Active elements and selected hidden markers (`hidden`, `aria-hidden="true"`, simple inline `display:none`) are ignored. Class rules, external stylesheets and computed CSS visibility are not evaluated. HTML entities and inline spacing are preserved; headings, paragraphs, lists, `pre`, quotations and image captions become ordered scenes. Links preserve their label and complete resolved URL; A opens a target only when that URL is registered in the same collection. Other links are shown as uncollected sources. Navigation keeps at most four temporary back entries, cleared when starting a new search or leaving the reader. No bookmarks, persisted history or restored reading position are added.
 
 Each text scene uses the existing seven-row profile. An image has one caption row; longer alt text continues on following caption pages. Unsupported images produce visible alt-text placeholders. Unsupported scripts, CSS, video and dynamic-site behavior are not emulated.
 
@@ -27,7 +27,7 @@ Each text scene uses the existing seven-row profile. An image has one caption ro
 | Images / links | <=8 image references and <=32 links per HTML document |
 | Image source | PNG or JPEG only; <=2 MiB, each dimension <=4,096 and <=4,194,304 pixels |
 | Decoder allocation allowance | 32 MiB during host decoding; this is not a whole-process memory cap |
-| Prepared image | <=128 × 80, aspect ratio retained; alpha composited onto white; RGB565 little-endian |
+| Prepared image | <=128 × 80, aspect ratio retained without upscaling; alpha composited onto white; RGB565 little-endian |
 | Prepared image collection | <=8 MiB of retained pixel/preview data |
 
 Preparation occurs on the host at startup. These byte/node/dimension limits are not a parser or codec execution-time sandbox. Network fetching and its DNS/redirect/robots safeguards remain separate pending work.
@@ -66,7 +66,7 @@ Rust validates each header, length, dimensions and CRC without allocating; its 1
 
 The native worker and GUI each retain a bounded stripe reply. The worker waits for GUI consumption before publishing another stripe. A missed consumption deadline preserves the pending buffer and marks it failed rather than overwriting unread pixels. The GUI allocates one image cache only after a valid first stripe and displays it only after complete validated receipt. That temporary cache is at most **20,480 bytes**, in addition to the **15,360-byte LVGL draw band**, network/TLS/task buffers and the retained <=512-byte scene. It is released on page change, cancellation, error or menu transition.
 
-The native worker uses a 10 KiB task stack and cooperative cancellation checks between stages/reads; clock and blocking socket calls retain their existing timeouts. A new request may wait for the old worker's safe cleanup. This is not asynchronous TLS-task destruction or a guarantee of an immediate cancellation deadline.
+The native worker uses a 10 KiB task stack and cooperative cancellation checks between stages/reads. Native clock state is polled in 200 ms slices up to the 20-second synchronization limit; blocking socket calls retain their existing timeouts. A new request may wait for the old worker's safe cleanup. This is not asynchronous TLS-task destruction or a guarantee of an immediate cancellation deadline.
 
 ## Physical verification — 2026-10-10
 

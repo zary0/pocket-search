@@ -759,5 +759,21 @@
         "frame_source": "browser-ui-preview-not-physical"
       }
     ]
+  },
+  "companion_preparer_revision": {
+    "metadata_limits_applied_before_decoder_creation": true,
+    "avoids_duplicate_metadata_parsing": true,
+    "avoids_upscaling_small_images": true,
+    "original_native_sample_streams_byte_identical": true,
+    "streams": {
+      "2": {
+        "bytes": 11152,
+        "sha256": "53efc7b48ab0bf80475ca604ab10c54264d4418544cfede91d7601addb57d790"
+      },
+      "7": {
+        "bytes": 20720,
+        "sha256": "adf6e7419576e1606683de0fb9a6f8d75d43c1ac89dc527437c03d625258482d"
+      }
+    }
   }
 }
