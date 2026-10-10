@@ -20,11 +20,13 @@ Dependency source is downloaded by Cargo rather than vendored here. The companio
 | [unicode-ident](https://github.com/dtolnay/unicode-ident) | 1.0.26 | `(MIT OR Apache-2.0) AND Unicode-3.0` | Build-time procedural macro | [MIT](third_party/licenses/unicode-ident-1.0.26/LICENSE-MIT) + [Unicode](third_party/licenses/unicode-ident-1.0.26/LICENSE-UNICODE) |
 | [zmij](https://github.com/dtolnay/zmij) | 1.0.23 | `MIT` | Companion dependency | [MIT](third_party/licenses/zmij-1.0.23/LICENSE-MIT) |
 
+The locked Serde packages (`serde`, `serde_core`, and `serde_derive`) share the upstream [MIT text at source commit 7fc3b4c30c94f73a96ebd1553f2b090d928fc3a8](https://github.com/serde-rs/serde/blob/7fc3b4c30c94f73a96ebd1553f2b090d928fc3a8/LICENSE-MIT). That text starts with the permission grant and supplies no copyright-holder/year line; the bundled copies preserve it verbatim rather than inserting an unverified attribution.
+
 `chromatic-client` has no external crate dependencies. It is project-authored and licensed GPL-3.0-only.
 
 ## ModRetro display transport
 
-The QSPI settings, framebuffer addressing, and display initialization sequence in `devices/chromatic/components/pocket_band_display` follow the ModRetro Chromatic MCU transport at [commit 63ed3b62b16768ad2415c9e3b865b438ca40fcc6](https://github.com/ModRetro/oss-chromatic-console-mcu/tree/63ed3b62b16768ad2415c9e3b865b438ca40fcc6), whose [license](https://github.com/ModRetro/oss-chromatic-console-mcu/blob/63ed3b62b16768ad2415c9e3b865b438ca40fcc6/LICENSE) is GNU GPL v3. Pocket Search's bounded band driver replaces the full-frame buffering and transaction handling; its source and modifications are GPL-3.0-only. Preserve applicable upstream notices when importing further code.
+The QSPI transaction settings and framebuffer addressing in `devices/chromatic/components/pocket_band_display` follow the ModRetro Chromatic MCU transport at [commit 63ed3b62b16768ad2415c9e3b865b438ca40fcc6](https://github.com/ModRetro/oss-chromatic-console-mcu/tree/63ed3b62b16768ad2415c9e3b865b438ca40fcc6), whose [license](https://github.com/ModRetro/oss-chromatic-console-mcu/blob/63ed3b62b16768ad2415c9e3b865b438ca40fcc6/LICENSE) is GNU GPL v3. Pocket Search's bounded band driver replaces the full-frame buffering and transaction handling; its source and modifications are GPL-3.0-only. Preserve applicable upstream notices when importing further code.
 
 No official firmware binary, FPGA image, commercial game, device backup, or third-party font is included. ModRetro and Chromatic identify the target device; the project is independent of ModRetro.
 

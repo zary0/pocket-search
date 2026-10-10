@@ -56,6 +56,8 @@ gh api repos/zary0/pocket-search/branches/main/protection
 gh api repos/zary0/pocket-search/codeowners/errors
 ```
 
+If the repository remains private on a paid plan, check eligibility for each security feature separately; branch-protection availability does not establish that scanning/reporting features are available.
+
 In repository **Settings → Security and quality**, enable/confirm Dependabot alerts and security updates, repository secret scanning, repository push protection, and private vulnerability reporting. Public repositories have free secret-scanning coverage; explicitly verify repository-level controls rather than relying on a contributor's account-level push protection. See [secret scanning](https://docs.github.com/en/code-security/how-tos/secure-your-secrets/detect-secret-leaks/enable-secret-scanning) and [push protection](https://docs.github.com/en/code-security/concepts/secret-security/about-push-protection).
 
 Verify the repository's `security_and_analysis` settings and that **Security → Report a vulnerability** appears. Then update [SECURITY.md](../SECURITY.md), the README, and this status table to the verified state and preferred reporting link. Never describe planned controls as enabled. Do not publish test secrets to check detection.
