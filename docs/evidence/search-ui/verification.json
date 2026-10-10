@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "execution_mode": "physical-mcu-ui-with-synthetic-input",
+  "frame_source": "physical-mcu-render-buffer-over-usb",
+  "physical_buttons_tested": false,
+  "panel_scanout_tested": false,
+  "search_transport_connected": false,
+  "application_version": "0.13.9-search-ui",
+  "application_sha256": "3ed3d84fef988fa4c87fc0c31fad338c876c59fa8e1aac63639c91cf74c26ecf",
+  "application_sha256_provenance": "installation-readback-report",
+  "wifi_state": "connecting",
+  "display": {
+    "visible": true,
+    "heap": 126472,
+    "gui": true
+  },
+  "states": {
+    "initial_home": {
+      "mode": 0,
+      "query_bytes": 0,
+      "transport_connected": false
+    },
+    "kana_keyboard": {
+      "mode": 1,
+      "query_bytes": 0,
+      "transport_connected": false
+    },
+    "submission": {
+      "mode": 2,
+      "query_bytes": 3,
+      "transport_connected": false
+    },
+    "final_home": {
+      "mode": 0,
+      "query_bytes": 0,
+      "transport_connected": false
+    }
+  },
+  "captures": [
+    {
+      "file": "native-home.png",
+      "sha256": "bffa230c023fee5c3ea86582eacd23372024963ba91cbacbd766242d7fc8b1a6",
+      "rgb565_sha256": "bb34de325f4f132d037cb9260e75457347c3847001f599850e1cc1652e8e05fb"
+    },
+    {
+      "file": "native-kana.png",
+      "sha256": "b495c2e9aa8c02ae84f81b84fc6d19ad2c849f1d055832ae095668ae7a9a3a09",
+      "rgb565_sha256": "268b4abf3fe017bee19919aecbf8e3d40bce6e8ec7f7438238390affba950797"
+    },
+    {
+      "file": "native-notice.png",
+      "sha256": "dc1357ba74f560b03fdd4ad4bcce1886035848b968cf6aaf8360bfafd271bae2",
+      "rgb565_sha256": "0f34a0f964fc631ab8cf79b3471fc402226a598a0dd1e6218569bde789bfa10b"
+    },
+    {
+      "file": "native-home-final.png",
+      "sha256": "bffa230c023fee5c3ea86582eacd23372024963ba91cbacbd766242d7fc8b1a6",
+      "rgb565_sha256": "bb34de325f4f132d037cb9260e75457347c3847001f599850e1cc1652e8e05fb"
+    }
+  ],
+  "installation": {
+    "application_sha256": "3ed3d84fef988fa4c87fc0c31fad338c876c59fa8e1aac63639c91cf74c26ecf",
+    "application_bytes": 1851760,
+    "application_readback_verified": true,
+    "previous_application_verified": true,
+    "partition_table_verified_unchanged": true,
+    "nvs_preserved": true,
+    "original_recovery_backup_verified": true,
+    "bootloader_modified": false,
+    "fpga_modified": false,
+    "efuse_modified": false
+  },
+  "operator_observation": {
+    "source": "user-report",
+    "white_search_home_visible": true,
+    "physical_a_opens_input": true,
+    "remaining_physical_controls_tested": false
+  },
+  "source_files": {
+    "devices/chromatic/components/pocket_search_ui/CMakeLists.txt": "c4e9f80a5c6e7292dfe40018d250e6ecf22dafbece10c8aeb5111b0902cbe677",
+    "devices/chromatic/components/pocket_search_ui/pocket_search_input.h": "8f9fd9712e962b2b7da98854ad33564cac110f5110a6a90036d94fe6edac642c",
+    "devices/chromatic/components/pocket_search_ui/pocket_search_ui.c": "610409fcb7ac9eebf3bc714a98f493ed54974127d1dbf1f6f2961bfb1fce3dd0",
+    "devices/chromatic/components/pocket_search_ui/pocket_search_ui.h": "f67f6da562553c72d7488751deb5e3b80ab54fbffb3e71f6b8427104001c5076"
+  }
+}

@@ -30,7 +30,7 @@ The handheld owns the interaction and display. A companion service on a computer
 | Crawler / extractor | None | Bounded HTTPS fetching, robots.txt, HTML extraction, collection timestamps |
 | Index / ranking | In-memory inverted index, BM25-style ranking, English words and Japanese character/bigram tokens | Persistent corpus, updates, deduplication, quality evaluation |
 | Companion API | Host-side PCS1 text packet encoder | HTTP routes, corpus identity, deployment, real content |
-| Device client | `no_std` decoder and button actions | Xtensa build, firmware adapter, Wi-Fi transport, input UI, font rendering, physical tests |
+| Device client | `no_std` decoder/button actions on the host; separate C/LVGL search home and bounded keyboard prototype | Rust Xtensa build, decoder/transport integration, results/reader, physical search E2E |
 | Images | Proposed 128 × 80 RGB565 stripe budget | Fetching, resizing, stripe protocol, display and heap measurements |
 
 ## Designed for the handheld
@@ -52,7 +52,7 @@ The handheld owns the interaction and display. A companion service on a computer
 | Start | Query entry | Query entry |
 | Select | Home | Home |
 
-These actions are implemented in the client core, not yet connected to physical button events. The query keyboard is pending; English and Japanese input remain in scope.
+These result/reader actions are implemented in the client core but are not connected to a physical search flow. A separate native C UI provides the search home and a bounded hiragana/Latin keyboard; its search service remains unconnected. See [search UI status](docs/search-ui.md) and the [browser preview](ui/README.md).
 
 ## Runtime and development environment
 
