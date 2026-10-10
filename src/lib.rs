@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
 pub mod chromatic;
+pub mod crawler;
 pub mod dom;
 pub mod server;
 
@@ -29,7 +30,20 @@ pub struct SearchHit {
     pub score: f64,
 }
 
+#[derive(Clone)]
+pub struct Collection {
+    pub sample: bool,
+    pub label: String,
+    pub generation: String,
+}
+#[derive(Clone, Serialize)]
+pub struct Provenance {
+    pub fetched_at: u64,
+    pub source_sha256: String,
+}
 pub struct SearchIndex {
+    pub(crate) collection: Collection,
+    pub(crate) provenance: BTreeMap<usize, Provenance>,
     documents: Vec<Document>,
     postings: BTreeMap<String, Vec<Posting>>,
     lengths: Vec<f64>,
@@ -106,6 +120,12 @@ impl SearchIndex {
         }
         let average_length = (lengths.iter().sum::<f64>() / documents.len().max(1) as f64).max(1.0);
         Self {
+            collection: Collection {
+                sample: true,
+                label: "Original sample collection · 2026-10-10".into(),
+                generation: "original-samples-v1".into(),
+            },
+            provenance: BTreeMap::new(),
             documents,
             postings,
             lengths,

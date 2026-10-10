@@ -22,31 +22,31 @@ The 24-cell row profile treats ASCII as one cell and other Unicode as two. It is
 
 ## Companion responsibilities
 
-The companion owns collection, HTML extraction, ranking, source metadata, and image preparation. The current host code implements an in-memory inverted index, Japanese/English tokenization, BM25-style scoring, and packet formatting. It reads JSON fixtures and registered local HTML/PNG/JPEG files. HTML5 parsing produces semantic reading scenes; it exposes bounded read-only HTTP routes but does not fetch websites.
+The companion owns collection, HTML extraction, ranking, source metadata, and image preparation. The current host code implements an in-memory inverted index, Japanese/English tokenization, BM25-style scoring, and packet formatting. It reads JSON fixtures, registered local files, or an immutable snapshot produced by the separate bounded public-HTTPS crawler. HTML5 parsing produces semantic reading scenes. Search-serving routes never fetch an arbitrary URL.
 
-The device receives one result per response, up to ten ranked results. Each result references a document through a numeric ID. IDs are currently one-based positions in the loaded corpus. A service must keep that corpus immutable while a client uses its IDs. Persistent storage and a corpus-generation token must be added before live index replacement, preventing an ID from opening an unrelated document after a rebuild.
+The device receives one result per response, up to ten ranked results. Each result references a document through a numeric ID. IDs are currently one-based positions in the loaded corpus. A service must keep that corpus immutable while a client uses its IDs. Collected snapshots are stored with source/time/hash records and a generation token. Reader/image requests bind to that generation; mismatches fail with HTTP 409. Durable cross-snapshot storage and live replacement remain pending.
 
 Bodies are split into seven-row pages. Titles can be shortened with an ellipsis; result excerpts can be shortened with an instruction to open the full page. Full bodies remain on the host and are paginated rather than silently discarded. Full source URLs stay on the host; a source/details action is needed to inspect URLs too long for a result screen.
 
 ## Experimental service routes
 
-`src/server.rs` uses a small standard-library HTTP service with four workers and eight queued sockets. It serves one immutable sample corpus:
+`src/server.rs` uses a small standard-library HTTP service with four workers and eight queued sockets. It serves one immutable sample or collected corpus:
 
 - `GET /v1/chromatic/search?q=...&result=0`: one PCS1 result packet.
 - `GET /v1/chromatic/page?id=...&page=0`: one PCS1 reader packet.
 - `GET /v1/search?q=...`: up to ten JSON results for the companion browser.
-- `GET /v1/collection`: the sample collection label and count.
+- `GET /v1/collection`: the collection label, sample flag, generation and count.
 - `GET /v1/dom?id=...&page=...`: bounded semantic scene metadata.
 - `GET /v1/chromatic/image?id=...&page=...`: validated RGB565 stripes for a registered image scene.
 - `GET /v1/image?id=...&page=...`: the same quantized pixels as a prepared PNG.
 
-Reject queries longer than 96 UTF-8 bytes and unknown document/page IDs. Use explicit content lengths, bounded request/response times, and no query/body logging. A zero-result packet has document ID zero and cannot open an invented document. Collection metadata is currently a fixed sample label. Corpus generation and collected-page provenance must be added before live updates. See [API limits](search-results.md). This protocol is not Google search or a general-purpose HTML browser.
+Reject queries longer than 96 UTF-8 bytes and unknown document/page IDs. Use explicit content lengths, bounded request/response times, and no query/body logging. A zero-result packet has document ID zero and cannot open an invented document. Collection metadata identifies fixtures or collected pages, and DOM metadata includes collected-source provenance. No hot reload or live index replacement is implemented. See [API limits](search-results.md). This protocol is not Google search or a general-purpose HTML browser.
 
-## Planned public-page collection
+## Bounded public-page collection
 
 Use explicit seed URLs and domains, obey robots.txt, and cap page count, depth, response bytes, timeouts, and per-host frequency. Fetch public HTTPS pages with certificate verification. Validate resolved addresses, pin the approved destination, and validate redirects before following them. Exclude private/local destinations and authenticated content.
 
-Extract title, source URL, body, links, image references, and collection time. Render extracted content as data. Do not execute page scripts on the handheld or invent content for unsupported sites. Crawling and network boundary tests remain pending.
+Extract title, source URL, body, links, image references, and collection time. Render extracted content as data. Do not execute page scripts on the handheld or invent content for unsupported sites. The CLI collector and mocked boundary tests are implemented; public-web scope and operational limits are described in [crawling](crawling.md). Actual adversarial network acceptance, durable frontier/storage and unattended operation remain pending.
 
 ## Image path
 

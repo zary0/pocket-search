@@ -3,9 +3,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
+#include "pocket_search_collection.h"
 #define PS_IMAGE_PACKET_BYTES 2072
 #define PS_IMAGE_CACHE_BYTES 20480
 #define PS_IMAGE_WIRE_BYTES 20720
+enum { PS_NET_STALE_COLLECTION = 11 };
 
 typedef struct {uint16_t offset,length;} PS_Text;
 typedef struct {uint32_t document_id;uint16_t page_index,page_count;uint8_t kind,line_count;uint16_t reserved;PS_Text title,lines[7];uint32_t link_target;} PS_View;
@@ -14,8 +16,8 @@ typedef struct {uint32_t document_id;uint16_t page_index,width,height,y,rows,pix
 _Static_assert(sizeof(PS_ImageView)==20,"Rust/C image ABI mismatch");
 int32_t ps_packet_decode(const uint8_t *bytes,size_t length,PS_View *out);
 int32_t ps_image_decode(const uint8_t *bytes,size_t length,PS_ImageView *out);
-typedef struct {unsigned sequence;uint8_t kind;uint32_t document;uint16_t page;char query[97];} PS_Request;
-typedef struct {unsigned sequence;int error,http_status;unsigned elapsed_ms,wire_bytes,heap_before,minimum_free_heap_bytes,largest_free_block_bytes,stack_hwm;bool tls_verified,clock_synced,finished;size_t length;uint8_t bytes[PS_IMAGE_PACKET_BYTES];} PS_Reply;
+typedef struct {unsigned sequence;uint8_t kind;uint32_t document;uint16_t page;char query[97],generation[PS_GENERATION_BYTES];} PS_Request;
+typedef struct {unsigned sequence;int error,http_status;unsigned elapsed_ms,wire_bytes,heap_before,minimum_free_heap_bytes,largest_free_block_bytes,stack_hwm;bool tls_verified,clock_synced,finished,sample;char generation[PS_GENERATION_BYTES];size_t length;uint8_t bytes[PS_IMAGE_PACKET_BYTES];} PS_Reply;
 bool PS_NetStart(const PS_Request *request);
 bool PS_NetPoll(PS_Reply *reply);
 bool PS_NetConfigured(void);

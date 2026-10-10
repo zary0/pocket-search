@@ -61,9 +61,10 @@ P0 uses controlled fixtures to prove integration. It must not be presented as se
 
 ## P1 — Real web content and book text
 
-- [ ] Add a public-HTTPS crawler/extractor for explicit seeds and allowed domains. Respect robots.txt; bound page count, depth, bytes, parsing time, redirects, and per-host request rate; validate destinations before fetching.
-- [ ] Collect actual public pages and collection time. Registered local HTML now provides title, complete extracted text, source URL, links and image references; live-page acquisition/provenance remains pending. Do not execute fetched scripts or substitute invented content for unsupported sites.
-- [ ] Add deduplication, persistence, and corpus-generation checks before live index replacement so a result ID cannot open an unrelated document.
+- [x] Add a bounded public-HTTPS crawler/extractor for explicit seeds with public-web or exact-domain scope. Respect robots.txt; bound page count, depth, bytes, parsing time, redirects, and per-host request rate; validate destinations before fetching.
+- [x] Collect bounded public pages with source URL, collection time, SHA-256 records, extracted text/links and protected PNG/JPEG preparation. Live host acquisition is verified on Example Domain, IANA and W3C, including two prepared source images; physical real-page acceptance remains pending. Do not execute fetched scripts or substitute invented content for unsupported sites.
+- [x] Add within-run deduplication, immutable snapshot persistence and generation checks so collected reader IDs fail on a mismatched collection.
+- [ ] Add a durable cross-domain frontier, cross-run deduplication, partitioned corpus/index storage, automatic resumption and incremental updates; current snapshots are capped at 16 pages and never hot-reloaded.
 - [ ] Add a bounded source/details view for complete URLs and collection information that do not fit a result screen.
 - [ ] Import user-provided or redistributable plain-text books into the companion, with bounded file/page sizes and source metadata. Reuse the reader; device requests refer to registered document IDs rather than arbitrary filesystem paths.
 - [ ] Make Japanese query entry usable and verify input, wrapping, glyph fallback, and complete reading against actual Japanese content.
@@ -73,14 +74,14 @@ P0 uses controlled fixtures to prove integration. It must not be presented as se
 
 ## P2 — Source images
 
-- [ ] Fetch registered images referenced by collected documents, applying the crawler's origin/redirect/size protections, and resize them on the companion.
+- [x] Fetch registered images referenced by collected documents, applying the crawler's origin/redirect/size protections, and resize them on the companion.
 - [x] Define and implement PCI1 RGB565 stripes, CRC/order/document/page validation, cooperative cancellation and incomplete-transfer rejection for an image up to 128 × 80 pixels.
 - [x] Display registered image stripes through LVGL and the bounded band driver using one temporary <=20 KiB image cache; release it when leaving the image.
 - [ ] Display an actual source image and return to text with B; measure TLS-active peak memory, responsiveness, and interrupted-transfer recovery.
 
 **Completion:** an image from the selected source displays correctly on the physical console within the measured memory budget, and failure/back navigation works.
 
-Registered local PNG/JPEG resizing and two original source images have native Wi-Fi/render-buffer verification; see [DOM/image evidence](dom-images.md). Actual network collection, physical interruption acceptance and TLS allocator peak tracing remain pending.
+Registered local PNG/JPEG resizing and two original source images have native Wi-Fi/render-buffer verification; see [DOM/image evidence](dom-images.md). Live network collection and image preparation are now verified on the host; physical source-image/interruption acceptance and TLS allocator peak tracing remain pending.
 
 ## P3 — Quality and measured improvements
 
@@ -103,4 +104,4 @@ The [search-first UI](search-ui.md) now connects to the bounded API and Xtensa R
 - [x] Physical C/LVGL rendering measurements, 16/48-row display transports, and an opt-in graphics compiler experiment. These do not verify the reader or native Wi-Fi search.
 - [x] `develop` → `main` → annotated `vX.Y.Z` version/package policy and CI/CD orchestration requiring physical evidence before release.
 
-The complete reproducible application, collected real-web corpus, and qualified physical search E2E are still pending; the experimental sample API/reader loop is implemented. Keep [implementation status](../README.md) accurate as each acceptance boundary is met.
+The complete reproducible application and qualified physical search E2E are still pending; the sample API/reader loop and a bounded real-web snapshot collector are implemented. Keep [implementation status](../README.md) accurate as each acceptance boundary is met.
