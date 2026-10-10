@@ -2672,10 +2672,6 @@
       {
         "path": "third_party/licenses/windows-sys-0.52.0/license-mit",
         "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
-      },
-      {
-        "path": "third_party/licenses/windows-sys-0.52.0/src/Windows/Win32/Security/LicenseProtection/mod.rs",
-        "sha256": "17a51f78e1ad133a82c098466abbd1028f852853c98a7d606dda18a2509b9099"
       }
     ]
   },
@@ -2694,10 +2690,6 @@
       {
         "path": "third_party/licenses/windows-sys-0.61.2/license-mit",
         "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383"
-      },
-      {
-        "path": "third_party/licenses/windows-sys-0.61.2/src/Windows/Win32/Security/LicenseProtection/mod.rs",
-        "sha256": "a48ff77be5dd144f696440880d34a8b4d9ac89f6c2a31cf45fe9cfa137f14a7f"
       }
     ]
   },
