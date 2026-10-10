@@ -24,6 +24,11 @@ jobs:
           /tmp/test-band-plan
           cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -DPOCKET_BAND_ROWS=48 tests/test_band_plan.c -o /tmp/test-band-plan48
           /tmp/test-band-plan48
+      - name: Check bounded search input
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined tests/test_search_input.c -o /tmp/test-search-input
+          /tmp/test-search-input
+          node --test tests/test_search_input.mjs
       - run: cargo fmt --all --check
       - run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - run: cargo test --locked --workspace

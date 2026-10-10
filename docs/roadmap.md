@@ -91,6 +91,8 @@ Bookmarks, browsing history, launch-time reading restoration, and the Codex appr
 
 ## Completed enablers — not product completion
 
+The [search-first UI](search-ui.md) now has a browser preview and separate native C home/input prototype. API/Rust decoder/reader integration and physical search acceptance remain P0 work.
+
 - [x] Chromatic-first MCU/service architecture, English documentation, and GPL-3.0-only contribution/security guidance.
 - [x] Rust search/ranking, bounded text encoding, allocation-free `no_std` decoding, and button action mapping with host validation.
 - [x] Repeatable host timing/allocation measurements and compact bounded search selection.

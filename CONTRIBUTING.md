@@ -11,6 +11,9 @@ Prefer measured changes with a clear behavior or resource benefit. Do not trade 
 ## Checks
 
 ```sh
+node --test tests/test_search_input.mjs
+cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined tests/test_search_input.c -o /tmp/test-search-input
+/tmp/test-search-input
 cargo fmt --all --check
 cargo clippy --locked --workspace --all-targets -- -D warnings
 cargo test --locked --workspace
