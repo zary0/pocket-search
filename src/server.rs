@@ -152,6 +152,10 @@ pub fn route(index: &SearchIndex, method: &str, target: &str) -> Response {
             "text/javascript; charset=utf-8",
             include_bytes!("../ui/input.mjs").as_slice(),
         )),
+        "/feedback.mjs" => Some((
+            "text/javascript; charset=utf-8",
+            include_bytes!("../ui/feedback.mjs").as_slice(),
+        )),
         "/images.mjs" => Some((
             "text/javascript; charset=utf-8",
             include_bytes!("../ui/images.mjs").as_slice(),
