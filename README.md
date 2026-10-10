@@ -19,22 +19,23 @@ Chromatic MCU
   buttons → local Rust ranking → local reader pagination → 160 × 144 LCD
 ```
 
-Rust owns the restricted link frontier, text extraction, fixed-capacity term/document masks, ranking and PCS1 formatting. The existing ESP-IDF adapter owns HTTPS, cancellation, Wi-Fi and the display. Collection happens on the first submitted query after boot or a refresh. Later searches and reader navigation open no sockets; they use the device's retained collection, even if Wi-Fi is temporarily unavailable. Restart discards that RAM index and the next search collects again.
+Rust owns the restricted link frontier, text extraction, fixed-capacity term/document masks, ranking, PCS1 results and PSR1 styled reader formatting. The existing ESP-IDF adapter owns HTTPS, cancellation, Wi-Fi and the display. Collection happens on the first submitted query after boot or a refresh. Later searches and reader navigation open no sockets; they use the device's retained collection, even if Wi-Fi is temporarily unavailable. Restart discards that RAM index and the next search collects again.
 
 | Component | Autonomous native mode | Current limit |
 | --- | --- | --- |
 | Crawler | Direct verified HTTPS, same-profile link discovery, one request at a time, robots policy check | One fixed public host/path profile, eight frontier entries, four retained pages, 90-second collection deadline |
-| HTML extraction | Streaming text/title, basic entities, UTF-8-safe storage, script/style/comment exclusion | Compact parser, not HTML5 layout, JavaScript or CSS execution |
+| HTML extraction | Streaming text/title, basic entities, UTF-8-safe storage, headings, inline weight/size and paragraph breaks; script/style/comment exclusion | Compact parser, not HTML5 layout, JavaScript or CSS execution |
 | Index / search | Allocation-free inverted term hashes with document masks; exact matching verifies candidates; a full table falls back to bounded text scanning | 256 term slots, ASCII word matching and non-ASCII substring matching; not the host BM25/Japanese tokenizer |
-| Reader | Results, A to open, up/down line scrolling, left/right screen jumps and B to return, all generated on the MCU | 2,560 retained UTF-8 bytes per document; the last viewport visibly marks truncated text |
+| Reader | Results, A to open, up/down line scrolling, left/right screen jumps and B to return, all generated on the MCU | 2,560 retained UTF-8 bytes and 48 style transitions per document; visible text/style limit markers |
 | Images / video | Earlier companion-mode still-image experiment remains in the host tools and evidence | Autonomous image decoding/resizing and video are not implemented |
 
-See [on-device scope and verification](docs/on-device-search.md), [architecture](docs/architecture.md), and the [product roadmap](docs/roadmap.md).
+See [native typography](docs/typography.md), [on-device scope and verification](docs/on-device-search.md), [architecture](docs/architecture.md), and the [product roadmap](docs/roadmap.md).
 
 ## Designed for the handheld
 
-- **160 × 144 pixels**, a title, seven body rows and button hints.
+- **160 × 144 pixels**, a title, a 144 × 92 styled reading viewport and button hints.
 - One result per screen; every match in the admitted four-page collection is reachable.
+- Headings at **16/14 px**, body at **12 px**, annotations at **10 px**, inline bold and paragraph gaps. Up to eight variable-height rows fit each validated viewport.
 - **96-byte UTF-8 queries** and **512-byte locally generated text packets**.
 - A fixed **16 KiB opaque Rust state region**, plus a **2,049-byte robots buffer**. TLS, task stacks, fonts and the 15 KiB display band have separate costs.
 - No bookmarks, browsing history, restored reading position or Codex approval UI.
@@ -86,7 +87,7 @@ The companion admits up to 256 pages, can prepare PNG/JPEG images, and uses a ri
 
 ## Hardware evidence and limits
 
-The current on-device application is `0.13.18-scroll`, with up/down line scrolling and left/right screen jumps. The earlier `0.13.17-local` experiment established autonomous collection: With Mac services and tunnels stopped, it directly collected four public pages and returned four `AI` matches. The operator confirmed battery-only restart, query entry and A to read. One first collection took 18.241 seconds; local ranking/packet generation took 5.042 ms on the inspected console. See [measurements and acceptance limits](docs/on-device-search.md), [standalone evidence](docs/evidence/on-device-search/verification.json) and [scroll verification](docs/evidence/reader-scroll/verification.json).
+The current on-device application is `0.13.19-type`, with semantic font sizes, inline bold, paragraph spacing and up/down line scrolling. Styles are normalized for the small screen; external CSS and web fonts are not reproduced. See [typography scope and native evidence](docs/typography.md). The earlier `0.13.17-local` experiment established autonomous collection: With Mac services and tunnels stopped, it directly collected four public pages and returned four `AI` matches. The operator confirmed battery-only restart, query entry and A to read. One first collection took 18.241 seconds; local ranking/packet generation took 5.042 ms on the inspected console. See [measurements and acceptance limits](docs/on-device-search.md), [standalone evidence](docs/evidence/on-device-search/verification.json) and [scroll verification](docs/evidence/reader-scroll/verification.json).
 
 App-only installation preserves the established partition table, bootloader, FPGA and Wi-Fi settings. The index is volatile; there is no flash cache yet. The source profile, parsing and memory limits are explicit, so the application does not claim general browser support or Internet-wide search.
 

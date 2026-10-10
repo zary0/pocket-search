@@ -155,6 +155,84 @@ pub struct View {
     pub link_target: u32,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub struct RichRow {
+    pub text: Text,
+    pub styles: Text,
+    pub y: u8,
+    pub height: u8,
+    pub glyphs: u8,
+    pub reserved: u8,
+}
+#[repr(C)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub struct RichView {
+    pub document_id: u32,
+    pub position: u16,
+    pub positions: u16,
+    pub title: Text,
+    pub row_count: u8,
+    pub reserved: [u8; 3],
+    pub rows: [RichRow; chromatic_client::rich::ROWS],
+}
+/// Validate a PSR1 viewport and borrow its text/style offsets.
+/// # Safety
+/// Input owns length readable bytes; output is aligned, writable and disjoint.
+/// Keep input unchanged while any returned offsets are in use.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_rich_decode(
+    bytes: *const u8,
+    length: usize,
+    out: *mut RichView,
+) -> i32 {
+    if bytes.is_null()
+        || out.is_null()
+        || !(20..=MAX_PACKET_BYTES).contains(&length)
+        || (out as usize) % core::mem::align_of::<RichView>() != 0
+    {
+        return -1;
+    }
+    let data = unsafe { core::slice::from_raw_parts(bytes, length) };
+    let Ok(packet) = chromatic_client::rich::Packet::decode(data) else {
+        return -2;
+    };
+    let range = |b: &[u8]| Text {
+        offset: (b.as_ptr() as usize - data.as_ptr() as usize) as u16,
+        length: b.len() as u16,
+    };
+    let mut view = RichView {
+        document_id: packet.document_id,
+        position: packet.position,
+        positions: packet.positions,
+        title: range(packet.title.as_bytes()),
+        row_count: packet.row_count as u8,
+        ..RichView::default()
+    };
+    for (i, row) in packet.rows[..packet.row_count].iter().enumerate() {
+        view.rows[i] = RichRow {
+            text: range(row.text.as_bytes()),
+            styles: range(row.styles),
+            y: row.y,
+            height: row.height,
+            glyphs: row.glyphs,
+            reserved: 0,
+        };
+    }
+    unsafe { out.write(view) };
+    0
+}
+/// Original calibration viewport; does not touch the search collection.
+/// # Safety
+/// Out owns 512 writable bytes and is not concurrently accessed.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_rich_probe(out: *mut u8) -> i32 {
+    if out.is_null() {
+        return -1;
+    }
+    chromatic_client::rich::probe(unsafe { core::slice::from_raw_parts_mut(out, 512) }) as i32
+}
+
 /// Validate a PCS1 packet and return text offsets, leaving output unchanged on failure.
 ///
 /// # Safety
@@ -257,6 +335,29 @@ fn panic(_: &core::panic::PanicInfo) -> ! {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn rich_ffi_borrows_styles_and_rejects_bad_input_without_changing_output() {
+        assert_eq!(core::mem::size_of::<RichView>(), 112);
+        let mut bytes = [0; 512];
+        let mut view = RichView::default();
+        unsafe {
+            let n = ps_rich_probe(bytes.as_mut_ptr());
+            assert!(n > 0);
+            assert_eq!(ps_rich_decode(bytes.as_ptr(), n as usize, &mut view), 0);
+            assert_eq!(view.rows[0].height, 18);
+            assert_eq!(view.rows[1].height, 14);
+            let caption = view.rows.iter().find(|r| r.height == 12).unwrap();
+            assert_eq!(
+                bytes[caption.styles.offset as usize] & 15,
+                chromatic_client::rich::CAPTION
+            );
+            let prior = view;
+            bytes[4] = 2;
+            assert_eq!(ps_rich_decode(bytes.as_ptr(), n as usize, &mut view), -2);
+            assert_eq!(view, prior);
+            assert_eq!(ps_rich_decode(core::ptr::null(), n as usize, &mut view), -1);
+        }
+    }
     #[test]
     fn local_opaque_state_ffi_streaming_and_refusals() {
         #[repr(align(8))]

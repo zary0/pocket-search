@@ -5,6 +5,7 @@
 #![forbid(unsafe_code)]
 
 pub mod local;
+pub mod rich;
 
 pub const DISPLAY_WIDTH: usize = 160;
 pub const DISPLAY_HEIGHT: usize = 144;

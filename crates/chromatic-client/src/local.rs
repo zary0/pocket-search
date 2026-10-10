@@ -11,6 +11,7 @@ pub const SEED: &str = "https://www-formal.stanford.edu/jmc/whatisai/node1.html"
 const URL_BYTES: usize = 128;
 const WORDS: usize = 256;
 const FRONTIER: usize = 8;
+const STYLE_RUNS: usize = 48;
 
 #[derive(Clone, Copy)]
 struct Text<const N: usize> {
@@ -59,6 +60,9 @@ struct Document {
     body: Text<BODY_BYTES>,
     url: Text<URL_BYTES>,
     limited: u8,
+    runs: [crate::rich::Run; STYLE_RUNS],
+    run_count: u8,
+    style_limited: u8,
 }
 impl Document {
     const EMPTY: Self = Self {
@@ -66,6 +70,9 @@ impl Document {
         body: Text::EMPTY,
         url: Text::EMPTY,
         limited: 0,
+        runs: [crate::rich::Run::EMPTY; STYLE_RUNS],
+        run_count: 0,
+        style_limited: 0,
     };
 }
 
@@ -86,6 +93,9 @@ struct Parser {
     scalar: [u8; 4],
     scalar_len: u8,
     scalar_need: u8,
+    styles: [(u8, u8); 16],
+    depth: u8,
+    style: u8,
 }
 impl Parser {
     const EMPTY: Self = Self {
@@ -104,6 +114,9 @@ impl Parser {
         scalar: [0; 4],
         scalar_len: 0,
         scalar_need: 0,
+        styles: [(0, 0); 16],
+        depth: 0,
+        style: 0,
     };
 }
 
@@ -185,8 +198,193 @@ impl LocalSearch {
         let doc = &mut self.documents[self.count as usize];
         if self.parser.title != 0 {
             let _ = doc.title.push(c);
-        } else if !doc.body.push(c) {
-            doc.limited = 1;
+        } else {
+            if c.is_whitespace() && doc.body.as_str().ends_with('\n') {
+                return;
+            }
+            let before = doc.body.len;
+            if !doc.body.push(c) {
+                doc.limited = 1;
+            }
+            if doc.body.len > before {
+                let mut style = if doc.style_limited != 0 {
+                    0
+                } else {
+                    self.parser.style
+                };
+                let previous = doc
+                    .runs
+                    .get(usize::from(doc.run_count).wrapping_sub(1))
+                    .map_or(0, |r| r.style);
+                if style != previous {
+                    if usize::from(doc.run_count) >= STYLE_RUNS - 1 {
+                        doc.style_limited = 1;
+                        style = 0;
+                    }
+                    if style != previous && usize::from(doc.run_count) < STYLE_RUNS {
+                        doc.runs[usize::from(doc.run_count)] = crate::rich::Run {
+                            start: before,
+                            style,
+                        };
+                        doc.run_count += 1;
+                    }
+                }
+            }
+        }
+    }
+    fn block_break(&mut self, wanted: usize) {
+        let doc = &mut self.documents[self.count as usize];
+        while doc.body.as_str().ends_with(' ') {
+            doc.body.len -= 1;
+        }
+        while doc.run_count > 0 && doc.runs[usize::from(doc.run_count - 1)].start >= doc.body.len {
+            doc.run_count -= 1;
+        }
+        if doc.body.len == 0 {
+            return;
+        }
+        let present = doc
+            .body
+            .as_str()
+            .bytes()
+            .rev()
+            .take_while(|b| *b == b'\n')
+            .count();
+        for _ in present..wanted {
+            let n = usize::from(doc.body.len);
+            if n == BODY_BYTES {
+                doc.limited = 1;
+                break;
+            }
+            doc.body.bytes[n] = b'\n';
+            doc.body.len += 1;
+        }
+    }
+    fn style_tag(&mut self, name: &str, closing: bool, attributes: &str) {
+        let tags = [
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+            "b",
+            "strong",
+            "small",
+            "sub",
+            "sup",
+            "figcaption",
+            "aside",
+            "footer",
+            "font",
+            "span",
+            "p",
+            "div",
+            "blockquote",
+            "caption",
+        ];
+        let Some(tag) = tags
+            .iter()
+            .position(|t| name.eq_ignore_ascii_case(t))
+            .map(|n| n as u8 + 1)
+        else {
+            return;
+        };
+        let doc = &mut self.documents[self.count as usize];
+        if doc.style_limited != 0 {
+            self.parser.style = 0;
+            return;
+        }
+        if closing {
+            if let Some(n) = self.parser.styles[..usize::from(self.parser.depth)]
+                .iter()
+                .rposition(|s| s.0 == tag)
+            {
+                self.parser.style = self.parser.styles[n].1;
+                self.parser.depth = n as u8;
+            }
+            return;
+        }
+        // Legacy pages may omit </p>; a new block ends the prior paragraph.
+        if (1..=6).contains(&tag) || tag == 17 || tag == 18 {
+            if let Some(n) = self.parser.styles[..usize::from(self.parser.depth)]
+                .iter()
+                .rposition(|s| s.0 == 17)
+            {
+                self.parser.style = self.parser.styles[n].1;
+                self.parser.depth = n as u8;
+            }
+        }
+        if usize::from(self.parser.depth) == self.parser.styles.len() {
+            doc.style_limited = 1;
+            self.parser.style = 0;
+            self.parser.depth = 0;
+            return;
+        }
+        self.parser.styles[usize::from(self.parser.depth)] = (tag, self.parser.style);
+        self.parser.depth += 1;
+        use crate::rich::{BOLD, CAPTION, HEADING, SUBHEADING};
+        if tag == 1 {
+            self.parser.style = HEADING | BOLD;
+        } else if tag <= 3 {
+            self.parser.style = SUBHEADING | BOLD;
+        } else if tag <= 6 {
+            self.parser.style = BOLD;
+        } else if tag <= 8 {
+            self.parser.style |= BOLD;
+        } else if tag <= 14 || tag == 20 {
+            self.parser.style = (self.parser.style & BOLD) | CAPTION;
+        }
+        if let Some(value) = attribute(attributes, "size").filter(|_| tag == 15) {
+            self.parser.style = (self.parser.style & BOLD)
+                | match value {
+                    "1" | "-1" | "-2" => CAPTION,
+                    "4" | "+1" => SUBHEADING,
+                    "5" | "6" | "7" | "+2" | "+3" | "+4" => HEADING,
+                    _ => 0,
+                };
+        }
+        if let Some(css) = attribute(attributes, "style") {
+            for declaration in css.split(';') {
+                let Some((key, value)) = declaration.split_once(':') else {
+                    continue;
+                };
+                let key = key.trim();
+                let value = value.trim();
+                if key.eq_ignore_ascii_case("font-weight") {
+                    if value.eq_ignore_ascii_case("bold")
+                        || value.eq_ignore_ascii_case("bolder")
+                        || value.parse::<u16>().is_ok_and(|n| n >= 600)
+                    {
+                        self.parser.style |= BOLD;
+                    } else if value.eq_ignore_ascii_case("normal") || value == "400" {
+                        self.parser.style &= !BOLD;
+                    }
+                } else if key.eq_ignore_ascii_case("font-size") {
+                    let class = if value.eq_ignore_ascii_case("small")
+                        || value.eq_ignore_ascii_case("smaller")
+                    {
+                        Some(CAPTION)
+                    } else if value.eq_ignore_ascii_case("large")
+                        || value.eq_ignore_ascii_case("larger")
+                    {
+                        Some(HEADING)
+                    } else {
+                        value
+                            .strip_suffix("px")
+                            .and_then(|n| n.trim().parse::<u16>().ok())
+                            .map(|n| match n {
+                                0..=11 => CAPTION,
+                                12..=13 => 0,
+                                14..=15 => SUBHEADING,
+                                _ => HEADING,
+                            })
+                    };
+                    if let Some(class) = class {
+                        self.parser.style = (self.parser.style & BOLD) | class;
+                    }
+                }
+            }
         }
     }
     fn scalar(&mut self, b: u8) {
@@ -233,6 +431,7 @@ impl LocalSearch {
     }
     fn end_tag(&mut self) {
         if self.parser.overflow != 0 {
+            self.documents[self.count as usize].style_limited = 1;
             return;
         }
         let tag = self.parser.tag;
@@ -273,13 +472,34 @@ impl LocalSearch {
                 }
             }
         }
-        if matches_ignore_case(
-            name,
-            &[
-                "p", "br", "div", "li", "h1", "h2", "h3", "hr", "tr", "td", "title", "a",
-            ],
-        ) {
-            self.emit(' ');
+        if self.parser.skip == 0 && self.parser.head == 0 && self.parser.title == 0 {
+            if matches_ignore_case(
+                name,
+                &[
+                    "p",
+                    "h1",
+                    "h2",
+                    "h3",
+                    "h4",
+                    "h5",
+                    "h6",
+                    "blockquote",
+                    "figcaption",
+                    "aside",
+                    "footer",
+                    "caption",
+                ],
+            ) {
+                self.block_break(2);
+            } else if matches_ignore_case(
+                name,
+                &[
+                    "br", "div", "li", "hr", "tr", "td", "dt", "dd", "dl", "ul", "ol",
+                ],
+            ) {
+                self.block_break(1);
+            }
+            self.style_tag(name, closing, text);
         }
     }
     pub fn feed(&mut self, bytes: &[u8]) {
@@ -365,6 +585,11 @@ impl LocalSearch {
             return false;
         }
         self.active = 0;
+        let doc = &mut self.documents[self.count as usize];
+        doc.body.len = doc.body.as_str().trim_end().len() as u16;
+        while doc.run_count > 0 && doc.runs[usize::from(doc.run_count - 1)].start >= doc.body.len {
+            doc.run_count -= 1;
+        }
         if !complete || self.documents[self.count as usize].body.len == 0 {
             return false;
         }
@@ -486,39 +711,20 @@ impl LocalSearch {
             out,
         )
     }
-    /// One seven-row viewport. The PCS1 position is its top wrapped-text line,
-    /// so adjacent positions overlap instead of skipping an entire screen.
+    /// One styled viewport. Its position is a visual line, with both pixel and
+    /// packet budgets determining the last valid viewport.
     pub fn reader_packet(&self, id: usize, offset: usize, out: &mut [u8]) -> usize {
         if id == 0 || id > self.count() {
             return 0;
         }
         let doc = &self.documents[id - 1];
-        let count = line_count(doc.body.as_str()) + usize::from(doc.limited != 0);
-        let positions = count.saturating_sub(TEXT_ROWS) + 1;
-        if offset >= positions {
-            return 0;
-        }
-        let mut lines = [""; TEXT_ROWS];
-        let n = wrapped(doc.body.as_str(), &mut lines, offset);
-        if doc.limited != 0 && offset + 1 == positions && n < TEXT_ROWS {
-            lines[n] = "[Text limit reached]";
-            return packet(
-                2,
-                id as u32,
-                offset,
-                positions,
-                doc.title.as_str(),
-                &lines[..n + 1],
-                out,
-            );
-        }
-        packet(
-            2,
-            id as u32,
-            offset,
-            positions,
+        crate::rich::encode(
+            id,
             doc.title.as_str(),
-            &lines[..n],
+            doc.body.as_str(),
+            &doc.runs[..usize::from(doc.run_count)],
+            u8::from(doc.limited != 0) | (u8::from(doc.style_limited != 0) << 1),
+            offset,
             out,
         )
     }
@@ -626,6 +832,9 @@ fn take_line(text: &str) -> (&str, &str) {
     let mut end = 0;
     let mut space = None;
     for (at, c) in text.char_indices() {
+        if c == '\n' {
+            return (&text[..at], text[at..].trim_start());
+        }
         let width = if c.is_ascii() { 1 } else { 2 };
         if columns + width > TEXT_COLUMNS {
             break;
@@ -643,13 +852,8 @@ fn take_line(text: &str) -> (&str, &str) {
     }
     (&text[..end], text[end..].trim_start())
 }
-fn line_count(mut text: &str) -> usize {
-    let mut n = 0;
-    while !text.is_empty() {
-        text = take_line(text).1;
-        n += 1;
-    }
-    n
+pub(crate) fn short_title(text: &str) -> &str {
+    take_line(text).0
 }
 fn wrapped<'a>(mut text: &'a str, out: &mut [&'a str], mut skip: usize) -> usize {
     while skip > 0 && !text.is_empty() {
@@ -803,7 +1007,7 @@ mod tests {
             index.seed();
             collect(&mut index, html, split);
             assert_eq!(index.documents[0].title.as_str(), "AI & learning");
-            assert_eq!(index.documents[0].body.as_str(), "Real 日本 AI 語 Next ");
+            assert_eq!(index.documents[0].body.as_str(), "Real 日本 AI 語\n\nNext");
             assert_eq!(index.ranking("virus").1, 0);
             assert_eq!(index.ranking("noise").1, 0);
             assert_eq!(index.ranking("日本").1, 1);
@@ -845,7 +1049,10 @@ mod tests {
         }
         assert_eq!(index.search_packet("AI", 4, &mut out), 0);
         let n = index.reader_packet(1, 0, &mut out);
-        assert_eq!(Packet::decode(&out[..n]).unwrap().kind, crate::Kind::Reader);
+        assert_eq!(
+            crate::rich::Packet::decode(&out[..n]).unwrap().document_id,
+            1
+        );
         assert_eq!(index.reader_packet(1, 99, &mut out), 0);
         assert_eq!(index.ranking("stanford").1, 0);
         assert_eq!(index.ranking("AI nonexistent").1, 0);
@@ -877,14 +1084,14 @@ mod tests {
         assert!(index.documents[0].body.len as usize <= BODY_BYTES);
         assert_eq!(index.ranking("語").1, 1);
         let mut out = [0; 512];
-        let positions =
-            (line_count(index.documents[0].body.as_str()) + 1).saturating_sub(TEXT_ROWS) + 1;
+        let n = index.reader_packet(1, 0, &mut out);
+        let positions = usize::from(crate::rich::Packet::decode(&out[..n]).unwrap().positions);
         for p in 0..positions {
             let n = index.reader_packet(1, p, &mut out);
-            let packet = Packet::decode(&out[..n]).unwrap();
-            assert_eq!(packet.page_count as usize, positions);
+            let packet = crate::rich::Packet::decode(&out[..n]).unwrap();
+            assert_eq!(packet.positions as usize, positions);
             if p + 1 == positions {
-                assert!(packet.lines.contains(&"[Text limit reached]"));
+                assert!(packet.rows.iter().any(|r| r.text == "[Text limit reached]"));
             }
         }
         assert_eq!(index.reader_packet(1, positions, &mut out), 0);
@@ -897,26 +1104,141 @@ mod tests {
         let mut first = [0; 512];
         let mut next = [0; 512];
         let n = index.reader_packet(1, 0, &mut first);
-        let first_view = Packet::decode(&first[..n]).unwrap();
-        assert_eq!(first_view.line_count, TEXT_ROWS);
-        assert!(first_view.page_count > 1);
-        assert_eq!(first_view.action(crate::Button::Up), crate::Action::None);
-        assert_eq!(first_view.action(crate::Button::Down), crate::Action::Next);
-        let positions = first_view.page_count as usize;
+        let first_view = crate::rich::Packet::decode(&first[..n]).unwrap();
+        assert!(first_view.row_count >= 6);
+        assert!(first_view.positions > 1);
+        let positions = first_view.positions as usize;
         for offset in 1..positions {
             let a = index.reader_packet(1, offset - 1, &mut first);
             let b = index.reader_packet(1, offset, &mut next);
-            let previous = Packet::decode(&first[..a]).unwrap();
-            let current = Packet::decode(&next[..b]).unwrap();
-            assert_eq!(previous.lines[1..], current.lines[..TEXT_ROWS - 1]);
-            assert_eq!(current.page_index as usize, offset);
-            assert_eq!(current.action(crate::Button::Up), crate::Action::Previous);
+            let previous = crate::rich::Packet::decode(&first[..a]).unwrap();
+            let current = crate::rich::Packet::decode(&next[..b]).unwrap();
+            for i in 1..previous.row_count {
+                assert_eq!(previous.rows[i].text, current.rows[i - 1].text);
+            }
+            assert_eq!(current.position as usize, offset);
             if offset + 1 == positions {
-                assert_eq!(current.action(crate::Button::Down), crate::Action::None);
-                assert!(current.lines[TEXT_ROWS - 1].contains("here."));
+                assert!(current.rows[current.row_count - 1].text.contains("here."));
             }
         }
         assert_eq!(index.reader_packet(1, positions, &mut next), 0);
+    }
+    #[test]
+    fn streaming_typography_preserves_nested_styles_and_paragraphs_at_every_split() {
+        let html=b"<h1>Heading title</h1><p>Normal <strong>bold <small>note</small></strong> tail.</p><p style='font-size:10px;font-weight:700'>Caption.</p><h2>Subhead</h2><p>Final paragraph.</p>";
+        for split in 1..=html.len() {
+            let mut index = LocalSearch::new();
+            index.seed();
+            collect(&mut index, html, split);
+            let doc = &index.documents[0];
+            assert!(doc.body.as_str().contains("\n\n"));
+            assert_eq!(doc.style_limited, 0);
+            let style_at = |word: &str| {
+                let at = doc.body.as_str().find(word).unwrap();
+                doc.runs[..usize::from(doc.run_count)]
+                    .iter()
+                    .rev()
+                    .find(|r| usize::from(r.start) <= at)
+                    .map_or(0, |r| r.style)
+            };
+            assert_eq!(
+                style_at("Heading"),
+                crate::rich::HEADING | crate::rich::BOLD
+            );
+            assert_eq!(style_at("bold"), crate::rich::BOLD);
+            assert_eq!(style_at("note"), crate::rich::CAPTION | crate::rich::BOLD);
+            assert_eq!(style_at("tail"), 0);
+            assert_eq!(
+                style_at("Caption"),
+                crate::rich::CAPTION | crate::rich::BOLD
+            );
+            assert_eq!(
+                style_at("Subhead"),
+                crate::rich::SUBHEADING | crate::rich::BOLD
+            );
+            assert_eq!(style_at("Final"), 0);
+            assert_eq!(index.ranking("bold").1, 1);
+            let mut out = [0; 512];
+            let n = index.reader_packet(1, 0, &mut out);
+            let first = crate::rich::Packet::decode(&out[..n]).unwrap();
+            assert_eq!(
+                first.rows[0].style(0),
+                crate::rich::HEADING | crate::rich::BOLD
+            );
+            assert_eq!(first.rows[0].height, 18);
+            assert!(
+                first.rows[..first.row_count]
+                    .iter()
+                    .any(|r| r.text.is_empty() && r.height == 6)
+            );
+            for position in 0..first.positions {
+                let n = index.reader_packet(1, usize::from(position), &mut out);
+                crate::rich::Packet::decode(&out[..n]).unwrap();
+            }
+        }
+    }
+    #[test]
+    fn typography_limits_keep_all_text_readable_and_mark_the_fallback() {
+        let mut index = LocalSearch::new();
+        index.seed();
+        index.next_url(&mut [0; 128]);
+        for _ in 0..60 {
+            index.feed(b"<b>x</b>y ");
+        }
+        assert!(index.finish(true));
+        let doc = &index.documents[0];
+        assert_eq!(doc.style_limited, 1);
+        assert!(usize::from(doc.run_count) <= STYLE_RUNS);
+        assert_eq!(doc.body.as_str().matches("xy").count(), 60);
+        assert_eq!(index.ranking("xy").1, 1);
+        let mut out = [0; 512];
+        let n = index.reader_packet(1, 0, &mut out);
+        let positions = crate::rich::Packet::decode(&out[..n]).unwrap().positions;
+        let n = index.reader_packet(1, usize::from(positions - 1), &mut out);
+        assert!(
+            crate::rich::Packet::decode(&out[..n])
+                .unwrap()
+                .rows
+                .iter()
+                .any(|r| r.text == "[Style limit reached]")
+        );
+        let mut deep = LocalSearch::new();
+        deep.seed();
+        deep.next_url(&mut [0; 128]);
+        for _ in 0..17 {
+            deep.feed(b"<b>");
+        }
+        deep.feed(b"safe");
+        for _ in 0..17 {
+            deep.feed(b"</b>");
+        }
+        assert!(deep.finish(true));
+        assert_eq!(deep.documents[0].style_limited, 1);
+        assert_eq!(deep.ranking("safe").1, 1);
+    }
+    #[test]
+    fn implicit_paragraph_closing_restores_normal_style_without_stack_growth() {
+        let mut index = LocalSearch::new();
+        index.seed();
+        index.next_url(&mut [0; 128]);
+        index.feed(b"<p style='font-weight:bold'>first<p>second");
+        for _ in 0..40 {
+            index.feed(b"<p>next");
+        }
+        assert!(index.finish(true));
+        let doc = &index.documents[0];
+        assert_eq!(doc.style_limited, 0);
+        assert!(doc.body.as_str().starts_with("first\n\nsecond"));
+        let at = doc.body.as_str().find("second").unwrap();
+        assert_eq!(
+            doc.runs[..usize::from(doc.run_count)]
+                .iter()
+                .rev()
+                .find(|r| usize::from(r.start) <= at)
+                .unwrap()
+                .style,
+            0
+        );
     }
     #[test]
     fn saturated_terms_fall_back_and_hash_candidates_require_exact_text() {

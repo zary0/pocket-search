@@ -3,6 +3,7 @@
 #include "pocket_search_ui.h"
 #include "pocket_search_input.h"
 #include "pocket_search_net.h"
+#include "pocket_typography.h"
 #include "chromatic_wifi.h"
 #include "menu_mgr.h"
 #include "tab_shared.h"
@@ -22,11 +23,13 @@ static struct {
     const char *notice; CW_Status wifi;
     unsigned sequence; uint16_t result_index,requested_page;uint32_t requested_id;uint8_t requested_kind;
     uint8_t packet[512];PS_View view;int network_error;bool verified;
+    PS_RichView rich_view;bool rich,probe;
+    uint32_t probe_document;uint16_t probe_position;
     uint8_t *image_pixels;uint16_t image_width,image_height,image_rows;
     struct {uint32_t document;uint16_t page;} back[4];unsigned back_count;
 } u = {.dirty=true,.sample=true};
 static lv_obj_t *root, *brand, *field, *input, *heading, *body, *footer, *status, *submit, *cells[12], *entry;
-static lv_obj_t *rows[7], *picture;
+static lv_obj_t *rows[7], *picture, *rich_body;
 static lv_img_dsc_t image_descriptor;
 static const char *kana[] = {"あいうえお","かきくけこ","さしすせそ","たちつてと","なにぬねの","はひふへほ","まみむめも","やゆよ","らりるれろ","わをんー","゛゜小","空白"};
 static const char *lower[] = {"abc","def","ghi","jkl","mno","pqrs","tuv","wxyz","01234","56789",".,!?-_/","空白"};
@@ -35,8 +38,10 @@ static const char *symbols[] = {"0123","4567","89","@#$","%&*","()+","-=:",";.,"
 static portMUX_TYPE lock = portMUX_INITIALIZER_UNLOCKED;
 static int pending_key;
 static unsigned observed_mode, observed_bytes, observed_image_bytes, observed_back;
+static bool observed_rich,observed_probe;static unsigned observed_large,observed_small,observed_bold,observed_gaps;
 static PS_View observed_view;static bool observed_verified;
 static bool pending_query_set;static char pending_query[97];
+static bool pending_probe;
 static const char *key_names[] = {"home","up","down","left","right","a","b","start","select"};
 static const Button_t buttons[] = {0,kButton_Up,kButton_Down,kButton_Left,kButton_Right,kButton_A,kButton_B,kButton_Start,kButton_Select};
 static const char **groups(void) { return u.script==0?kana:u.script==1?lower:u.script==2?upper:symbols; }
@@ -58,6 +63,7 @@ static lv_obj_t *label(lv_obj_t *parent,int x,int y,int w) {
     lv_label_set_long_mode(o,LV_LABEL_LONG_CLIP); return o;
 }
 static void visible(lv_obj_t *o, bool show) { if(show) lv_obj_clear_flag(o,LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(o,LV_OBJ_FLAG_HIDDEN); }
+static void draw_rich(lv_event_t *event){PS_TypographyDraw(event,u.packet,&u.rich_view);}
 static void create(lv_obj_t *screen) {
     root=lv_obj_create(screen); lv_obj_remove_style_all(root); lv_obj_set_pos(root,0,0); lv_obj_set_size(root,160,144);
     lv_obj_set_style_bg_color(root,lv_color_hex(0xffffff),0); lv_obj_set_style_bg_opa(root,LV_OPA_COVER,0); lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
@@ -78,6 +84,8 @@ static void create(lv_obj_t *screen) {
     lv_obj_set_style_bg_opa(submit,LV_OPA_COVER,0); lv_obj_set_style_radius(submit,3,0); lv_obj_set_height(submit,18); lv_label_set_text_static(submit,"Start:Search");
     for(unsigned i=0;i<12;++i) { cells[i]=label(root,0,0,46); lv_obj_set_height(cells[i],16); lv_obj_set_style_radius(cells[i],3,0); }
     for(unsigned i=0;i<7;++i){rows[i]=label(root,8,34+i*13,144);lv_obj_set_height(rows[i],13);}
+    rich_body=lv_obj_create(root);lv_obj_remove_style_all(rich_body);lv_obj_set_pos(rich_body,8,34);lv_obj_set_size(rich_body,144,92);
+    lv_obj_clear_flag(rich_body,LV_OBJ_FLAG_SCROLLABLE);lv_obj_add_event_cb(rich_body,draw_rich,LV_EVENT_DRAW_MAIN,NULL);visible(rich_body,false);
     picture=lv_img_create(root);lv_obj_add_flag(picture,LV_OBJ_FLAG_HIDDEN);
     u.dirty=true;
 }
@@ -87,13 +95,14 @@ static void release_image(void){
     memset(&image_descriptor,0,sizeof(image_descriptor));
 }
 static void cancel(void){PS_NetCancel(u.sequence);++u.sequence;release_image();}
-static void mode(Mode value) { u.mode=value; u.selection=0; u.notice=NULL; u.dirty=true; }
+static void mode(Mode value) { u.mode=value;if(value!=READER)u.probe=false;u.selection=0; u.notice=NULL; u.dirty=true; }
 static void keyboard(Role role) {
     mode(KEYBOARD); u.role=role; u.script=role==QUERY?0:1; u.group=0; u.letter=0; u.choosing=false;
     memset(u.draft,0,sizeof(u.draft)); if(role==QUERY) memcpy(u.draft,u.query,sizeof(u.query));
 }
 static void message(const char *value,Role destination) { mode(NOTICE); u.notice=value; u.notice_role=destination; }
 static void request(uint8_t kind,uint32_t document,uint16_t page){
+    u.probe=false;
     PS_NetCancel(u.sequence);release_image();
     PS_Request r={.sequence=++u.sequence,.kind=kind,.document=document,.page=page};if(kind==1)memcpy(r.query,u.query,sizeof(r.query));memcpy(r.generation,u.generation,sizeof(r.generation));
     u.requested_kind=kind;u.requested_id=document;u.requested_page=page;u.network_error=0;u.verified=false;
@@ -119,6 +128,7 @@ static void render(void) {
     visible(brand,home); visible(submit,home); visible(status,home); visible(field,home||typing); visible(heading,!home); visible(body,!home&&!typing);
     for(unsigned i=0;i<12;++i) visible(cells[i],false);
     for(unsigned i=0;i<7;++i)visible(rows[i],false);
+    visible(rich_body,false);
     visible(picture,false);
     lv_label_set_text_static(status,u.wifi.state==CW_CONNECTED?"Wi-Fi":"Offline");
     lv_obj_set_pos(field,8,home?72:25); lv_obj_set_size(field,144,28);
@@ -142,19 +152,21 @@ static void render(void) {
     } else if(u.mode==LOADING||u.mode==IMAGE_LOADING){lv_label_set_text_static(body,"On-device search\n\nCollecting if needed\nVerified HTTPS");lv_label_set_text_static(footer,"B:Cancel Start:Type");}
     else if(u.mode==RESULTS||u.mode==READER||u.mode==IMAGE_READER){
         visible(body,false);visible(status,true);lv_obj_set_pos(status,8,3);lv_obj_set_width(status,144);lv_obj_set_style_text_align(status,LV_TEXT_ALIGN_LEFT,0);
-        if(u.mode==READER)snprintf(text,sizeof(text),"%u%%",u.view.page_count>1?(unsigned)u.view.page_index*100/(u.view.page_count-1):100);
+        if(u.probe)snprintf(text,sizeof(text),"TEST");
+        else if(u.mode==READER)snprintf(text,sizeof(text),"%u%%",u.view.page_count>1?(unsigned)u.view.page_index*100/(u.view.page_count-1):100);
         else snprintf(text,sizeof(text),"%u/%u",u.view.page_index+1,u.view.page_count);
         lv_label_set_text(status,text);lv_obj_set_pos(heading,8,18);
         memcpy(text,u.packet+u.view.title.offset,u.view.title.length);text[u.view.title.length]=0;lv_label_set_text(heading,text);lv_obj_set_style_text_color(heading,lv_color_hex(0x1a73e8),0);
         if(u.mode==IMAGE_READER){
             visible(picture,true);lv_obj_set_pos(picture,(160-u.image_width)/2,34+(80-u.image_height)/2);
             if(u.view.line_count){memcpy(text,u.packet+u.view.lines[0].offset,u.view.lines[0].length);text[u.view.lines[0].length]=0;visible(rows[0],true);lv_obj_set_pos(rows[0],8,116);lv_label_set_text(rows[0],text);}
-        }else for(unsigned i=0;i<u.view.line_count;++i){
+        }else if(u.rich){visible(rich_body,true);lv_obj_invalidate(rich_body);}
+        else for(unsigned i=0;i<u.view.line_count;++i){
             memcpy(text,u.packet+u.view.lines[i].offset,u.view.lines[i].length);text[u.view.lines[i].length]=0;
             visible(rows[i],true);lv_obj_set_pos(rows[i],8,34+i*13);lv_label_set_text(rows[i],text);
             lv_obj_set_style_text_color(rows[i],lv_color_hex(u.view.kind==5||u.view.kind==4?0x1a73e8:0x202124),0);
         }
-        lv_label_set_text_static(footer,u.mode==RESULTS?"Up/Down A:Read B:Back":u.view.kind==4&&u.view.link_target?"A:Open Up/Down B":"Up/Down:Scroll B:Back");
+        lv_label_set_text_static(footer,u.probe?"Original test. B:Back":u.mode==RESULTS?"Up/Down A:Read B:Back":u.view.kind==4&&u.view.link_target?"A:Open Up/Down B":"Up/Down:Scroll B:Back");
     }
     else if(u.mode==NOTICE) { lv_label_set_text_static(body,u.notice?u.notice:""); lv_label_set_text_static(heading,u.notice_role==QUERY?"Pocket Search":"Wi-Fi"); lv_label_set_text_static(footer,u.notice_role==QUERY?"A:Type B:Back":"A:Retype B:Wi-Fi"); }
     else if(u.mode==WIFI_LIST) {
@@ -175,7 +187,9 @@ static void render(void) {
     lv_obj_move_foreground(root); u.dirty=false;
     if(home){lv_obj_set_pos(status,104,5);lv_obj_set_width(status,48);lv_obj_set_style_text_align(status,LV_TEXT_ALIGN_RIGHT,0);}
     if(u.mode!=RESULTS&&u.mode!=READER&&u.mode!=IMAGE_READER){lv_obj_set_pos(heading,8,4);lv_obj_set_style_text_color(heading,lv_color_hex(0x202124),0);}
-    taskENTER_CRITICAL(&lock); observed_mode=(unsigned)u.mode; observed_bytes=(unsigned)strlen(u.query);observed_view=u.view;observed_verified=u.verified;observed_image_bytes=(unsigned)u.image_width*u.image_height*2;observed_back=u.back_count; taskEXIT_CRITICAL(&lock);
+    unsigned large=0,small=0,bold=0,gaps=0;bool styled=u.mode==READER&&u.rich;
+    if(styled){const unsigned sizes[]={12,16,14,10};small=16;for(unsigned i=0;i<u.rich_view.row_count;++i){PS_RichRow *row=&u.rich_view.rows[i];if(!row->glyphs)++gaps;for(unsigned j=0;j<row->glyphs;++j){unsigned s=(u.packet[row->styles.offset+j/2]>>((j%2)*4))&15,n=sizes[s&3];if(n>large)large=n;if(n<small)small=n;if(s&4)++bold;}}}
+    taskENTER_CRITICAL(&lock); observed_mode=(unsigned)u.mode; observed_bytes=(unsigned)strlen(u.query);observed_view=u.view;observed_verified=u.verified;observed_image_bytes=(unsigned)u.image_width*u.image_height*2;observed_back=u.back_count;observed_rich=styled;observed_probe=u.probe;observed_large=large;observed_small=small;observed_bold=bold;observed_gaps=gaps; taskEXIT_CRITICAL(&lock);
 }
 OSD_Result_t PocketUI_Draw(void *arg) {
     Tab_DrawCtx_t *ctx=arg; if(!ctx || !ctx->pScreen) return kOSD_Result_Err_NullDataPtr;
@@ -188,6 +202,7 @@ OSD_Result_t PocketUI_Draw(void *arg) {
 OSD_Result_t PocketUI_Button(Button_t b,ButtonState_t state,void *arg) {
     (void)arg; if(state!=kButtonState_Pressed) return kOSD_Result_Ok; u.dirty=true;
     int delta=(b==kButton_Down||b==kButton_Right)?1:(b==kButton_Up||b==kButton_Left)?-1:0;
+    if(u.probe){if(b==kButton_B)request(2,u.probe_document,u.probe_position);return kOSD_Result_Ok;}
     if(u.mode==LOADING||u.mode==IMAGE_LOADING||u.mode==RESULTS||u.mode==READER||u.mode==IMAGE_READER){
         bool loading=u.mode==LOADING||u.mode==IMAGE_LOADING;
         if(b==kButton_Select||(b==kButton_B&&(loading||u.mode==RESULTS))){cancel();u.back_count=0;mode(HOME);return kOSD_Result_Ok;}
@@ -253,11 +268,15 @@ OSD_Result_t PocketEntry_Draw(void *screen) { if(!entry) { entry=label(screen,77
 OSD_Result_t PocketEntry_Button(Button_t b,ButtonState_t s,void *arg) { (void)arg; if(b==kButton_A && s==kButtonState_Pressed) MenuMgr_SelectTab(kTabID_Search); return kOSD_Result_Ok; }
 OSD_Result_t PocketEntry_Transition(void *arg) { (void)arg; if(entry) lv_obj_del(entry); entry=NULL; return kOSD_Result_Ok; }
 static int command(int argc,char **argv) {
-    if(argc==3&&!strcmp(argv[1],"query")){size_t n=strlen(argv[2]);if(n>96||!ps_valid(argv[2],n))return 1;taskENTER_CRITICAL(&lock);bool available=!pending_key&&!pending_query_set;if(available){memset(pending_query,0,sizeof(pending_query));memcpy(pending_query,argv[2],n);pending_query_set=true;}taskEXIT_CRITICAL(&lock);if(available)printf("SEARCH_UI_QUEUED\n");return available?0:1;}
+    if(argc==2&&!strcmp(argv[1],"typography")){taskENTER_CRITICAL(&lock);bool available=!pending_key&&!pending_query_set&&!pending_probe;if(available)pending_probe=true;taskEXIT_CRITICAL(&lock);if(available)printf("SEARCH_UI_QUEUED\n");return available?0:1;}
+    if(argc==3&&!strcmp(argv[1],"query")){size_t n=strlen(argv[2]);if(n>96||!ps_valid(argv[2],n))return 1;taskENTER_CRITICAL(&lock);bool available=!pending_key&&!pending_query_set&&!pending_probe;if(available){memset(pending_query,0,sizeof(pending_query));memcpy(pending_query,argv[2],n);pending_query_set=true;}taskEXIT_CRITICAL(&lock);if(available)printf("SEARCH_UI_QUEUED\n");return available?0:1;}
     if(argc!=2) return 1;
-    if(!strcmp(argv[1],"status")) { taskENTER_CRITICAL(&lock); unsigned m=observed_mode,n=observed_bytes;PS_View v=observed_view;bool verified=observed_verified;unsigned image_bytes=observed_image_bytes,back=observed_back;taskEXIT_CRITICAL(&lock);printf("SEARCH_UI {\"mode\":%u,\"query_bytes\":%u,\"tls_verified\":%s,\"rust_decoder\":true,\"document_id\":%lu,\"page_index\":%u,\"page_count\":%u,\"kind\":%u,\"image_bytes\":%u,\"back_depth\":%u}\n",m,n,verified?"true":"false",(unsigned long)v.document_id,v.page_index,v.page_count,v.kind,image_bytes,back); return 0; }
+    if(!strcmp(argv[1],"status")) {
+        taskENTER_CRITICAL(&lock);unsigned m=observed_mode,n=observed_bytes;PS_View v=observed_view;bool verified=observed_verified,styled=observed_rich,probe=observed_probe;unsigned image_bytes=observed_image_bytes,back=observed_back,large=observed_large,small=observed_small,bold=observed_bold,gaps=observed_gaps;taskEXIT_CRITICAL(&lock);
+        printf("SEARCH_UI {\"mode\":%u,\"query_bytes\":%u,\"tls_verified\":%s,\"rust_decoder\":true,\"document_id\":%lu,\"page_index\":%u,\"page_count\":%u,\"kind\":%u,\"image_bytes\":%u,\"back_depth\":%u,\"styled\":%s,\"typography_probe\":%s,\"largest_font_px\":%u,\"smallest_font_px\":%u,\"bold_glyphs\":%u,\"paragraph_gaps\":%u}\n",m,n,verified?"true":"false",(unsigned long)v.document_id,v.page_index,v.page_count,v.kind,image_bytes,back,styled?"true":"false",probe?"true":"false",large,small,bold,gaps);return 0;
+    }
     for(unsigned i=0;i<sizeof(key_names)/sizeof(*key_names);++i) if(!strcmp(argv[1],key_names[i])) {
-        taskENTER_CRITICAL(&lock); bool available=!pending_key&&!pending_query_set; if(available) pending_key=(int)i+1; taskEXIT_CRITICAL(&lock);
+        taskENTER_CRITICAL(&lock); bool available=!pending_key&&!pending_query_set&&!pending_probe; if(available) pending_key=(int)i+1; taskEXIT_CRITICAL(&lock);
         if(available) { printf("SEARCH_UI_QUEUED\n"); }
         return available?0:1;
     }
@@ -278,14 +297,19 @@ void PocketUI_Poll(void) {
                 if(u.image_rows!=u.image_height)valid=false;
                 else{image_descriptor.header.cf=LV_IMG_CF_TRUE_COLOR;image_descriptor.header.w=u.image_width;image_descriptor.header.h=u.image_height;image_descriptor.data_size=(uint32_t)u.image_width*u.image_height*2;image_descriptor.data=u.image_pixels;lv_img_set_src(picture,&image_descriptor);u.verified=true;mode(IMAGE_READER);}
             }
+        }else if(u.requested_kind==2&&reply.length>=4&&!memcmp(reply.bytes,"PSR1",4)){
+            PS_RichView rich;valid=valid&&reply.finished&&reply.length<=sizeof(u.packet)&&ps_rich_decode(reply.bytes,reply.length,&rich)==0;
+            if(valid&&(rich.position!=u.requested_page||rich.document_id!=u.requested_id))valid=false;
+            if(valid){memcpy(u.packet,reply.bytes,reply.length);u.rich_view=rich;u.rich=true;u.verified=true;u.view=(PS_View){.document_id=rich.document_id,.page_index=rich.position,.page_count=rich.positions,.kind=2,.title=rich.title};mode(READER);}
         }else{
             PS_View view;valid=valid&&reply.finished&&reply.length<=sizeof(u.packet)&&ps_packet_decode(reply.bytes,reply.length,&view)==0;
             if(valid&&(view.page_index!=u.requested_page||(u.requested_kind==1?(view.kind!=1||view.page_count>256):(view.kind<2||view.kind>5||view.document_id!=u.requested_id))))valid=false;
-            if(valid){memcpy(u.generation,reply.generation,sizeof(u.generation));u.sample=reply.sample;memcpy(u.packet,reply.bytes,reply.length);u.view=view;u.verified=true;if(view.kind==1){u.result_index=view.page_index;mode(RESULTS);}else if(view.kind==3)request(3,view.document_id,view.page_index);else mode(READER);}
+            if(valid){memcpy(u.generation,reply.generation,sizeof(u.generation));u.sample=reply.sample;memcpy(u.packet,reply.bytes,reply.length);u.view=view;u.rich=false;u.verified=true;if(view.kind==1){u.result_index=view.page_index;mode(RESULTS);}else if(view.kind==3)request(3,view.document_id,view.page_index);else mode(READER);}
         }
         if(!valid){release_image();u.network_error=reply.error;u.verified=false;message(reply.error==PS_NET_STALE_COLLECTION?"Collection changed.\nA: Search again":reply.error==1?"Wi-Fi disconnected.\nSelect: Wi-Fi setup":reply.error==2?"Clock sync failed.\nTry again.":reply.error==12?"robots.txt blocks\nthis collection.":reply.error==13?"No usable pages.\nRight on home:\nRetry collection.":reply.error?"Connection failed.\nTry again.":"Invalid response.\nTry again.",QUERY);}
     }
-    char query[97];taskENTER_CRITICAL(&lock); int key=pending_key; pending_key=0;bool set_query=pending_query_set;if(set_query){memcpy(query,pending_query,sizeof(query));memset(pending_query,0,sizeof(pending_query));pending_query_set=false;}taskEXIT_CRITICAL(&lock);
+    char query[97];taskENTER_CRITICAL(&lock); int key=pending_key; pending_key=0;bool set_query=pending_query_set;bool probe=pending_probe;pending_probe=false;if(set_query){memcpy(query,pending_query,sizeof(query));memset(pending_query,0,sizeof(pending_query));pending_query_set=false;}taskEXIT_CRITICAL(&lock);
+    if(probe&&u.mode==READER&&u.verified&&!u.probe){u.probe_document=u.view.document_id;u.probe_position=u.view.page_index;int n=ps_rich_probe(reply.bytes);PS_RichView rich;if(n>0&&ps_rich_decode(reply.bytes,(size_t)n,&rich)==0){memcpy(u.packet,reply.bytes,(size_t)n);u.rich_view=rich;u.rich=true;u.probe=true;u.view=(PS_View){.document_id=rich.document_id,.page_count=rich.positions,.kind=2,.title=rich.title};u.dirty=true;}return;}
     if(set_query){cancel();u.back_count=0;mode(HOME);memcpy(u.query,query,sizeof(u.query));MenuMgr_SelectTab(kTabID_Search);return;}if(!key)return;
     if(key==1) { cancel();u.back_count=0;mode(HOME); MenuMgr_SelectTab(kTabID_Search); }
     else (void)PocketUI_Button(buttons[key-1],kButtonState_Pressed,NULL);
