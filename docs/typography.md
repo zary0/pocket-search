@@ -1,5 +1,7 @@
 # Native reader typography
 
+This document records the earlier PSR1 typography path. The current reader extends it with [160px semantic flow and basic box/paint CSS](native-flow-layout.md); historical image identities and measurements below remain unchanged.
+
 The autonomous `0.13.21-css` reader preserves a bounded set of heading, body, annotation, inline weight and paragraph distinctions from fetched HTML. Rust extracts styles while streaming the original page, wraps text to measured glyph advances, and generates validated PSR1 viewports. The MCU draws those glyphs through LVGL on the 160 × 144 display. Collection, search and rendering require no companion service.
 
 ## Supported source structure

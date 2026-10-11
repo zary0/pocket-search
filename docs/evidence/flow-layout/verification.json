@@ -1,0 +1,373 @@
+{
+  "schema_version": 1,
+  "application_version": "0.13.25-flow",
+  "application_bytes": 1972096,
+  "application_sha256": "fc955dd779d5645c422b1e41fbcf2e0dae70a495b55dc34f956d7c46f99361c7",
+  "core_source_commit": "0f74285dfdaa4f3ff87778eb80911f8418ce70d7",
+  "rust_archive_sha256": "91954478a8426dff6d6917243264a64c6715bfe717406a5214e0b42b0edab3ad",
+  "rust_source_sha256": {
+    "crates/chromatic-client/src/flow.rs": "7847d7e4b5585b22aa49972853bcc5516392ed8ca69c0794cc18b4190dca36b6",
+    "crates/chromatic-client/src/rich.rs": "1754659859beb3e348aed3c720901352cbc1748170f29af0eeccda6e2797cf13",
+    "crates/chromatic-client/src/box_css.rs": "f0b4338ca172430ade6553fff2834004fff1846f80ad40eaba3c8530100ef7c8",
+    "crates/chromatic-client/src/local.rs": "e681a0837f2195d1d8ad2c167e52ea926c4b5ef786c3c4d1e03902cdf0ccb844",
+    "crates/chromatic-client/src/webfont.rs": "2518d3d5ebed80e7ad189711b547997b54a20b2de832e9e393bd327d6cfbba2e",
+    "crates/chromatic-client/src/lib.rs": "eb8892dd2ff37a30d02f88cde6fb9de94787341573d980573aea4ad0c21f1850",
+    "crates/chromatic-client/src/css.rs": "4f948e5752cc4b26afdf0150bdb157adbf095f982e17a48141d0eb03f061d555",
+    "crates/chromatic-ffi/src/lib.rs": "e404166dbe3a2a54b30d74b8ea0051593d6e6811d6d99455d7b5a90808223737"
+  },
+  "component_source_sha256": {
+    "pocket_search_input.h": "0d167246a027d26210d40c980f77c8e8a57d006a35c9a3ec2837a48cf72a87ff",
+    "pocket_typography.c": "46766e266e752ccd6fef8b1a843d740861b0ae9f1f72829d6143ae4a34d26480",
+    "pocket_search_net.h": "b14f770b3ad7ac9bd35909c0274f541d926d978044feba30e04bd5925cbff0e5",
+    "CMakeLists.txt": "311df041eecca01ff6b72b28399818cd6194764cc60372bcb3fef076ffd18716",
+    "pocket_search_origin.h": "48a70fb0e7b0dfc6a7790a8490ec80a1dbb2240fd879e9a6808375d18ff4637b",
+    "pocket_search_ui.h": "f67f6da562553c72d7488751deb5e3b80ab54fbffb3e71f6b8427104001c5076",
+    "pocket_typography.h": "9587956b568067e9e930f40c333a0d7e40846185cb4ab680dffef97e94c9d926",
+    "pocket_search_net.c": "abb6920cfffca95ff399ba4b6b124f446dd48755a49e90a1dd2931deccba5ff4",
+    "pocket_search_origin.c": "4118e2d756347ab01818ef778696be31b76327e666b93acc9a95392768890fa3",
+    "pocket_frame_capture.h": "252d2deb18da60f8bfae37ed8ddfffebcc73f44407cebc41b47c9dfbe7389809",
+    "pocket_search_collection.h": "c55fd86745f0eddad18423df20a13d9268f31311aa91053d60aee7021307ecc9",
+    "pocket_resource_policy.h": "a9fef63e4d2adec317f60078de6e218e5e08baea829a4714bead3bc3a346407b",
+    "pocket_search_ui.c": "49a5a8420cd2fd32b627d94a27703640cd548ec17a352bd9ef1266d5c69e707b"
+  },
+  "operator_main_sha256": "5262dbd124e55707c7400afe5de697dce7bfafa70fc73efef1a33537fdcd69ca",
+  "operator_integration_patch_sha256": "4ccd519825feffc763f7ee864f8ca9575d462ec839c6e074d0e263b834e2e6d8",
+  "installation": {
+    "application_version": "0.13.25-flow",
+    "application_sha256": "fc955dd779d5645c422b1e41fbcf2e0dae70a495b55dc34f956d7c46f99361c7",
+    "application_bytes": 1972096,
+    "application_readback_verified": true,
+    "previous_application_verified": true,
+    "partition_table_verified_unchanged": true,
+    "nvs_preserved": true,
+    "original_recovery_backup_verified": true,
+    "bootloader_modified": false,
+    "fpga_modified": false,
+    "efuse_modified": false
+  },
+  "execution_mode": "on-device crawl/index/search/semantic layout",
+  "host_proxy_used": false,
+  "frames": [
+    {
+      "file": "heading-box-links.png",
+      "sha256": "5a9db68fa87ca2165954d49a0f3ff3da2bd07001063d97b24d1850b67c440942",
+      "source": "physical MCU render-buffer readback of original on-device TEST layout; no panel camera observation"
+    },
+    {
+      "file": "lists-image-slot.png",
+      "sha256": "5da5128fb49b8deaa0c08b559333fa540399d10939337499a5a0f6262c6c8017",
+      "source": "physical MCU render-buffer readback of original on-device TEST layout; no panel camera observation"
+    }
+  ],
+  "observations": [
+    {
+      "command": "fwversion",
+      "value": {
+        "mcu": "v0.13.25-flow",
+        "fpga": "18.14",
+        "chromatic": "v4.6"
+      }
+    },
+    {
+      "command": "wifi_status",
+      "value": {
+        "state": "connected",
+        "enabled": true,
+        "configured": true,
+        "retries": 0,
+        "reason": 0,
+        "lastError": "ESP_OK",
+        "freeHeap": 95928
+      }
+    },
+    {
+      "command": "wifi_time_status",
+      "value": {
+        "started": true,
+        "synchronized": true,
+        "sync_count": 1,
+        "unix_time": 1791722503,
+        "error": "ESP_OK"
+      }
+    },
+    {
+      "command": "search_ui status",
+      "value": {
+        "mode": 0,
+        "query_bytes": 0,
+        "tls_verified": false,
+        "rust_decoder": true,
+        "document_id": 0,
+        "page_index": 0,
+        "page_count": 0,
+        "kind": 0,
+        "image_bytes": 0,
+        "back_depth": 0,
+        "styled": false,
+        "typography_probe": false,
+        "largest_font_px": 0,
+        "smallest_font_px": 0,
+        "bold_glyphs": 0,
+        "paragraph_gaps": 0
+      }
+    },
+    {
+      "command": "search_endpoint status",
+      "value": {
+        "configured": true,
+        "service_required": false,
+        "execution_mode": "on-device"
+      }
+    },
+    {
+      "command": "search_local status",
+      "value": {
+        "execution_mode": "on-device",
+        "service_required": false,
+        "documents": 0,
+        "requests": 0,
+        "body_bytes": 0,
+        "running": false,
+        "state_bytes": 22272,
+        "state_used_bytes": 20968,
+        "robots_buffer_bytes": 2049,
+        "maximum_documents": 4,
+        "text_bytes_per_document": 2560,
+        "persistent_index": false,
+        "native_images": false
+      }
+    },
+    {
+      "command": "network",
+      "value": {
+        "sequence": 2,
+        "execution_mode": "on-device",
+        "service_required": false,
+        "error": 0,
+        "http_status": 200,
+        "bytes": 164,
+        "wire_bytes": 74202,
+        "documents": 4,
+        "compute_us": 4139,
+        "tls_verified": true,
+        "clock_synced": true,
+        "elapsed_ms": 37144,
+        "heap_before": 85908,
+        "minimum_free_heap_bytes": 33764,
+        "minimum_largest_free_block_bytes": 27648,
+        "stack_hwm": 3628
+      }
+    },
+    {
+      "command": "completed-with-search_ui a",
+      "value": {
+        "sequence": 3,
+        "execution_mode": "on-device",
+        "service_required": false,
+        "error": 0,
+        "http_status": 0,
+        "bytes": 208,
+        "wire_bytes": 0,
+        "documents": 4,
+        "compute_us": 31818,
+        "tls_verified": true,
+        "clock_synced": true,
+        "elapsed_ms": 32,
+        "heap_before": 83272,
+        "minimum_free_heap_bytes": 83272,
+        "minimum_largest_free_block_bytes": 45056,
+        "stack_hwm": 4124
+      }
+    },
+    {
+      "command": "fwversion",
+      "value": {
+        "mcu": "v0.13.25-flow",
+        "fpga": "18.14",
+        "chromatic": "v4.6"
+      }
+    },
+    {
+      "command": "wifi_status",
+      "value": {
+        "state": "connected",
+        "enabled": true,
+        "configured": true,
+        "retries": 0,
+        "reason": 0,
+        "lastError": "ESP_OK",
+        "freeHeap": 94944
+      }
+    },
+    {
+      "command": "wifi_time_status",
+      "value": {
+        "started": true,
+        "synchronized": true,
+        "sync_count": 1,
+        "unix_time": 1791722838,
+        "error": "ESP_OK"
+      }
+    },
+    {
+      "command": "search_ui status",
+      "value": {
+        "mode": 8,
+        "query_bytes": 2,
+        "tls_verified": true,
+        "rust_decoder": true,
+        "document_id": 1,
+        "page_index": 10,
+        "page_count": 11,
+        "kind": 2,
+        "image_bytes": 0,
+        "back_depth": 0,
+        "styled": true,
+        "typography_probe": true,
+        "largest_font_px": 12,
+        "smallest_font_px": 10,
+        "bold_glyphs": 0,
+        "paragraph_gaps": 1
+      }
+    },
+    {
+      "command": "search_endpoint status",
+      "value": {
+        "configured": true,
+        "service_required": false,
+        "execution_mode": "on-device"
+      }
+    },
+    {
+      "command": "search_local status",
+      "value": {
+        "execution_mode": "on-device",
+        "service_required": false,
+        "documents": 4,
+        "requests": 10,
+        "body_bytes": 74202,
+        "running": false,
+        "state_bytes": 22272,
+        "state_used_bytes": 20968,
+        "robots_buffer_bytes": 2049,
+        "maximum_documents": 4,
+        "text_bytes_per_document": 2560,
+        "persistent_index": false,
+        "native_images": false
+      }
+    },
+    {
+      "command": "completed-with-search_ui b",
+      "value": {
+        "sequence": 4,
+        "execution_mode": "on-device",
+        "service_required": false,
+        "error": 0,
+        "http_status": 0,
+        "bytes": 208,
+        "wire_bytes": 0,
+        "documents": 4,
+        "compute_us": 31808,
+        "tls_verified": true,
+        "clock_synced": true,
+        "elapsed_ms": 32,
+        "heap_before": 85168,
+        "minimum_free_heap_bytes": 85168,
+        "minimum_largest_free_block_bytes": 45056,
+        "stack_hwm": 4116
+      }
+    },
+    {
+      "command": "fwversion",
+      "value": {
+        "mcu": "v0.13.25-flow",
+        "fpga": "18.14",
+        "chromatic": "v4.6"
+      }
+    },
+    {
+      "command": "wifi_status",
+      "value": {
+        "state": "connected",
+        "enabled": true,
+        "configured": true,
+        "retries": 0,
+        "reason": 0,
+        "lastError": "ESP_OK",
+        "freeHeap": 94796
+      }
+    },
+    {
+      "command": "wifi_time_status",
+      "value": {
+        "started": true,
+        "synchronized": true,
+        "sync_count": 1,
+        "unix_time": 1791722840,
+        "error": "ESP_OK"
+      }
+    },
+    {
+      "command": "search_ui status",
+      "value": {
+        "mode": 8,
+        "query_bytes": 2,
+        "tls_verified": true,
+        "rust_decoder": true,
+        "document_id": 2,
+        "page_index": 0,
+        "page_count": 122,
+        "kind": 4,
+        "image_bytes": 0,
+        "back_depth": 0,
+        "styled": true,
+        "typography_probe": false,
+        "largest_font_px": 12,
+        "smallest_font_px": 12,
+        "bold_glyphs": 0,
+        "paragraph_gaps": 0
+      }
+    },
+    {
+      "command": "search_endpoint status",
+      "value": {
+        "configured": true,
+        "service_required": false,
+        "execution_mode": "on-device"
+      }
+    },
+    {
+      "command": "search_local status",
+      "value": {
+        "execution_mode": "on-device",
+        "service_required": false,
+        "documents": 4,
+        "requests": 10,
+        "body_bytes": 74202,
+        "running": false,
+        "state_bytes": 22272,
+        "state_used_bytes": 20968,
+        "robots_buffer_bytes": 2049,
+        "maximum_documents": 4,
+        "text_bytes_per_document": 2560,
+        "persistent_index": false,
+        "native_images": false
+      }
+    }
+  ],
+  "portable_validation": {
+    "rust_tests": 81,
+    "python_tests": 23,
+    "browser_helper_tests": 18,
+    "frame_capture_sanitizer": true,
+    "strict_clippy": true,
+    "formatting": true,
+    "xtensa_archive": true,
+    "esp_idf_application": true
+  },
+  "operator_panel_confirmation": false,
+  "battery_only_acceptance_for_this_image": false,
+  "qualified_physical_e2e": false,
+  "native_source_image_pixels": false,
+  "complete_reproducible_release_firmware": false
+}

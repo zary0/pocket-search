@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-//! Deliberately small typography cascade. No DOM, allocation, imports or URLs fetched here.
+//! Bounded typography and box cascade. No allocation, imports or network here.
 use crate::rich::{BOLD, CAPTION, HEADING, SUBHEADING, WEBFONT};
 
 pub const RULES: usize = 8;
@@ -12,6 +12,7 @@ struct Rule {
     values: [u8; 3],
     mask: u8,
     important: u8,
+    paint: crate::box_css::Declarations,
 }
 impl Rule {
     const EMPTY: Self = Self {
@@ -20,6 +21,7 @@ impl Rule {
         values: [0; 3],
         mask: 0,
         important: 0,
+        paint: crate::box_css::Declarations::EMPTY,
     };
 }
 /// Integer-only fields allow the native opaque state to be zero-initialized.
@@ -205,7 +207,8 @@ impl Sheet {
                     rule.selector[..sel.len()].copy_from_slice(sel.as_bytes());
                     rule.len = sel.len() as u8;
                     declarations(body, self.family(), &mut rule);
-                    if rule.mask == 0 {
+                    rule.paint.parse(body);
+                    if rule.mask == 0 && rule.paint.mask == 0 {
                         continue;
                     }
                     self.rules[self.count as usize] = rule;
@@ -223,37 +226,7 @@ impl Sheet {
             0
         }] {
             let sel = core::str::from_utf8(&rule.selector[..rule.len as usize]).unwrap_or("");
-            let score = if let Some(s) = sel.strip_prefix('#') {
-                if s == id { 3 } else { 0 }
-            } else if let Some(s) = sel.strip_prefix('.') {
-                if classes.split_ascii_whitespace().any(|c| c == s) {
-                    2
-                } else {
-                    0
-                }
-            } else if let Some((tag, class)) = sel.split_once('.') {
-                if tag.eq_ignore_ascii_case(name)
-                    && classes.split_ascii_whitespace().any(|c| c == class)
-                {
-                    202
-                } else {
-                    0
-                }
-            } else if sel == "*" {
-                1
-            } else if sel.eq_ignore_ascii_case(name) {
-                2
-            } else {
-                0
-            };
-            // Tags have lower specificity than classes, even when their spelling matches.
-            let score = if sel.starts_with('.') {
-                score * 100
-            } else if sel.starts_with('#') {
-                score * 1000
-            } else {
-                score
-            };
+            let score = specificity(sel, name, id, classes);
             cascade(rule, score, &mut priorities, &mut values);
         }
         let mut rule = Rule::EMPTY;
@@ -275,8 +248,57 @@ impl Sheet {
         }
         style
     }
+    pub fn paint(
+        &self,
+        name: &str,
+        id: &str,
+        classes: &str,
+        inline: &str,
+        mut style: crate::box_css::Style,
+    ) -> crate::box_css::Style {
+        let mut priorities = [0; crate::box_css::PROPERTIES];
+        for rule in &self.rules[..if self.enabled != 0 {
+            self.count as usize
+        } else {
+            0
+        }] {
+            let sel = core::str::from_utf8(&rule.selector[..rule.len as usize]).unwrap_or("");
+            rule.paint.cascade(
+                specificity(sel, name, id, classes),
+                &mut priorities,
+                &mut style,
+            );
+        }
+        let mut declarations = crate::box_css::Declarations::EMPTY;
+        declarations.parse(inline);
+        declarations.cascade(4000, &mut priorities, &mut style);
+        style
+    }
     pub fn count(&self) -> usize {
         self.count as usize
+    }
+}
+fn specificity(sel: &str, name: &str, id: &str, classes: &str) -> u16 {
+    if let Some(s) = sel.strip_prefix('#') {
+        if s == id { 3000 } else { 0 }
+    } else if let Some(s) = sel.strip_prefix('.') {
+        if classes.split_ascii_whitespace().any(|c| c == s) {
+            200
+        } else {
+            0
+        }
+    } else if let Some((tag, class)) = sel.split_once('.') {
+        if tag.eq_ignore_ascii_case(name) && classes.split_ascii_whitespace().any(|c| c == class) {
+            202
+        } else {
+            0
+        }
+    } else if sel == "*" {
+        1
+    } else if sel.eq_ignore_ascii_case(name) {
+        2
+    } else {
+        0
     }
 }
 fn cascade(rule: &Rule, score: u16, priority: &mut [u16; 3], values: &mut [u8; 3]) {
@@ -543,7 +565,13 @@ mod tests {
         sheet.discover("https://example.org/new/page.html", "/other.css");
         assert!(!sheet.cached());
         sheet.parse(b"p{color:red}", "https://example.org/other.css");
-        assert_eq!(sheet.count(), 0);
+        assert_eq!(sheet.count(), 1);
+        assert_eq!(
+            sheet
+                .paint("p", "", "", "", crate::box_css::Style::DEFAULT)
+                .color,
+            0xf800
+        );
         let oversized = [b' '; BYTES + 1];
         sheet.parse(&oversized, "https://example.org/x");
         assert!(!sheet.cached());

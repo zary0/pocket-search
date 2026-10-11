@@ -15,36 +15,36 @@ Public HTTPS site
         │ native DNS, clock sync, verified TLS
         ▼
 Chromatic MCU
-  bounded crawl frontier → streaming HTML text → RAM inverted index
+  bounded crawl frontier → streaming HTML + semantic tree → RAM inverted index
   buttons → local Rust ranking → local reader pagination → 160 × 144 LCD
 ```
 
-Rust owns the restricted link frontier, text extraction, fixed-capacity term/document masks, ranking, PCS1 results and PSR1 styled reader formatting. The existing ESP-IDF adapter owns HTTPS, cancellation, Wi-Fi and the display. Collection happens on the first submitted query after boot or a refresh. Later searches and reader navigation open no sockets; they use the device's retained collection, even if Wi-Fi is temporarily unavailable. Restart discards that RAM index and the next search collects again.
+Rust owns the restricted link frontier, text extraction, fixed-capacity term/document masks, ranking, PCS1 results and PFW1 semantic reader formatting. The existing ESP-IDF adapter owns HTTPS, cancellation, Wi-Fi and the display. Collection happens on the first submitted query after boot or a refresh. Later searches and reader navigation open no sockets; they use the device's retained collection, even if Wi-Fi is temporarily unavailable. Restart discards that RAM index and the next search collects again.
 
 | Component | Autonomous native mode | Current limit |
 | --- | --- | --- |
 | Crawler | Direct verified HTTPS, same-profile link discovery, one request at a time, robots policy check | One fixed public host/path profile, eight frontier entries, four retained pages, 90-second collection deadline |
-| HTML extraction | Streaming text/title, basic entities, UTF-8-safe storage, headings, inline weight/size and paragraph breaks; script/style/comment exclusion | Compact parser, not HTML5 layout, JavaScript or complete CSS layout |
+| HTML extraction | Streaming text/title and a bounded semantic tree: headings, paragraphs, nested lists, links and image slots; script/style/comment exclusion | Compact parser, not HTML5 layout, JavaScript or complete CSS layout |
 | Index / search | Allocation-free inverted term hashes with document masks; exact matching verifies candidates; a full table falls back to bounded text scanning | 256 term slots, ASCII word matching and non-ASCII substring matching; not the host BM25/Japanese tokenizer |
-| Reader | Results, A to open, up/down line scrolling, left/right screen jumps and B to return, all generated on the MCU | 2,560 retained UTF-8 bytes and 48 style transitions per document; visible text/style limit markers |
-| Typography resources | Bounded external-CSS cascade, one cached stylesheet, static TrueType ASCII atlas | One <=3 KiB sheet / eight selectors, raw TTF <=24 KiB; no WOFF2, shaping or proportional font metrics |
-| Images / video | Earlier companion-mode still-image experiment remains in the host tools and evidence | Autonomous image decoding/resizing and video are not implemented |
+| Reader | Results, A to open, up/down line scrolling, left/right screen jumps and B to return, all generated on the MCU | 2,560 retained UTF-8 bytes, 48 typography transitions and 24 semantic nodes per document; visible limit markers |
+| Typography resources | Basic text color, solid background, pixel margin/padding/border CSS; one cached external sheet and static TrueType ASCII atlas | One <=3 KiB sheet / eight selectors, raw TTF <=24 KiB; no WOFF2, shaping or proportional font metrics |
+| Images / video | Native image position/source/alt placeholders; earlier companion-mode still-image experiment remains in the host tools and evidence | Autonomous image decoding/resizing and video are not implemented |
 
-See [native typography](docs/typography.md), [on-device scope and verification](docs/on-device-search.md), [architecture](docs/architecture.md), and the [product roadmap](docs/roadmap.md).
+See [semantic layout and CSS scope](docs/native-flow-layout.md), [native typography](docs/typography.md), [on-device scope and verification](docs/on-device-search.md), [architecture](docs/architecture.md), and the [product roadmap](docs/roadmap.md).
 
 ## Designed for the handheld
 
-- **160 × 144 pixels**, a title, a 144 × 92 styled reading viewport and button hints.
+- **160 × 144 pixels**, a title, a 160 × 92 flow reading viewport and button hints.
 - One result per screen; every match in the admitted four-page collection is reachable.
 - Headings at **16/14 px**, body at **12 px**, annotations at **10 px**, inline bold and paragraph gaps. Up to eight variable-height rows fit each validated viewport.
 - **96-byte UTF-8 queries** and **512-byte locally generated text packets**.
-- A fixed **16 KiB opaque Rust state region**, plus a **2,049-byte robots buffer**. TLS, task stacks, fonts and the 15 KiB display band have separate costs.
+- A fixed **22,272-byte opaque Rust state region**, plus a **2,049-byte robots buffer**. TLS, task stacks, fonts and the 15 KiB display band have separate costs.
 - No bookmarks, browsing history, restored reading position or Codex approval UI.
 - Source URLs are displayed in results. Unsupported active content is treated as data and never executed.
 
 | Button | Home | Results | Reader |
 | --- | --- | --- | --- |
-| A | Enter a query | Open selected document | Reserved |
+| A | Enter a query | Open selected document | Open the first visible already-collected link |
 | Start | Submit current query | Query entry | Query entry |
 | Up / down | Reserved | Previous / next result | Scroll up / down one text line |
 | Left / right | Right clears collection for the next query | Reserved | Jump up / down seven lines |

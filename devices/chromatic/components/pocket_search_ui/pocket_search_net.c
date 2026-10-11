@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <stdatomic.h>
 
-#define LOCAL_STATE_BYTES 16640
+#define LOCAL_STATE_BYTES 22272
 #define HTML_LIMIT 65536
 #define ROBOTS_LIMIT 2048
 #define COLLECTION_US 90000000
@@ -188,7 +188,7 @@ static void worker(void *arg){
             char css_url[256];bool ready=false;
             if(!error&&ps_local_resource(local_state,sizeof(local_state),0,(uint8_t*)css_url)>0&&load_css(css_url,&r,start,&ready,NULL)){
                 // No retained DOM: refetch once with the bounded cascade, then publish.
-                size_t saved_length=ps_local_backup_bytes();uint8_t *saved=saved_length<=3072?calloc(1,saved_length):NULL;
+                size_t saved_length=ps_local_backup_bytes();uint8_t *saved=saved_length<=4608?calloc(1,saved_length):NULL;
                 if(saved&&ps_local_backup(local_state,sizeof(local_state),saved,saved_length,0)==0){
                     ps_local_reparse(local_state,sizeof(local_state),ready?1:0);
                     for(unsigned i=0;i<10&&!cancelled();++i)vTaskDelay(pdMS_TO_TICKS(100));

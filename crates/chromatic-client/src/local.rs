@@ -5,7 +5,7 @@ use crate::{HEADER_BYTES, MAX_PACKET_BYTES, TEXT_COLUMNS, TEXT_ROWS};
 
 pub const MAX_DOCUMENTS: usize = 4;
 pub const BODY_BYTES: usize = 2560;
-pub const STATE_BUDGET: usize = 16640;
+pub const STATE_BUDGET: usize = 22272;
 pub const BASE: &str = "https://www-formal.stanford.edu/jmc/whatisai/";
 pub const SEED: &str = "https://www-formal.stanford.edu/jmc/whatisai/node1.html";
 const URL_BYTES: usize = 128;
@@ -63,6 +63,7 @@ struct Document {
     runs: [crate::rich::Run; STYLE_RUNS],
     run_count: u8,
     style_limited: u8,
+    tree: crate::flow::Tree,
 }
 impl Document {
     const EMPTY: Self = Self {
@@ -73,6 +74,7 @@ impl Document {
         runs: [crate::rich::Run::EMPTY; STYLE_RUNS],
         run_count: 0,
         style_limited: 0,
+        tree: crate::flow::Tree::EMPTY,
     };
 }
 
@@ -513,6 +515,11 @@ impl LocalSearch {
             }
         }
         if self.parser.skip == 0 && self.parser.head == 0 && self.parser.title == 0 {
+            if closing {
+                self.documents[self.count as usize]
+                    .tree
+                    .close(name, self.documents[self.count as usize].body.len);
+            }
             if matches_ignore_case(
                 name,
                 &[
@@ -534,12 +541,48 @@ impl LocalSearch {
             } else if matches_ignore_case(
                 name,
                 &[
-                    "br", "div", "li", "hr", "tr", "td", "dt", "dd", "dl", "ul", "ol",
+                    "br", "div", "li", "hr", "tr", "td", "dt", "dd", "dl", "ul", "ol", "figure",
+                    "img",
                 ],
             ) {
                 self.block_break(1);
             }
             self.style_tag(name, closing, text);
+            if !closing {
+                let at = self.documents[self.count as usize].body.len;
+                let opened =
+                    self.documents[self.count as usize]
+                        .tree
+                        .open(name, text, at, &self.sheet);
+                if name.eq_ignore_ascii_case("li") {
+                    if let Some(i) = opened {
+                        let number =
+                            self.documents[self.count as usize].tree.nodes[i as usize].number;
+                        if number > 0 {
+                            if number >= 10 {
+                                self.emit(char::from(b'0' + (number / 10).min(9)));
+                            }
+                            self.emit(char::from(b'0' + number % 10));
+                            self.emit('.');
+                        } else {
+                            self.emit('-');
+                        }
+                        self.emit(' ');
+                    }
+                }
+                if name.eq_ignore_ascii_case("img") {
+                    for c in "[Image: ".chars() {
+                        self.emit(c);
+                    }
+                    for c in attribute(text, "alt").unwrap_or("no description").chars() {
+                        self.emit(c);
+                    }
+                    self.emit(']');
+                    let at = self.documents[self.count as usize].body.len;
+                    self.documents[self.count as usize].tree.close("img", at);
+                    self.block_break(1);
+                }
+            }
         }
     }
     pub fn feed(&mut self, bytes: &[u8]) {
@@ -627,6 +670,7 @@ impl LocalSearch {
         self.active = 0;
         let doc = &mut self.documents[self.count as usize];
         doc.body.len = doc.body.as_str().trim_end().len() as u16;
+        doc.tree.finish(doc.body.len);
         while doc.run_count > 0 && doc.runs[usize::from(doc.run_count - 1)].start >= doc.body.len {
             doc.run_count -= 1;
         }
@@ -640,7 +684,7 @@ impl LocalSearch {
         // Build from the retained valid text only. The URL and hidden markup
         // never become terms. A saturated table falls back to exact scanning.
         for section in 0..2 {
-            let doc = self.documents[id];
+            let doc = &self.documents[id];
             let text = if section == 0 {
                 doc.title.as_str()
             } else {
@@ -751,6 +795,34 @@ impl LocalSearch {
             out,
         )
     }
+    /// Semantic 160px viewport; source images retain their slot/alt/source only.
+    pub fn flow_packet(&self, id: usize, offset: usize, out: &mut [u8]) -> usize {
+        if id == 0 || id > self.count() {
+            return 0;
+        }
+        let doc = &self.documents[id - 1];
+        crate::flow::encode(
+            id,
+            crate::flow::Content {
+                title: doc.title.as_str(),
+                body: doc.body.as_str(),
+                runs: &doc.runs[..doc.run_count as usize],
+                tree: &doc.tree,
+                marker: u8::from(doc.limited != 0) | (u8::from(doc.style_limited != 0) << 1),
+            },
+            offset,
+            out,
+            |link| {
+                let target = doc.tree.resource(link);
+                let mut resolved = [0; crate::css::URL];
+                let n = crate::css::resolve(doc.url.as_str(), target, &mut resolved);
+                self.documents[..self.count()]
+                    .iter()
+                    .position(|d| d.url.as_str().as_bytes() == &resolved[..n] && n > 0)
+                    .map_or(0, |i| i as u32 + 1)
+            },
+        )
+    }
     /// One styled viewport. Its position is a visual line, with both pixel and
     /// packet budgets determining the last valid viewport.
     pub fn reader_packet(&self, id: usize, offset: usize, out: &mut [u8]) -> usize {
@@ -773,6 +845,185 @@ impl LocalSearch {
 fn matches_ignore_case(value: &str, values: &[&str]) -> bool {
     values.iter().any(|s| value.eq_ignore_ascii_case(s))
 }
+
+#[cfg(test)]
+mod flow_tests {
+    use super::*;
+    use crate::{box_css, flow};
+    extern crate std;
+    use std::{boxed::Box, string::String};
+    const HTML: &[u8] = include_bytes!("../../../examples/fixtures/flow.html");
+    #[test]
+    fn closing_nested_same_kind_keeps_outer_ranges_and_paint() {
+        let html=b"<div style='color:red'><div style='color:blue'>inner</div>outer tail<ul><li>first<ul><li>inner item</li></ul>outer item tail</li><li>second item</li></ul></div>";
+        for split in 0..=html.len() {
+            let mut state = Box::new(LocalSearch::new());
+            state.seed();
+            assert!(state.next_url(&mut [0; 128]) > 0);
+            state.feed(&html[..split]);
+            state.feed(&html[split..]);
+            assert!(state.finish(true));
+            let doc = &state.documents[0];
+            let at = doc.body.as_str().find("outer tail").unwrap();
+            let outer = &doc.tree.nodes[0];
+            assert!(outer.end as usize > at);
+            assert_eq!(outer.style.color, box_css::color("red").unwrap());
+            let nested = &doc.tree.nodes[1];
+            assert!((nested.end as usize) <= at);
+            let at = doc.body.as_str().find("outer item tail").unwrap();
+            let parent = doc.tree.nodes[..doc.tree.count as usize]
+                .iter()
+                .find(|n| {
+                    n.kind == flow::ITEM
+                        && doc.body.as_str()[n.start as usize..n.end as usize].contains("first")
+                })
+                .unwrap();
+            assert!(parent.end as usize > at);
+            let mut packet = [0; 512];
+            let n = state.flow_packet(1, 0, &mut packet);
+            flow::Packet::decode(&packet[..n]).unwrap();
+        }
+    }
+    fn collect(split: usize) -> Box<LocalSearch> {
+        let mut state = Box::new(LocalSearch::new());
+        state.seed();
+        let mut url = [0; 128];
+        assert!(state.next_url(&mut url) > 0);
+        state.feed(&HTML[..split]);
+        state.feed(&HTML[split..]);
+        assert!(state.finish(true));
+        state
+    }
+    #[test]
+    fn semantic_tree_and_css_survive_every_stream_boundary() {
+        let baseline = collect(0);
+        let mut expected = [0; 512];
+        let n = baseline.flow_packet(1, 0, &mut expected);
+        flow::Packet::decode(&expected[..n]).unwrap();
+        let doc = &baseline.documents[0];
+        assert!(doc.body.as_str().contains("1. Keep the structure."));
+        assert!(doc.body.as_str().contains("2. Reflow to 160 pixels."));
+        assert!(doc.body.as_str().contains("- Read by scrolling."));
+        let link = doc.tree.nodes[..doc.tree.count as usize]
+            .iter()
+            .position(|n| n.kind == flow::LINK)
+            .unwrap();
+        assert_eq!(doc.tree.resource(link), "node2.html");
+        assert_eq!(
+            doc.tree.nodes[link].style.color,
+            box_css::color("#1a73e8").unwrap_or(0x1b3d)
+        );
+        let image = doc.tree.nodes[..doc.tree.count as usize]
+            .iter()
+            .position(|n| n.kind == flow::IMAGE)
+            .unwrap();
+        assert_eq!(doc.tree.resource(image), "article.jpg");
+        assert!(
+            doc.body.as_str()
+                [doc.tree.nodes[image].start as usize..doc.tree.nodes[image].end as usize]
+                .contains("Source illustration")
+        );
+        let item = doc.tree.nodes[..doc.tree.count as usize]
+            .iter()
+            .find(|n| n.kind == flow::ITEM)
+            .unwrap();
+        assert_eq!(doc.tree.nodes[item.parent as usize].kind, 26);
+        for split in 0..=HTML.len() {
+            let state = collect(split);
+            let mut actual = [0; 512];
+            let len = state.flow_packet(1, 0, &mut actual);
+            assert_eq!(len, n, "split {split}");
+            assert_eq!(actual[..len], expected[..n], "split {split}");
+        }
+    }
+    #[test]
+    fn all_viewports_fit_and_preserve_tail_links_images_and_color_boxes() {
+        let mut state = collect(0);
+        let mut url = [0; 128];
+        assert!(state.next_url(&mut url) > 0);
+        state.feed(b"<title>Linked source</title><p>Actual linked content</p>");
+        assert!(state.finish(true));
+        let mut bytes = [0; 512];
+        let n = state.flow_packet(1, 0, &mut bytes);
+        let positions = flow::Packet::decode(&bytes[..n]).unwrap().positions;
+        let (mut link, mut image, mut border, mut red, mut tail) =
+            (false, false, false, false, false);
+        for position in 0..positions {
+            let n = state.flow_packet(1, position as usize, &mut bytes);
+            assert!(n > 0 && n <= 512);
+            let packet = flow::Packet::decode(&bytes[..n]).unwrap();
+            link |= packet.link_target == 2;
+            for row in &packet.rows[..packet.row_count] {
+                image |= row.flags & 4 != 0;
+                border |= row.stroke > 0;
+                tail |= row.text.contains("retained page.");
+                for code in row.codes {
+                    let p = &packet.palette[usize::from(code >> 4) * 5..];
+                    red |= u16::from_le_bytes([p[0], p[1]])
+                        == box_css::color("rgb(120,40,70)").unwrap();
+                }
+            }
+        }
+        assert!(link && image && border && red && tail);
+        assert_eq!(state.flow_packet(1, positions as usize, &mut bytes), 0);
+        let n = state.flow_packet(1, positions as usize - 1, &mut bytes);
+        let last = flow::Packet::decode(&bytes[..n]).unwrap();
+        assert!(
+            last.rows[..last.row_count]
+                .iter()
+                .any(|r| r.text.contains("retained page."))
+        );
+    }
+    #[test]
+    fn structural_overflow_keeps_searchable_text_and_a_visible_limit() {
+        let mut state = Box::new(LocalSearch::new());
+        state.seed();
+        assert!(state.next_url(&mut [0; 128]) > 0);
+        for _ in 0..80 {
+            state.feed(b"<p><span style='color:red'>AI structure</span></p>");
+        }
+        state.feed(b"<p>Tail sentinel survives.</p>");
+        assert!(state.finish(true));
+        assert_eq!(state.documents[0].tree.limited, 1);
+        let mut bytes = [0; 512];
+        let n = state.flow_packet(1, 0, &mut bytes);
+        let positions = flow::Packet::decode(&bytes[..n]).unwrap().positions;
+        let mut seen = String::new();
+        for p in 0..positions {
+            let n = state.flow_packet(1, p as usize, &mut bytes);
+            let v = flow::Packet::decode(&bytes[..n]).unwrap();
+            for row in &v.rows[..v.row_count] {
+                seen.push_str(row.text);
+            }
+        }
+        assert!(seen.contains("Tail sentinel survives."));
+        assert!(seen.contains("[Structure limit reached]"));
+        assert!(core::mem::size_of::<LocalSearch>() <= STATE_BUDGET);
+    }
+    #[test]
+    fn packet_truncations_mutations_and_utf8_never_panic() {
+        let state = collect(0);
+        let mut bytes = [0; 512];
+        let n = state.flow_packet(1, 0, &mut bytes);
+        for length in 0..n {
+            assert!(flow::Packet::decode(&bytes[..length]).is_err());
+        }
+        for at in 0..n {
+            for b in [0, 31, 127, 255] {
+                let mut altered = bytes;
+                altered[at] = b;
+                let _ = flow::Packet::decode(&altered[..n]);
+            }
+        }
+        let mut state = Box::new(LocalSearch::new());
+        state.seed();
+        assert!(state.next_url(&mut [0; 128]) > 0);
+        state.feed("<h1>日本語</h1><p style='padding:999px;border:999px solid red'>日本語の本文🙂が続く。</p>".as_bytes());
+        assert!(state.finish(true));
+        let n = state.flow_packet(1, 0, &mut bytes);
+        flow::Packet::decode(&bytes[..n]).unwrap();
+    }
+}
 fn allowed_relative(value: &str) -> bool {
     value
         .strip_prefix("node")
@@ -782,7 +1033,7 @@ fn allowed_relative(value: &str) -> bool {
 pub fn allowed_url(url: &str) -> bool {
     url.strip_prefix(BASE).is_some_and(allowed_relative)
 }
-fn attribute<'a>(text: &'a str, key: &str) -> Option<&'a str> {
+pub(crate) fn attribute<'a>(text: &'a str, key: &str) -> Option<&'a str> {
     let bytes = text.as_bytes();
     let mut at = text.find(char::is_whitespace)?;
     while at < bytes.len() {
@@ -1383,6 +1634,6 @@ mod css_pipeline_tests {
         assert!(index.finish(true));
         assert_eq!(index.documents[0].body.as_str(), "AI complete original");
         assert!(!index.save_active(&mut saved));
-        assert!(core::mem::size_of::<SavedDocument>() <= 3072);
+        assert!(core::mem::size_of::<SavedDocument>() <= 4608);
     }
 }
