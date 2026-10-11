@@ -1,6 +1,6 @@
 # Chromatic reading protocols
 
-PCS1 is the implemented host/client text format for the Chromatic reader. The optional API transports PCS1 packets; the autonomous adapter generates PCS1 results and PSR1 styled reading windows locally. Kinds 3–5 add image descriptors, registered links and headings for companion-mode scenes. [PCI1](dom-images.md#pci1-image-stripes) carries prepared image pixels separately. Full provenance UI and qualified physical E2E remain pending.
+PCS1 is the implemented host/client text format for the Chromatic reader. The optional API transports PCS1 packets; the autonomous adapter generates PCS1 results and PFW1 semantic reading windows locally (historical PSR1 calibration remains supported). Kinds 3–5 add image descriptors, registered links and headings for companion-mode scenes. [PCI1](dom-images.md#pci1-image-stripes) carries prepared image pixels separately. Full provenance UI and qualified physical E2E remain pending.
 
 ## Limits
 
@@ -85,3 +85,11 @@ Each row allows at most 64 text bytes and 28 Unicode scalars. Controls are forbi
 Position count is derived from the final retained rows fitting the pixel, eight-row and packet budgets. It is not a fixed `total_rows - 7` formula. Up/down change the top row by one; left/right jump seven. The final position includes the retained tail and any text/style limit markers. The formatter returns failure for an out-of-range position rather than fabricating a page.
 
 See [native typography](typography.md) for source interpretation, drawing, memory and verification boundaries. PSR1 does not carry arbitrary CSS, executable code, fonts or image pixels.
+
+## PFW1 semantic flow windows
+
+PFW1 version 1 uses a 24-byte header: magic `[0..4)`, version 1 at byte 4, previous/next flags at 5, row count at 6, title UTF-8 byte length at 7, document ID `u32le` at 8, visual position/positions `u16le` at 12/14, payload byte length `u16le` at 16, paint count at 18, color-limit flag at 19 and already-collected link target ID `u32le` at 20. Zero link ID means no admitted visible destination. Unknown flags/versions are rejected.
+
+The title is followed by up to eight five-byte paint entries (`foreground u16le`, `background u16le`, flags: solid background bit 0 / underline bit 1). Entry zero carries the canvas background. Each of up to eight rows has 16 bytes of geometry: y, height, text bytes, scalar count, text x, text width, text y-in-row, border width, top/bottom edge flags, solid-background/image-slot flags, background `u16le`, border `u16le`, box x and box width. Then come UTF-8 text and one code byte per scalar: low nibble is the existing typography style, high nibble indexes the palette. Image-slot bit 2 means a text placeholder, never source image pixels.
+
+A packet is at most 512 bytes; rows allow 64 text bytes and 28 scalars, fit 160 × 92 and begin at the previous row's bottom. Text must fit its inner width and row height, and remain inside the box extent. Border width is at most 3 px. The decoder rejects controls, invalid UTF-8, mismatched scalar count, invalid palette indices, overlapping/gapped rows, invalid geometry/navigation and trailing data. Native drawing consumes only validated borrowed offsets. See [layout limits and acceptance](native-flow-layout.md).

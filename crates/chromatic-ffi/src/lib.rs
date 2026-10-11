@@ -253,7 +253,7 @@ pub unsafe extern "C" fn ps_local_packet(
     let out = unsafe { core::slice::from_raw_parts_mut(out, 512) };
     (match kind {
         1 => index.search_packet(query, page as usize, out),
-        2 => index.reader_packet(document as usize, page as usize, out),
+        2 => index.flow_packet(document as usize, page as usize, out),
         _ => 0,
     }) as i32
 }
@@ -329,6 +329,109 @@ pub struct RichView {
     pub row_count: u8,
     pub reserved: [u8; 3],
     pub rows: [RichRow; chromatic_client::rich::ROWS],
+}
+#[repr(C)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub struct FlowRow {
+    pub text: Text,
+    pub codes: Text,
+    pub x: u8,
+    pub y: u8,
+    pub width: u8,
+    pub height: u8,
+    pub text_y: u8,
+    pub stroke: u8,
+    pub edges: u8,
+    pub flags: u8,
+    pub background: u16,
+    pub border: u16,
+    pub box_x: u8,
+    pub box_width: u8,
+    pub reserved: [u8; 2],
+}
+#[repr(C)]
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub struct FlowView {
+    pub document_id: u32,
+    pub position: u16,
+    pub positions: u16,
+    pub link_target: u32,
+    pub title: Text,
+    pub palette: Text,
+    pub row_count: u8,
+    pub limited: u8,
+    pub reserved: [u8; 2],
+    pub rows: [FlowRow; chromatic_client::flow::ROWS],
+}
+/// Original diagnostic viewport; does not touch the retained search collection.
+/// # Safety
+/// Out owns 512 exclusively writable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_flow_probe(out: *mut u8, position: u32) -> i32 {
+    if out.is_null() {
+        return -1;
+    }
+    chromatic_client::flow::probe(position as usize, unsafe {
+        core::slice::from_raw_parts_mut(out, 512)
+    }) as i32
+}
+/// Validate a bounded PFW1 viewport. Leave output unchanged on failure.
+/// # Safety
+/// Input owns length readable bytes; output is aligned, writable and disjoint.
+/// Keep input unchanged while any returned offsets are in use.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_flow_decode(
+    bytes: *const u8,
+    length: usize,
+    out: *mut FlowView,
+) -> i32 {
+    if bytes.is_null()
+        || out.is_null()
+        || !(24..=MAX_PACKET_BYTES).contains(&length)
+        || (out as usize) % core::mem::align_of::<FlowView>() != 0
+    {
+        return -1;
+    }
+    let data = unsafe { core::slice::from_raw_parts(bytes, length) };
+    let Ok(packet) = chromatic_client::flow::Packet::decode(data) else {
+        return -2;
+    };
+    let range = |b: &[u8]| Text {
+        offset: (b.as_ptr() as usize - data.as_ptr() as usize) as u16,
+        length: b.len() as u16,
+    };
+    let mut view = FlowView {
+        document_id: packet.document_id,
+        position: packet.position,
+        positions: packet.positions,
+        link_target: packet.link_target,
+        title: range(packet.title.as_bytes()),
+        palette: range(packet.palette),
+        row_count: packet.row_count as u8,
+        limited: data[19],
+        ..FlowView::default()
+    };
+    for (i, row) in packet.rows[..packet.row_count].iter().enumerate() {
+        view.rows[i] = FlowRow {
+            text: range(row.text.as_bytes()),
+            codes: range(row.codes),
+            x: row.x,
+            y: row.y,
+            width: row.width,
+            height: row.height,
+            text_y: row.text_y,
+            stroke: row.stroke,
+            edges: row.edges,
+            flags: row.flags,
+            background: row.background,
+            border: row.border,
+            box_x: row.box_x,
+            box_width: row.box_width,
+            reserved: [0; 2],
+        };
+    }
+    unsafe { out.write(view) };
+    0
 }
 /// Validate a PSR1 viewport and borrow its text/style offsets.
 /// # Safety
@@ -602,5 +705,35 @@ mod tests {
             unsafe { ps_packet_decode(bytes.as_ptr(), bytes.len(), &mut view) },
             0
         );
+    }
+    #[test]
+    fn flow_abi_borrowing_scrolling_and_invalid_output_contract() {
+        assert_eq!(core::mem::size_of::<FlowRow>(), 24);
+        assert_eq!(core::mem::size_of::<FlowView>(), 216);
+        let mut bytes = [0; 512];
+        let mut view = FlowView::default();
+        unsafe {
+            let n = ps_flow_probe(bytes.as_mut_ptr(), 0);
+            assert!(n > 0);
+            assert_eq!(ps_flow_decode(bytes.as_ptr(), n as usize, &mut view), 0);
+            assert!(view.positions > 1);
+            let positions = view.positions;
+            for p in 0..positions {
+                let n = ps_flow_probe(bytes.as_mut_ptr(), u32::from(p));
+                assert!(n > 0);
+                assert_eq!(ps_flow_decode(bytes.as_ptr(), n as usize, &mut view), 0);
+                assert_eq!(view.position, p);
+                for row in &view.rows[..view.row_count as usize] {
+                    assert!(row.text.offset as usize + row.text.length as usize <= n as usize);
+                    assert!(row.x as usize + row.width as usize <= 160);
+                }
+            }
+            let previous = view;
+            bytes[4] = 99;
+            assert_eq!(ps_flow_decode(bytes.as_ptr(), 512, &mut view), -2);
+            assert_eq!(view, previous);
+            assert_eq!(ps_flow_decode(core::ptr::null(), 512, &mut view), -1);
+            assert_eq!(ps_flow_probe(bytes.as_mut_ptr(), u32::from(positions)), 0);
+        }
     }
 }

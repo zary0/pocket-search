@@ -70,3 +70,37 @@ void PS_TypographyDraw(lv_event_t *event,const uint8_t *packet,const PS_RichView
         }
     }
 }
+static lv_color_t rgb565(uint16_t value){return lv_color_make(((value>>11)&31)*255/31,((value>>5)&63)*255/63,(value&31)*255/31);}
+static void rect(lv_draw_ctx_t *ctx,lv_coord_t x,lv_coord_t y,unsigned w,unsigned h,lv_color_t color){
+    if(!w||!h)return;
+    lv_draw_rect_dsc_t d;lv_draw_rect_dsc_init(&d);d.bg_color=color;d.bg_opa=LV_OPA_COVER;d.border_width=0;d.radius=0;
+    lv_area_t a={x,y,x+(lv_coord_t)w-1,y+(lv_coord_t)h-1};lv_draw_rect(ctx,&d,&a);
+}
+void PS_FlowDraw(lv_event_t *event,const uint8_t *packet,const PS_FlowView *view){
+    if(lv_event_get_code(event)!=LV_EVENT_DRAW_MAIN)return;
+    lv_obj_t *object=lv_event_get_target(event);lv_area_t area;lv_obj_get_coords(object,&area);
+    lv_draw_ctx_t *ctx=lv_event_get_draw_ctx(event);const uint8_t *palette=packet+view->palette.offset;
+    rect(ctx,area.x1,area.y1,160,92,rgb565((uint16_t)palette[2]|((uint16_t)palette[3]<<8)));
+    lv_draw_label_dsc_t dsc;lv_draw_label_dsc_init(&dsc);
+    for(unsigned row=0;row<view->row_count;++row){
+        const PS_FlowRow *r=&view->rows[row];lv_coord_t bx=area.x1+r->box_x,by=area.y1+r->y;
+        if(r->flags&1)rect(ctx,bx,by,r->box_width,r->height,rgb565(r->background));
+        if(r->stroke){
+            lv_color_t color=rgb565(r->border);rect(ctx,bx,by,r->stroke,r->height,color);rect(ctx,bx+r->box_width-r->stroke,by,r->stroke,r->height,color);
+            if(r->edges&1)rect(ctx,bx,by,r->box_width,r->stroke,color);
+            if(r->edges&2)rect(ctx,bx,by+r->height-r->stroke,r->box_width,r->stroke,color);
+        }
+        unsigned x=r->x,glyph=0,at=0;const uint8_t *text=packet+r->text.offset,*codes=packet+r->codes.offset;
+        while(at<r->text.length){
+            unsigned code=codes[glyph],style=code&15;const uint8_t *paint=palette+(code>>4)*5;uint32_t c=text[at++];
+            unsigned remaining=c<128?0:(c&0xe0)==0xc0?1:(c&0xf0)==0xe0?2:3;
+            if(remaining){c&=(1u<<(6-remaining))-1;while(remaining--)c=(c<<6)|(text[at++]&63);}
+            unsigned advance=width(c,style);lv_coord_t gx=area.x1+(lv_coord_t)x,gy=by+r->text_y;
+            if(paint[4]&1)rect(ctx,gx,gy,advance,size(style)+2,rgb565((uint16_t)paint[2]|((uint16_t)paint[3]<<8)));
+            dsc.font=&fonts[style];dsc.color=rgb565((uint16_t)paint[0]|((uint16_t)paint[1]<<8));
+            lv_point_t p={gx,gy};lv_draw_letter(ctx,&dsc,&p,c);
+            if(paint[4]&2)rect(ctx,gx,gy+size(style)+1,advance,1,dsc.color);
+            x+=advance;++glyph;
+        }
+    }
+}
