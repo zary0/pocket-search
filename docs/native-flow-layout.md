@@ -1,6 +1,6 @@
 # Native semantic flow layout
 
-The `0.13.24-flow` increment retains a small semantic tree alongside each collected document, applies basic typography/paint/box CSS, and reflows its text into a **160 × 92** viewport on the 160 × 144 Chromatic display. Collection, structure, layout and drawing stay on the MCU. It introduces no rendering server, page proxy, JavaScript engine or new dependency.
+The `0.13.25-flow` increment retains a small semantic tree alongside each collected document, applies basic typography/paint/box CSS, and reflows its text into a **160 × 92** viewport on the 160 × 144 Chromatic display. Collection, structure, layout and drawing stay on the MCU. It introduces no rendering server, page proxy, JavaScript engine or new dependency.
 
 ## Retained structure
 
@@ -47,3 +47,5 @@ Portable checks exercise every split of the original [HTML fixture](../examples/
 `search_ui layout` displays an original `TEST` diagnostic only while a verified real article is open. Its structure and paint are prepared on the MCU, separately from the search corpus. Up/down and left/right inspect it; B restores the actual article. No fixture page, index or display packet is supplied over USB.
 
 Native measurements and image identity will be recorded separately from operator LCD/button/battery observations. This change does not complete release qualification, physical CI E2E or reproducible distribution packaging.
+
+The inspected operator integration uses `pocket_frame_capture.h` for development-only frame readback: three separately allocated 15,360-byte bands retain one complete 160 × 144 RGB565 frame. This addresses contiguous-allocation failure; the total temporary pixel storage remains 46,080 bytes. Allocation failures clean up all bands, row copies are checked before writing, and the existing GUI ownership/completion handshake must finish before freeing them. This is render-buffer evidence, not USB-video or an LCD camera capture. The operator main integration remains a release-reproducibility dependency.
