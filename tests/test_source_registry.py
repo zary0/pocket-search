@@ -20,3 +20,8 @@ class Sources(unittest.TestCase):
             with self.assertRaises(ValueError):module.registry(c)
         c=copy.deepcopy(self.config);c['profiles']*=5
         with self.assertRaises(ValueError):module.registry(c)
+    def test_legacy_ip_and_lan_names_fail_with_coherent_seed_and_robots(self):
+        for host in ['local-router','127.1','127.0.0.01','0x7f.0x0.0x0.0x1','a'*64+'.org']:
+            profile={'name':'Boundary','base':'https://'+host+'/a/','seed':'https://'+host+'/a/node1.html','robots':'https://'+host+'/robots.txt','scope':'node-html'}
+            c={'schema_version':1,'profiles':[profile]}
+            with self.subTest(host=host),self.assertRaises(ValueError):module.registry(c)

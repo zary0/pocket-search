@@ -18,7 +18,8 @@ public HTTPS URLs in an explicit directory on one authority; the selected scope
 admits either numbered `node*.html` leaves or bounded ASCII HTML paths. This is
 maintainer-reviewed configuration, not unrestricted URL entry or an Internet-wide
 crawler. Query strings, IP literals, credentials, ports, escapes and parent paths
-are rejected. Newly added authorities still need native resource and adversarial
+are rejected. Single-label LAN names, legacy shortened/octal/hex IP spellings and
+oversized DNS labels are also rejected before generating a profile. Newly added authorities still need native resource and adversarial
 network acceptance; a public-looking name alone does not establish safe DNS.
 
 - Home **Left** opens sources; Up/Down selects, A applies and B returns.

@@ -10,6 +10,11 @@ from urllib.parse import urlsplit
 ROOT = Path(__file__).resolve().parents[1]
 CONFIG = ROOT / 'devices/chromatic/sources.json'
 OUTPUT = ROOT / 'crates/chromatic-client/src/sources.rs'
+def public_dns_name(host):
+    # Reject single-label LAN names and inet_aton-style decimal/octal/hex IPs.
+    # A DNS-looking name still needs reviewed resolution policy on the device.
+    labels = host.split('.')
+    return len(labels) >= 2 and all(re.fullmatch(r'[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?', label) for label in labels) and bool(re.fullmatch(r'[a-z]{2,63}|xn--[a-z0-9-]{1,59}', labels[-1]))
 def registry(value):
     if set(value) != {'schema_version', 'profiles'} or value['schema_version'] != 1:
         raise ValueError('Unsupported source registry schema')
@@ -27,7 +32,7 @@ def registry(value):
         urls = [urlsplit(p[k]) for k in ('base', 'seed', 'robots')]
         for parsed, k in zip(urls, ('base', 'seed', 'robots')):
             host = parsed.hostname or ''
-            if parsed.scheme != 'https' or parsed.netloc != host or parsed.query or parsed.fragment or len(p[k]) >= 128 or not re.fullmatch(r'[a-z0-9]+(?:[.-][a-z0-9]+)+', host) or host.endswith(('.local','.localhost','.internal','.test','.invalid')) or '..' in parsed.path or '//' in parsed.path or not re.fullmatch(r'/[A-Za-z0-9/_\-.]*', parsed.path):
+            if parsed.scheme != 'https' or parsed.netloc != host or parsed.query or parsed.fragment or len(p[k]) >= 128 or not public_dns_name(host) or host.endswith(('.local','.localhost','.internal','.test','.invalid')) or '..' in parsed.path or '//' in parsed.path or not re.fullmatch(r'/[A-Za-z0-9/_\-.]*', parsed.path):
                 raise ValueError('Only bounded explicit public HTTPS paths are permitted')
             try: ipaddress.ip_address(host)
             except ValueError: pass
