@@ -13,7 +13,7 @@ a checked implementation item does not qualify a firmware release.
   requests. No host page proxy or external search API in autonomous mode.
 - [x] Complete MCU application source overlay, fonts, display/button integration,
   public pinned dependencies, checksum-verified tool installer and clean build.
-  Two macOS `0.14.0` builds match; isolated Linux native CI passes. See
+  Two fresh macOS `0.14.6` outputs match; isolated Linux native CI passes. See
   [build procedure and distribution boundary](native-firmware-build.md).
 - [x] Correct cancellation retry: a cancelled robots request does not cache a
   denial. Unpublished cancelled pages remain resumable. Transfer/format errors
@@ -26,7 +26,8 @@ a checked implementation item does not qualify a firmware release.
   MCU render-buffer readback and synthetic button injection are development
   evidence, not physical USB video or independent button/panel observation.
 - [ ] Provision a dedicated isolated runner, trusted installed lab driver,
-  deterministic native HTTPS fixture origin and actual capture/control access.
+  public HTTPS deployment of the implemented [native source fixture](native-fixture.md),
+  a reviewed candidate profile and actual capture/control access.
   Keep `CHROMATIC_E2E_READY=false` until verified. Never execute contributor PR
   code on the maintainer's daily-use machine.
 - [ ] Bind candidate/source/readback and all required physical E2E evidence,
@@ -92,8 +93,14 @@ See [retained-content implementation and limits](native-retained-content.md).
   after replacement; remove repeated whole-page counting from navigation.
 - [x] Implement explicit same-document reference/cached packet comparisons and
   a thirty-second current-native-UI render/heap/stack window without a test scene.
-- [ ] Record latest CPU, heap/largest block, stack, TLS/image and drawing timings
-  together; compare before/after under identical source and navigation workloads.
+- [x] Record scoped latest CPU, heap/largest block, stack, TLS/image and GUI windows;
+  compare same-document packet bytes and unchanged-reader transfers. See
+  [native measurements and exact scope](native-device-measurements.md). Physical
+  power, full TLS peak traces and broader size/speed profile comparison remain pending.
+- [x] Complete a scoped latest USB-powered thirty-minute offline reader run, with
+  3,760 queued controls, stable sampled heap, zero socket requests/storage failures
+  and all 120 positions traversed. It does not qualify battery, physical controls
+  or repeated network/image endurance.
 - [ ] Extend endurance testing and optimize measured bottlenecks without weakening
   certificate, content, storage and release validation. Assess task consolidation
   or bare-metal changes against equivalent working networking/recovery behavior.

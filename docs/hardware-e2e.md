@@ -25,6 +25,8 @@ Repository variables:
 | `CHROMATIC_LAB_DRIVER_SHA256` | Operator-approved digest of that installed executable |
 | `CHROMATIC_TEST_ORIGIN` | Reachable HTTPS fixture origin with a certificate accepted by the device |
 
+Readiness also requires an exact public HTTPS origin already admitted by a reviewed source profile; a variable cannot grant the device a new authority.
+
 These variables do not contain Wi-Fi passwords, activation keys, tokens, or backups. Runner credentials and private device state stay outside the repository and upload artifacts. Actions execute the driver with an argument list and verify its path and hash rather than evaluating a repository-provided shell command.
 
 ## Driver contract

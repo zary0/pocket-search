@@ -1,9 +1,12 @@
 # Retained sources, updates and native images
 
-The `0.14.3` increment keeps collection, storage, search, layout and baseline JPEG
+The `0.14.6` increment keeps collection, storage, search, layout and baseline JPEG
 processing on the ESP32. No companion service, tunnel, host image preparation or
 USB page proxy participates. It is an experimental increment; physical release
 qualification, current battery acceptance and a dedicated CI lab remain required.
+
+See [scoped native CPU, memory, rendering and image measurements](native-device-measurements.md)
+for installed-image identity and the actual development observations.
 
 ## Source configuration and controls
 

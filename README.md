@@ -110,13 +110,13 @@ Contributions should keep the device path bounded and justify performance change
 cargo bench --locked --bench performance > performance.json
 ```
 
-The Rust search and decoder timings are host-only measurements on Apple M4. A separate C/LVGL display probe measures native rendering on one physical console; see [display integration](docs/chromatic-rendering.md) and [performance results](docs/performance.md). The CPU-cycle probe has a target compile check; the experimental search image now executes the Rust decoder on Xtensa. Decoder cycle/peak-memory measurements and profile comparison remain pending.
+The companion benchmark runs on Apple M4. Separate [native device measurements](docs/native-device-measurements.md) record same-window CPU comparisons, decoder cycles, heap/stack, direct JPEG processing and actual GUI transfers on one Chromatic. Cached-count encoding drops from about 27 ms to 1 ms for the measured first viewport; unchanged-reader transfers drop to zero. These scoped USB-powered diagnostics do not establish physical release qualification or battery life. See also [display integration](docs/chromatic-rendering.md) and [historical performance results](docs/performance.md).
 
 ## CI, CD, and versions
 
 Development integrates through **`develop`**, then promotes to **`main`**. Stable releases use annotated **`vX.Y.Z`** tags matching the single workspace version. Development package names include the base version and commit and cannot be published as stable releases.
 
-Hosted CI checks versions, Rust behavior, bounded C/JavaScript input, and release-gate unit tests. Develop pushes record physical E2E as **not run** when the lab is explicitly disabled; once enabled they invoke qualification automatically. Main pushes, manual qualification, and release tags always require the real physical gate. Only a native Wi-Fi E2E result for the exact firmware/candidate permits release publication; missing or skipped hardware tests block it. The lab runner, trusted physical driver, and deterministic native fixture origin are pending, so no physical E2E pass or firmware release is claimed.
+Hosted CI checks versions, Rust behavior, bounded C/JavaScript input, and release-gate unit tests. Develop pushes record physical E2E as **not run** when the lab is explicitly disabled; once enabled they invoke qualification automatically. Main pushes, manual qualification, and release tags always require the real physical gate. Only a native Wi-Fi E2E result for the exact firmware/candidate permits release publication; missing or skipped hardware tests block it. A [deterministic native source fixture](docs/native-fixture.md) provides original HTML/JPEG and repeatable failures. Its public HTTPS deployment, the lab runner and trusted physical driver are pending, so no physical E2E pass or firmware release is claimed.
 
 See [branches and release packages](docs/releases.md) and [physical E2E lab setup](docs/hardware-e2e.md). Packages carry source, companion and native image hashes, build identity, validated evidence, and checksums. Publication promotes tested assets without rebuilding them.
 

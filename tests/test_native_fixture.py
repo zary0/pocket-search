@@ -64,6 +64,10 @@ class NativeFixture(unittest.TestCase):
     def test_original_image_has_small_baseline_dimensions(self):
         image = f.reply(f.BASE + "bars.jpg", {}).body
         self.assertLess(len(image), 24576)
+        asset = json.loads((f.ROOT / "ci/native-fixture/asset.json").read_text())
+        self.assertEqual(asset["sha256"], hashlib.sha256(image).hexdigest())
+        self.assertEqual(asset["bytes"], len(image))
+        self.assertEqual((asset["width"], asset["height"]), (192, 128))
         self.assertEqual(image[:2], b"\xff\xd8")
         self.assertEqual(image[-2:], b"\xff\xd9")
         i = image.index(b"\xff\xc0")

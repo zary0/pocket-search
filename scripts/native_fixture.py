@@ -20,7 +20,7 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 BASE = "/pocket-fixture/"
 MODES = ("normal", "changed", "timeout", "unavailable", "oversized", "wrong-type", "truncated", "malformed-image")
-MODIFIED = "Mon, 12 Oct 2026 00:00:00 GMT"
+MODIFIED = "Thu, 01 Jan 2026 00:00:00 GMT"
 
 
 @dataclass(frozen=True)

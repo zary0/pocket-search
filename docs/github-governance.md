@@ -17,7 +17,7 @@ As checked on **2026-10-10**, `zary0/pocket-search` is **private**, with `develo
 | Dependabot alerts and security-update PRs | Enabled and read back via GitHub API; security updates are not paused |
 | Repository secret scanning and push protection | Not enabled in the current private setup; enable and verify on public activation |
 | Private vulnerability reporting | Not enabled/verified; existing confidential-contact fallback in SECURITY.md remains in force |
-| Physical release gate | Workflow/evidence validation exists; full native application and lab E2E remain pending |
+| Physical release gate | Workflow/evidence validation exists; complete native build passes; provisioned lab and physical E2E remain pending |
 
 GitHub supports protected branches in public repositories on **GitHub Free**, including Free organizations; private branches require a supported paid plan. CODEOWNERS is also available for Free public repositories. See [protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) and [code owners](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners). Do not retain the private-plan limitation as a claim after publication.
 

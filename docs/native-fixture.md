@@ -3,8 +3,8 @@
 `scripts/native_fixture.py` serves four original bounded HTML pages and an original
 192 x 128 baseline JPEG. The device must collect, extract, index, lay out, decode and
 resize them itself. The origin has no search endpoint, page proxy, browser engine,
-image conversion, outbound requests or filesystem URL mapping. The fixture and
-its image are GPL-3.0-only; image provenance is in `ci/native-fixture/asset.json`.
+image conversion, outbound requests or filesystem URL mapping. It forces native resize to 120 x 80 rather than shipping
+display-ready pixels. The fixture and its image are GPL-3.0-only; image provenance is in `ci/native-fixture/asset.json`.
 
 The pages contain `PocketLab`, mixed English/Japanese text, headings, paragraph
 sizes, strong text, lists, links, an image slot and a definite end marker. They fit
@@ -12,6 +12,11 @@ the current retained-content limits. Search for `PocketLab` after collecting all
 four pages; use `quartz` for an absent term. Native E2E must check text, ordering,
 last-position bounds and actual glyphs rather than assuming a successful request
 means a correct display.
+
+`ci/native-fixture/generate.py` is the preferred source for the original bars. It
+requires Pillow only to regenerate a new JPEG; serving, CI content checks and the
+native device have no Pillow dependency. Encoder versions may change bytes, so
+the reviewed committed asset and its checksum remain the fixture's identity.
 
 ## Operator provisioning
 
