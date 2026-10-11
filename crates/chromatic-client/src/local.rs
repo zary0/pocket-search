@@ -547,11 +547,6 @@ impl LocalSearch {
             ) {
                 self.block_break(1);
             }
-            if closing {
-                self.documents[self.count as usize]
-                    .tree
-                    .close(name, self.documents[self.count as usize].body.len);
-            }
             self.style_tag(name, closing, text);
             if !closing {
                 let at = self.documents[self.count as usize].body.len;
@@ -858,6 +853,37 @@ mod flow_tests {
     extern crate std;
     use std::{boxed::Box, string::String};
     const HTML: &[u8] = include_bytes!("../../../examples/fixtures/flow.html");
+    #[test]
+    fn closing_nested_same_kind_keeps_outer_ranges_and_paint() {
+        let html=b"<div style='color:red'><div style='color:blue'>inner</div>outer tail<ul><li>first<ul><li>inner item</li></ul>outer item tail</li><li>second item</li></ul></div>";
+        for split in 0..=html.len() {
+            let mut state = Box::new(LocalSearch::new());
+            state.seed();
+            assert!(state.next_url(&mut [0; 128]) > 0);
+            state.feed(&html[..split]);
+            state.feed(&html[split..]);
+            assert!(state.finish(true));
+            let doc = &state.documents[0];
+            let at = doc.body.as_str().find("outer tail").unwrap();
+            let outer = &doc.tree.nodes[0];
+            assert!(outer.end as usize > at);
+            assert_eq!(outer.style.color, box_css::color("red").unwrap());
+            let nested = &doc.tree.nodes[1];
+            assert!((nested.end as usize) <= at);
+            let at = doc.body.as_str().find("outer item tail").unwrap();
+            let parent = doc.tree.nodes[..doc.tree.count as usize]
+                .iter()
+                .find(|n| {
+                    n.kind == flow::ITEM
+                        && doc.body.as_str()[n.start as usize..n.end as usize].contains("first")
+                })
+                .unwrap();
+            assert!(parent.end as usize > at);
+            let mut packet = [0; 512];
+            let n = state.flow_packet(1, 0, &mut packet);
+            flow::Packet::decode(&packet[..n]).unwrap();
+        }
+    }
     fn collect(split: usize) -> Box<LocalSearch> {
         let mut state = Box::new(LocalSearch::new());
         state.seed();

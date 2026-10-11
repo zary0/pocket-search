@@ -97,20 +97,31 @@ impl Declarations {
                 }
             }
             if key.eq_ignore_ascii_case("border") {
-                let mut parts = value.split_ascii_whitespace();
-                if let (Some(w), Some(kind), Some(c), None) =
-                    (parts.next(), parts.next(), parts.next(), parts.next())
-                {
-                    if kind.eq_ignore_ascii_case("solid") {
-                        if let (Some(w), Some(c)) = (pixels(w, 3), color(c)) {
+                if value.eq_ignore_ascii_case("none") {
+                    self.put(3, 0, important);
+                } else {
+                    let (mut width, mut paint, mut solid, mut valid) = (None, None, false, true);
+                    for part in value.split_ascii_whitespace() {
+                        if part.eq_ignore_ascii_case("solid") && !solid {
+                            solid = true;
+                        } else if let Some(w) = pixels(part, 3).filter(|_| width.is_none()) {
+                            width = Some(w);
+                        } else if let Some(c) = color(part).filter(|_| paint.is_none()) {
+                            paint = Some(c);
+                        } else {
+                            valid = false;
+                            break;
+                        }
+                    }
+                    if valid && solid {
+                        if let (Some(w), Some(c)) = (width, paint) {
                             self.put(3, u16::from(w), important);
                             self.put(2, c, important);
                         }
                     }
-                } else if value.eq_ignore_ascii_case("none") {
-                    self.put(3, 0, important);
                 }
             }
+
             if key.eq_ignore_ascii_case("border-width") {
                 if let Some(v) = pixels(value, 3) {
                     self.put(3, u16::from(v), important);
@@ -287,5 +298,17 @@ mod tests {
         assert_eq!(color("#ff0000"), color("red"));
         assert_eq!(color("#fff"), color("rgb(255,255,255)"));
         assert_eq!(color("rgb(256,0,0)"), None);
+        for value in [
+            "border:solid 1px red",
+            "border:red solid 1px",
+            "border:1px red solid",
+            "border:solid red 1px",
+        ] {
+            let style = sheet.paint("span", "", "", value, Style::DEFAULT);
+            assert_eq!(style.stroke, 1);
+            assert_eq!(style.border, 0xf800);
+        }
+        let bad = sheet.paint("span", "", "", "border:solid solid 1px red", Style::DEFAULT);
+        assert_eq!(bad.stroke, 0);
     }
 }

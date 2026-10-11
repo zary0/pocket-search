@@ -1,6 +1,6 @@
 # Native semantic flow layout
 
-The `0.13.23-flow` increment retains a small semantic tree alongside each collected document, applies basic typography/paint/box CSS, and reflows its text into a **160 × 92** viewport on the 160 × 144 Chromatic display. Collection, structure, layout and drawing stay on the MCU. It introduces no rendering server, page proxy, JavaScript engine or new dependency.
+The `0.13.24-flow` increment retains a small semantic tree alongside each collected document, applies basic typography/paint/box CSS, and reflows its text into a **160 × 92** viewport on the 160 × 144 Chromatic display. Collection, structure, layout and drawing stay on the MCU. It introduces no rendering server, page proxy, JavaScript engine or new dependency.
 
 ## Retained structure
 
@@ -22,7 +22,7 @@ Inline attributes and the existing first external stylesheet share property-wise
 | `color` | `#rgb`, `#rrggbb`, integer `rgb(r,g,b)` and 16 CSS color names; RGB565 output |
 | `background-color`, `background` | A supported solid color |
 | `margin`, `padding` | One to four nonnegative integer pixel values; four individual sides; each side clamps to 12 px |
-| `border` | `Npx solid COLOR` or `none`; uniform width clamps to 3 px |
+| `border` | Width, `solid`, and color in any token order, or `none`; uniform width clamps to 3 px |
 | `border-width`, `border-color` | A uniform pixel width or supported color |
 | `text-decoration` | `underline`, `none` |
 
