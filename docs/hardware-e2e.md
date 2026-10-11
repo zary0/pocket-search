@@ -6,13 +6,13 @@ The lab must test the native Pocket Search MCU application through the actual di
 
 ## Current readiness
 
-As checked on 2026-10-10, no lab runner is registered, `CHROMATIC_E2E_READY=false`, the complete Pocket Search MCU firmware project and installed lab driver are not implemented, and no reachable test HTTPS origin is configured. The workflows and release-gate validators exist. The experimental search UI/rendering images have external integration and different application/version identities; they cannot satisfy this pipeline.
+As checked on 2026-10-12, no lab runner is registered and `CHROMATIC_E2E_READY=false`. The complete MCU build is implemented and verified by hosted CI; the operator-installed physical lab driver and deterministic native fixture origin remain unavailable. The workflows and release-gate validators exist. Current USB render-buffer and synthetic-input checks cannot satisfy this pipeline.
 
 Automatic develop pushes record **Physical E2E not run** while the repository variable is explicitly `false`. This keeps the development status separate from a failed test or a fabricated pass. An unset/invalid value runs the strict readiness check and fails. Main pushes, manual dispatch on develop/main, and release tags always invoke qualification, whose readiness and physical evidence gates remain mandatory. Enable `true` only after the prerequisites below are verified; then develop pushes also run physical qualification automatically.
 
 ## Dedicated runner
 
-Use an operator-controlled machine with USB access to the intended Chromatic, ESP-IDF and the actual Rust Xtensa toolchain, Python 3.11+, and the firmware deployment/capture dependencies. The pinned Actions use Node.js 24 and require Actions Runner **2.327.1 or newer**. Register it for this repository with the `chromatic` label. Use a dedicated unit and preserve its verified recovery backup and Wi-Fi settings outside the checkout.
+Use an operator-controlled machine with USB access to the intended Chromatic, ESP-IDF and the actual Rust Xtensa toolchain, Python 3.12+, and the firmware deployment/capture dependencies. The pinned Actions use Node.js 24 and require Actions Runner **2.327.1 or newer**. Register it for this repository with the `chromatic` label. Use a dedicated unit and preserve its verified recovery backup and Wi-Fi settings outside the checkout.
 
 Configure the `chromatic-lab` environment for trusted `develop`, `main`, and stable release tags. Do not execute fork PRs or arbitrary contributor refs on the lab machine. Preconfigure physical capture access through the normal ModRetro/OS permission flow; CI cannot silently grant it. Keep the installed driver outside repository-controlled paths.
 
@@ -55,3 +55,7 @@ JUnit must contain exactly the required scenarios with zero failures, errors, or
 Parsing JSON and PNG metadata cannot authenticate their physical origin. Trust comes from the controlled runner and hash-approved driver performing actual installation, read-back, native requests, UI checks, and physical capture. `tests/test_pipeline.py` uses explicit synthetic unit fixtures solely to check gate acceptance/rejection. Those fixtures are never physical results or release evidence.
 
 After validation, the pipeline uploads only the candidate and selected evidence. Publication revalidates everything and promotes the same tested bytes without rebuilding. A missing runner or unfinished driver leaves the release blocked.
+
+## Personal-machine boundary
+
+Do not register a maintainer's daily-use Mac as a public self-hosted runner. It contains GitHub credentials, Gowin licenses and private device backups. Use a dedicated account and ideally a dedicated machine/USB fixture, outside personal credentials and directories, with operator-approved driver identity and normal physical capture permissions. PRs run only in GitHub-hosted compilation/unit jobs. Keep `CHROMATIC_E2E_READY=false` until exact-image installation/readback, physical controls/video, native fixture cases, recovery and battery evidence pass. A documented workflow alone is not a configured or tested lab.

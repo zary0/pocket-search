@@ -2,6 +2,8 @@
 #include <assert.h>
 #include "../devices/chromatic/components/pocket_search_ui/pocket_resource_policy.h"
 int main(void){
+    assert(PS_ResourceURL("https://www.w3.org/People/site.css",false));
+    assert(!PS_ResourceURL("https://www.w3.org.evil.invalid/site.css",false));
     assert(PS_ResourceURL("https://www-formal.stanford.edu/jmc/site.css",false));
     assert(PS_ResourceURL("https://www-formal.stanford.edu/jmc/font.ttf",true));
     assert(PS_ResourceURL("https://fonts.googleapis.com/css?family=VT323",false));

@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "profiles": [
+    {
+      "name": "Stanford AI",
+      "base": "https://www-formal.stanford.edu/jmc/whatisai/",
+      "seed": "https://www-formal.stanford.edu/jmc/whatisai/node1.html",
+      "robots": "https://www-formal.stanford.edu/robots.txt",
+      "scope": "node-html"
+    },
+    {
+      "name": "W3C Web",
+      "base": "https://www.w3.org/People/Berners-Lee/",
+      "seed": "https://www.w3.org/People/Berners-Lee/",
+      "robots": "https://www.w3.org/robots.txt",
+      "scope": "html-paths"
+    },
+    {
+      "name": "W3C People",
+      "base": "https://www.w3.org/People/Raggett/",
+      "seed": "https://www.w3.org/People/Raggett/",
+      "robots": "https://www.w3.org/robots.txt",
+      "scope": "html-paths"
+    }
+  ]
+}

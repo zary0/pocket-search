@@ -29,7 +29,9 @@
     "application_bytes": 2097152,
     "partition_table_offset": 32768,
     "nvs_offset": 36864,
-    "nvs_bytes": 24576
+    "nvs_bytes": 24576,
+    "corpus_offset": 2162688,
+    "corpus_bytes": 131072
   },
   "rust": {
     "rustc": "rustc 1.97.0-nightly (8ea53bcd7 2026-07-08) (1.97.0.0)",

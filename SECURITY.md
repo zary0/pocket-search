@@ -69,3 +69,9 @@ The current autonomous client has no bookmarks, query/browsing history or analyt
 The optional companion service disables request/query/body logging and sends no-store responses. Earlier temporary HTTPS providers could observe requests; no production retention or hosting privacy claim is made. Any future logging, persistence or collection behavior must be documented before deployment.
 
 If a secret is accidentally exposed, revoke or rotate it with its provider before treating file deletion as a fix. Notify the maintainer privately, review history and artifacts for exposure, and coordinate cleanup without copying the secret into an issue. Local ignore rules are only a convenience, not a substitute for review.
+
+## Native retained content and image limits
+
+The reviewed source registry is compile-time configuration. Public HTTPS names do not replace destination/robots review; arbitrary user URL entry is not enabled. Native snapshots retain public page text, styles, source URLs and validators, never queries or reading history. The unencrypted two-bank flash cache checks ownership, CRC, bounds and semantic structure. It is not cryptographic authentication, and logical clear does not securely erase older banks. Do not publish full-flash backups or corpus banks. Storage format changes can require recollection.
+
+The ROM JPEG path is limited to small baseline envelopes with checked table bounds, bounded dimensions/output, allocation cleanup and cooperative cancellation. Progressive JPEG and other image formats fail visibly. These checks do not prove the ROM entropy decoder safe for hostile unrestricted web content. Keep the small reviewed profile scope and expand native adversarial testing before widening it.

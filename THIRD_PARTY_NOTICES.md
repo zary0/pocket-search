@@ -237,3 +237,7 @@ The bounded CSS parser and static TrueType subset rasterizer are original projec
 The compiled `components/fonts/pocket_jp.c` bitmap is a modified Noto Sans JP font named **Pocket JP**, copyright 2014-2021 Adobe, Reserved Font Name 'Source'. It remains **OFL-1.1**, with the original notice in `components/fonts/POCKET-FONT-LICENSE.txt`. The generator renders 12-pixel glyphs at weight 500 to a 1-bit bitmap. The original font input SHA-256 is in `devices/chromatic/firmware/inputs.json`; derived bitmap bytes are included as compilable source. These font assets are not GPL code. Runtime downloads of other web fonts retain their separate licenses.
 
 See [complete native MCU build](docs/native-firmware-build.md) for compiler/dependency pins, supported hosts and application-only build/deployment boundaries. A native build pass does not replace physical E2E or complete distribution qualification.
+
+## ESP32 ROM JPEG path
+
+The native baseline JPEG adapter calls the existing ESP32 ROM TinyJPEG API declared in pinned ESP-IDF `esp32/rom/tjpgd.h`. That header attributes TinyJPEG to ChaN, 2012. The ROM decoder is resident device code; no JPEG decoder implementation or third-party source photograph is vendored by Pocket Search. The repository-authored admission policy, resizing callback and adapter are GPL-3.0-only. Preserve the pinned upstream ESP-IDF header notices and platform licensing with distributed corresponding source. This use does not establish general decoder conformance or a security audit.

@@ -96,6 +96,11 @@ def build(args):
     # Prevent caller-provided flags or target overrides from changing the fixed profile.
     for name in ("RUSTFLAGS", "CARGO_ENCODED_RUSTFLAGS", "CARGO_BUILD_TARGET"):
         environment.pop(name, None)
+    sysroot = subprocess.check_output([str(args.rustc), "--print", "sysroot"], text=True).strip()
+    cargo_home = Path(os.environ.get("CARGO_HOME", str(Path.home() / ".cargo")))
+    remaps = [(ROOT, "/pocket-search"), (Path(sysroot) / "lib/rustlib/src/rust", "/rust-src"), (cargo_home, "/cargo")]
+    rust_flags = ["--remap-path-prefix=" + str(source) + "=" + target for source, target in remaps]
+    environment["CARGO_ENCODED_RUSTFLAGS"] = "\x1f".join(rust_flags)
     rust_command = [str(args.cargo.resolve()), "build", "--locked", "-Zbuild-std=core", "--target", PIN["rust"]["target"], "-p", "chromatic-ffi", "--features", "native", "--profile", PIN["rust"]["profile"]]
     with (project / "rust-build.log").open("w") as log:
         subprocess.run(rust_command, cwd=ROOT, env=environment, stdout=log, stderr=subprocess.STDOUT, check=True)
@@ -115,7 +120,7 @@ def build(args):
                 inputs[str(path.relative_to(project))] = sha(path)
     for name in ("CMakeLists.txt", "sdkconfig.defaults", "partitions-wifi.csv"):
         inputs[name] = sha(project / name)
-    report = {"schema_version": 1, "project": "pocket-search", "target": "esp32", "commit": commit, "version": version, "sha256": sha(image), "application_bytes": image.stat().st_size, "deployment": "application-only", "development_dirty": args.allow_dirty, "installed": False, "physical_qualified": False, "rustc": compiler, "rust_archive_sha256": sha(archive), "pinned_inputs": PIN, "source_sha256": inputs}
+    report = {"schema_version": 1, "project": "pocket-search", "target": "esp32", "commit": commit, "version": version, "sha256": sha(image), "application_bytes": image.stat().st_size, "deployment": "application-only", "development_dirty": args.allow_dirty, "installed": False, "physical_qualified": False, "rustc": compiler, "rust_archive_sha256": sha(archive), "rust_path_remapping": True, "pinned_inputs": PIN, "source_sha256": inputs}
     shutil.copyfile(image, project / "application.bin")
     (project / "firmware.json").write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
     print(json.dumps({k: report[k] for k in ("version", "sha256", "application_bytes", "development_dirty", "physical_qualified")}))

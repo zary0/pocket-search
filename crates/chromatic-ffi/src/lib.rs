@@ -186,6 +186,261 @@ pub unsafe extern "C" fn ps_local_init(state: *mut u8, size: usize) -> i32 {
     0
 }
 /// # Safety
+/// Exclusively owned initialized state as for ps_local_init.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_cancel_transfer(state: *mut u8, size: usize) -> i32 {
+    if !state_valid(state, size) {
+        return -1;
+    }
+    unsafe { &mut *state.cast::<LocalSearch>() }.cancel_transfer();
+    0
+}
+#[unsafe(no_mangle)]
+pub extern "C" fn ps_local_profiles() -> u32 {
+    chromatic_client::local::PROFILES.len() as u32
+}
+fn saved_valid(saved: *mut u8, length: usize) -> bool {
+    !saved.is_null()
+        && length == ps_local_backup_bytes()
+        && (saved as usize) % core::mem::align_of::<chromatic_client::local::SavedDocument>() == 0
+}
+/// # Safety
+/// State follows ps_local_init. Saved is a zeroed aligned region of the exact
+/// backup size; URL exclusively owns 128 bytes. All regions are disjoint.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_update_begin(
+    state: *mut u8,
+    size: usize,
+    id: u32,
+    saved: *mut u8,
+    length: usize,
+    url: *mut u8,
+) -> i32 {
+    if !state_valid(state, size) || !saved_valid(saved, length) || url.is_null() {
+        return -1;
+    }
+    unsafe { &mut *state.cast::<LocalSearch>() }.begin_update(
+        id as usize,
+        unsafe { &mut *saved.cast() },
+        unsafe { core::slice::from_raw_parts_mut(url, 128) },
+    ) as i32
+}
+/// # Safety
+/// Saved was initialized by ps_local_update_begin and remains unchanged; output
+/// owns 96 writable bytes disjoint from it. Regions are exclusively owned.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_update_header(
+    saved: *mut u8,
+    length: usize,
+    modified: i32,
+    out: *mut u8,
+) -> i32 {
+    if !saved_valid(saved, length) || out.is_null() {
+        return -1;
+    }
+    LocalSearch::update_header(unsafe { &*saved.cast() }, modified != 0, unsafe {
+        core::slice::from_raw_parts_mut(out, 96)
+    }) as i32
+}
+/// # Safety
+/// Exclusive initialized state follows ps_local_init. Saved was initialized by
+/// ps_local_update_begin for this active update, is unchanged and disjoint.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_update_restore(
+    state: *mut u8,
+    size: usize,
+    saved: *mut u8,
+    length: usize,
+    unchanged: i32,
+    checked: u32,
+) -> i32 {
+    if !state_valid(state, size) || !saved_valid(saved, length) {
+        return -1;
+    }
+    if unsafe { &mut *state.cast::<LocalSearch>() }.restore_update(
+        unsafe { &*saved.cast() },
+        unchanged != 0,
+        checked,
+    ) {
+        0
+    } else {
+        -1
+    }
+}
+/// # Safety
+/// State follows ps_local_init. ETag and Modified own their readable lengths,
+/// are UTF-8 and exclusively owned, with no overlap with the initialized state.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_validators(
+    state: *mut u8,
+    size: usize,
+    etag: *const u8,
+    etag_len: usize,
+    modified: *const u8,
+    modified_len: usize,
+) -> i32 {
+    if !state_valid(state, size)
+        || etag.is_null()
+        || modified.is_null()
+        || etag_len > 95
+        || modified_len > 63
+    {
+        return -1;
+    }
+    let Ok(etag) = core::str::from_utf8(unsafe { core::slice::from_raw_parts(etag, etag_len) })
+    else {
+        return -1;
+    };
+    let Ok(modified) =
+        core::str::from_utf8(unsafe { core::slice::from_raw_parts(modified, modified_len) })
+    else {
+        return -1;
+    };
+    if unsafe { &mut *state.cast::<LocalSearch>() }.validators(etag, modified) {
+        0
+    } else {
+        -1
+    }
+}
+/// Maximum serialized retained-content bytes; excludes queries and runtime memory.
+#[unsafe(no_mangle)]
+pub extern "C" fn ps_local_snapshot_bytes() -> usize {
+    chromatic_client::local::SNAPSHOT_BYTES
+}
+/// # Safety
+/// State follows ps_local_init. Output exclusively owns capacity bytes and does
+/// not overlap state. No concurrent access to either region.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_snapshot(
+    state: *mut u8,
+    size: usize,
+    out: *mut u8,
+    capacity: usize,
+) -> i32 {
+    if !state_valid(state, size)
+        || out.is_null()
+        || capacity > chromatic_client::local::SNAPSHOT_BYTES
+    {
+        return -1;
+    }
+    unsafe { &*state.cast::<LocalSearch>() }
+        .snapshot(unsafe { core::slice::from_raw_parts_mut(out, capacity) })
+        .map_or(-1, |n| n as i32)
+}
+/// # Safety
+/// Exclusive initialized empty state follows ps_local_init. Input owns length
+/// readable bytes, does not overlap state, and cannot be changed concurrently.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_restore_snapshot(
+    state: *mut u8,
+    size: usize,
+    bytes: *const u8,
+    length: usize,
+) -> i32 {
+    if !state_valid(state, size)
+        || bytes.is_null()
+        || length > chromatic_client::local::SNAPSHOT_BYTES
+    {
+        return -1;
+    }
+    if unsafe { &mut *state.cast::<LocalSearch>() }
+        .restore_snapshot(unsafe { core::slice::from_raw_parts(bytes, length) })
+    {
+        0
+    } else {
+        -1
+    }
+}
+/// # Safety
+/// Exclusively owned initialized state as for ps_local_init.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_pending(state: *mut u8, size: usize) -> i32 {
+    if !state_valid(state, size) {
+        return -1;
+    }
+    i32::from(unsafe { &*state.cast::<LocalSearch>() }.pending())
+}
+/// # Safety
+/// Exclusive initialized state as for ps_local_init. Resets collection only.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_set_profile(state: *mut u8, size: usize, profile: u32) -> i32 {
+    if !state_valid(state, size) || profile > u8::MAX as u32 {
+        return -1;
+    }
+    if unsafe { &mut *state.cast::<LocalSearch>() }.set_profile(profile as u8) {
+        0
+    } else {
+        -1
+    }
+}
+/// # Safety
+/// The URL owns length readable bytes. No input is dereferenced when invalid.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_allowed(profile: u32, url: *const u8, length: usize) -> i32 {
+    if profile > u8::MAX as u32 || url.is_null() || length > 255 {
+        return -1;
+    }
+    let Ok(url) = core::str::from_utf8(unsafe { core::slice::from_raw_parts(url, length) }) else {
+        return -1;
+    };
+    i32::from(chromatic_client::local::allowed_profile_url(
+        profile as u8,
+        url,
+    ))
+}
+/// # Safety
+/// Out owns capacity writable bytes. No other state or input may overlap it.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_profile_text(
+    profile: u32,
+    part: u32,
+    out: *mut u8,
+    capacity: usize,
+) -> i32 {
+    let Some(&(name, base, seed, robots)) = chromatic_client::local::PROFILES.get(profile as usize)
+    else {
+        return -1;
+    };
+    let text = match part {
+        0 => name,
+        1 => base,
+        2 => seed,
+        3 => robots,
+        _ => return -1,
+    };
+    if out.is_null() || capacity <= text.len() {
+        return -1;
+    }
+    let output = unsafe { core::slice::from_raw_parts_mut(out, capacity) };
+    output[..text.len()].copy_from_slice(text.as_bytes());
+    output[text.len()] = 0;
+    text.len() as i32
+}
+/// # Safety
+/// Exclusive initialized state; out owns capacity writable non-overlapping bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_image_url(
+    state: *mut u8,
+    size: usize,
+    id: u32,
+    position: u32,
+    out: *mut u8,
+    capacity: usize,
+) -> i32 {
+    if !state_valid(state, size) || out.is_null() || capacity < chromatic_client::css::URL {
+        return -1;
+    }
+    let output = unsafe { core::slice::from_raw_parts_mut(out, capacity) };
+    let n =
+        unsafe { &*state.cast::<LocalSearch>() }.image_url(id as usize, position as usize, output);
+    if n > 0 && n < capacity {
+        output[n] = 0;
+        n as i32
+    } else {
+        0
+    }
+}
+/// # Safety
 /// Initialized exclusive state as for ps_local_init; out owns length writable,
 /// non-overlapping bytes. A successful call begins one unpublished document.
 #[unsafe(no_mangle)]
@@ -229,6 +484,25 @@ pub unsafe extern "C" fn ps_local_finish(state: *mut u8, size: usize, complete: 
     i32::from(unsafe { &mut *state.cast::<LocalSearch>() }.finish(complete == 1))
 }
 /// # Safety
+/// Exclusive initialized state. Record only a fully fetched verified HTML response.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_metadata(
+    state: *mut u8,
+    size: usize,
+    bytes: u32,
+    fetched_at: u32,
+    status: u32,
+) -> i32 {
+    if !state_valid(state, size) || status > u16::MAX as u32 {
+        return -1;
+    }
+    if unsafe { &mut *state.cast::<LocalSearch>() }.metadata(bytes, fetched_at, status as u16) {
+        0
+    } else {
+        -1
+    }
+}
+/// # Safety
 /// Initialized exclusive state; out owns 512 writable bytes, query owns length
 /// readable UTF-8 bytes. All regions are disjoint. Kind 1 searches; kind 2 reads.
 #[unsafe(no_mangle)]
@@ -254,6 +528,7 @@ pub unsafe extern "C" fn ps_local_packet(
     (match kind {
         1 => index.search_packet(query, page as usize, out),
         2 => index.flow_packet(document as usize, page as usize, out),
+        4 => index.info_packet(document as usize, page as usize, out),
         _ => 0,
     }) as i32
 }
@@ -276,7 +551,7 @@ pub unsafe extern "C" fn ps_local_robots(
     path: *const u8,
     path_length: usize,
 ) -> i32 {
-    if bytes.is_null() || path.is_null() || length > 2048 || path_length > 128 {
+    if bytes.is_null() || path.is_null() || length > 4096 || path_length > 256 {
         return 0;
     }
     let Ok(path) = core::str::from_utf8(unsafe { core::slice::from_raw_parts(path, path_length) })
@@ -613,6 +888,23 @@ mod tests {
             assert_eq!(ps_rich_decode(bytes.as_ptr(), n as usize, &mut view), -2);
             assert_eq!(view, prior);
             assert_eq!(ps_rich_decode(core::ptr::null(), n as usize, &mut view), -1);
+        }
+    }
+    #[test]
+    fn native_robots_ffi_accepts_large_policy_and_rejects_oversize() {
+        let mut rules = [b' '; 4096];
+        let prefix = b"User-agent: *\nDisallow: /private\n#";
+        rules[..prefix.len()].copy_from_slice(prefix);
+        unsafe {
+            assert_eq!(
+                ps_local_robots(rules.as_ptr(), 3844, b"/People/Berners-Lee/".as_ptr(), 19),
+                1
+            );
+            assert_eq!(
+                ps_local_robots(rules.as_ptr(), 4096, b"/private".as_ptr(), 8),
+                0
+            );
+            assert_eq!(ps_local_robots(rules.as_ptr(), 4097, b"/".as_ptr(), 1), 0);
         }
     }
     #[test]

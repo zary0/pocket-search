@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Unit fixtures validate release gates; these are NOT physical E2E tests."""
 import copy
+import os
+from unittest.mock import patch
 import json
 from pathlib import Path
 import struct
@@ -13,6 +15,18 @@ from scripts import pipeline as p
 
 
 class ReleaseGateTests(unittest.TestCase):
+    def test_readiness_requires_complete_build_and_explicit_lab_configuration(self):
+        with patch.dict(os.environ, {'CHROMATIC_E2E_READY':'false'},clear=True):
+            with self.assertRaises(p.Invalid):p.readiness(p.ROOT)
+        configured={'CHROMATIC_E2E_READY':'true','CHROMATIC_LAB_DRIVER':'/opt/pocket-lab/driver','CHROMATIC_LAB_DRIVER_SHA256':'0'*64,'CHROMATIC_TEST_ORIGIN':'https://fixture.example.org'}
+        with patch.dict(os.environ,configured,clear=True):
+            p.readiness(p.ROOT)
+            with tempfile.TemporaryDirectory() as folder:
+                with self.assertRaises(p.Invalid):p.readiness(Path(folder))
+        configured['CHROMATIC_TEST_ORIGIN']='http://fixture.example.org'
+        with patch.dict(os.environ,configured,clear=True):
+            with self.assertRaises(p.Invalid):p.readiness(p.ROOT)
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)

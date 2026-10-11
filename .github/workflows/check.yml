@@ -50,6 +50,7 @@ jobs:
         with:
           components: rustfmt, clippy
       - run: python3 scripts/pipeline.py version
+      - run: python3 scripts/generate_chromatic_sources.py --check
       - run: python3 -m unittest discover -s tests -v
       - name: Install FPGA simulation tooling
         run: |
@@ -87,7 +88,13 @@ jobs:
           /tmp/test-resource-policy
           cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined tests/test_frame_capture.c -o /tmp/test-frame-capture
           /tmp/test-frame-capture
+          cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined tests/test_jpeg_policy.c -o /tmp/test-jpeg-policy
+          /tmp/test-jpeg-policy
           node --test tests/test_search_input.mjs tests/test_pcs1.mjs tests/test_images.mjs tests/test_feedback.mjs
+      - name: Check persistent flash record corruption and torn commits
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined tests/test_store_format.c -o /tmp/pocket-store-format
+          /tmp/pocket-store-format
       - run: cargo fmt --all --check
       - run: cargo clippy --locked --workspace --all-targets -- -D warnings
       - run: cargo test --locked --workspace

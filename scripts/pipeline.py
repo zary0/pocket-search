@@ -266,7 +266,8 @@ def promote(root, folder, evidence_dir, output):
 
 def readiness(root):
     require(os.environ.get("CHROMATIC_E2E_READY") == "true", "Physical runner/adapter not enabled; release remains blocked")
-    require((root / "devices/chromatic/firmware/CMakeLists.txt").is_file(), "Pocket Search MCU firmware project is not implemented")
+    for path in ("devices/chromatic/firmware/overlay/CMakeLists.txt", "devices/chromatic/firmware/inputs.json", "devices/chromatic/firmware/sdkconfig.defaults", "scripts/build_chromatic_firmware.py"):
+        require((root / path).is_file(), "Complete native firmware build input is missing: " + path)
     for key in ("CHROMATIC_LAB_DRIVER", "CHROMATIC_LAB_DRIVER_SHA256", "CHROMATIC_TEST_ORIGIN"):
         require(os.environ.get(key), "Missing lab configuration: " + key)
     require(os.environ["CHROMATIC_TEST_ORIGIN"].startswith("https://"), "Lab origin must use verified HTTPS")

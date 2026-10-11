@@ -13,7 +13,7 @@
 #include <string.h>
 #include <stdlib.h>
 LV_FONT_DECLARE(pocket_jp);
-typedef enum { HOME, KEYBOARD, NOTICE, WIFI_LIST, WIFI_WAIT, WIFI_CONFIRM, LOADING, RESULTS, READER, IMAGE_LOADING, IMAGE_READER } Mode;
+typedef enum { HOME, KEYBOARD, NOTICE, WIFI_LIST, WIFI_WAIT, WIFI_CONFIRM, LOADING, RESULTS, READER, IMAGE_LOADING, IMAGE_READER, SOURCES, INFO } Mode;
 typedef enum { QUERY, SSID, PASSWORD } Role;
 static struct {
     Mode mode; Role role, notice_role; int script, group, letter, selection;
@@ -23,10 +23,11 @@ static struct {
     const char *notice; CW_Status wifi;
     unsigned sequence; uint16_t result_index,requested_page;uint32_t requested_id;uint8_t requested_kind;
     uint8_t packet[512];PS_View view;int network_error;bool verified;
-    PS_RichView rich_view;PS_FlowView flow_view;bool rich,flow,probe;
+    PS_RichView rich_view;PS_FlowView flow_view;bool rich,flow,probe,image_error;
     uint32_t probe_document;uint16_t probe_position;
     uint8_t *image_pixels;uint16_t image_width,image_height,image_rows;
     struct {uint32_t document;uint16_t page;} back[4];unsigned back_count;
+    uint32_t info_document;uint16_t info_position;bool info_results;
 } u = {.dirty=true,.sample=true};
 static lv_obj_t *root, *brand, *field, *input, *heading, *body, *footer, *status, *submit, *cells[12], *entry;
 static lv_obj_t *rows[7], *picture, *rich_body;
@@ -95,7 +96,7 @@ static void release_image(void){
     memset(&image_descriptor,0,sizeof(image_descriptor));
 }
 static void cancel(void){PS_NetCancel(u.sequence);++u.sequence;release_image();}
-static void mode(Mode value) { u.mode=value;if(value!=READER)u.probe=false;u.selection=0; u.notice=NULL; u.dirty=true; }
+static void mode(Mode value) { if(value!=NOTICE)u.image_error=false;u.mode=value;if(value!=READER)u.probe=false;u.selection=0; u.notice=NULL; u.dirty=true; }
 static void keyboard(Role role) {
     mode(KEYBOARD); u.role=role; u.script=role==QUERY?0:1; u.group=0; u.letter=0; u.choosing=false;
     memset(u.draft,0,sizeof(u.draft)); if(role==QUERY) memcpy(u.draft,u.query,sizeof(u.query));
@@ -104,9 +105,9 @@ static void message(const char *value,Role destination) { mode(NOTICE); u.notice
 static void request(uint8_t kind,uint32_t document,uint16_t page){
     u.probe=false;
     PS_NetCancel(u.sequence);release_image();
-    PS_Request r={.sequence=++u.sequence,.kind=kind,.document=document,.page=page};if(kind==1)memcpy(r.query,u.query,sizeof(r.query));memcpy(r.generation,u.generation,sizeof(r.generation));
+    PS_Request r={.sequence=++u.sequence,.kind=kind,.document=document,.page=page};if(kind==1||kind==5)memcpy(r.query,u.query,sizeof(r.query));memcpy(r.generation,u.generation,sizeof(r.generation));
     u.requested_kind=kind;u.requested_id=document;u.requested_page=page;u.network_error=0;u.verified=false;
-    if(!PS_NetStart(&r)){message("Previous request\nfinishing. Try again.",QUERY);return;}
+    if(!PS_NetStart(&r)){message("Previous request\nfinishing. Try again.",QUERY);u.image_error=kind==3;return;}
     mode(kind==3?IMAGE_LOADING:LOADING);
 }
 static void submit_query(void) {
@@ -123,6 +124,7 @@ static void modify_kana(void) {
         scalar_at(cycles[i],(j+1)%count(cycles[i]),next); ps_erase(u.draft); (void)ps_append(u.draft,PS_QUERY_BYTES,next); return;
     }
 }
+static bool visible_image(void){if(!u.flow)return false;for(unsigned i=0;i<u.flow_view.row_count;++i)if(u.flow_view.rows[i].flags&4)return true;return false;}
 static void render(void) {
     char text[128]; bool home=u.mode==HOME, typing=u.mode==KEYBOARD;
     visible(brand,home); visible(submit,home); visible(status,home); visible(field,home||typing); visible(heading,!home); visible(body,!home&&!typing);
@@ -133,7 +135,7 @@ static void render(void) {
     lv_label_set_text_static(status,u.wifi.state==CW_CONNECTED?"Wi-Fi":"Offline");
     lv_obj_set_pos(field,8,home?72:25); lv_obj_set_size(field,144,28);
     lv_label_set_text_static(heading,"Pocket Search"); lv_label_set_text_static(footer,"A:Type >:Recrawl");
-    if(home) { lv_label_set_text(input,u.query[0]?tail(u.query,20):"検索語を入力"); }
+    if(home) { lv_label_set_text(input,u.query[0]?tail(u.query,20):"検索語を入力");char name[32];if(PS_NetProfileName(PS_NetProfile(),name,sizeof(name))){snprintf(text,sizeof(text),"%s <:Sources",name);lv_label_set_text(footer,text);} }
     else if(typing) {
         lv_label_set_text_static(heading,u.role==QUERY?"Search":u.role==SSID?"Wi-Fi name":"Wi-Fi password");
         if(u.role==PASSWORD) { unsigned n=count(u.draft); if(n>20) n=20; memset(text,'*',n); text[n]=0; }
@@ -149,8 +151,8 @@ static void render(void) {
             lv_obj_set_style_text_color(o,lv_color_hex(selected?0xffffff:0x202124),0);
         }
         lv_label_set_text_static(footer,u.notice?u.notice:"Select:ABC Start:OK");
-    } else if(u.mode==LOADING||u.mode==IMAGE_LOADING){lv_label_set_text_static(body,"On-device search\n\nCollecting if needed\nVerified HTTPS");lv_label_set_text_static(footer,"B:Cancel Start:Type");}
-    else if(u.mode==RESULTS||u.mode==READER||u.mode==IMAGE_READER){
+    } else if(u.mode==LOADING||u.mode==IMAGE_LOADING){lv_label_set_text_static(body,u.mode==IMAGE_LOADING?"Loading image...":u.requested_kind==5?"Checking updates...\nB:Cancel":"On-device search\n\nCollecting if needed\nVerified HTTPS");lv_label_set_text_static(footer,"B:Cancel Start:Type");}
+    else if(u.mode==RESULTS||u.mode==READER||u.mode==IMAGE_READER||u.mode==INFO){
         visible(body,false);visible(status,true);lv_obj_set_pos(status,8,3);lv_obj_set_width(status,144);lv_obj_set_style_text_align(status,LV_TEXT_ALIGN_LEFT,0);
         if(u.probe)snprintf(text,sizeof(text),"TEST");
         else if(u.mode==READER)snprintf(text,sizeof(text),"%u%%",u.view.page_count>1?(unsigned)u.view.page_index*100/(u.view.page_count-1):100);
@@ -166,9 +168,15 @@ static void render(void) {
             visible(rows[i],true);lv_obj_set_pos(rows[i],8,34+i*13);lv_label_set_text(rows[i],text);
             lv_obj_set_style_text_color(rows[i],lv_color_hex(u.view.kind==5||u.view.kind==4?0x1a73e8:0x202124),0);
         }
-        lv_label_set_text_static(footer,u.probe?"Original test. B:Back":u.mode==RESULTS?"Up/Down A:Read B:Back":u.view.kind==4&&u.view.link_target?"A:Open Up/Down B":u.flow&&u.flow_view.limited?"Color limit. Up/Down B":"Up/Down:Scroll B:Back");
+        lv_label_set_text_static(footer,u.probe?"Original test. B:Back":u.mode==INFO?"Up/Down:Info B:Back":u.mode==RESULTS?"Up/Down A:Read B:Back":u.mode==IMAGE_READER?"B:Return to text":visible_image()?"A:Image Up/Down B":u.view.kind==4&&u.view.link_target?"A:Open Up/Down B":u.flow&&u.flow_view.limited?"Color limit. Up/Down B":"Up/Down:Scroll B:Back");
     }
-    else if(u.mode==NOTICE) { lv_label_set_text_static(body,u.notice?u.notice:""); lv_label_set_text_static(heading,u.notice_role==QUERY?"Pocket Search":"Wi-Fi"); lv_label_set_text_static(footer,u.notice_role==QUERY?"A:Type B:Back":"A:Retype B:Wi-Fi"); }
+    else if(u.mode==SOURCES){
+        lv_label_set_text_static(heading,"Search sources");lv_label_set_text_static(body,"");
+        unsigned first=u.selection>2?(unsigned)u.selection-2:0;
+        for(unsigned i=first;i<PS_NetProfileCount()&&i<first+3;++i){char name[32];if(PS_NetProfileName(i,name,sizeof(name))){snprintf(text,sizeof(text),"%s %s",i==(unsigned)u.selection?">":" ",name);visible(cells[i-first],true);lv_obj_set_pos(cells[i-first],8,38+(i-first)*24);lv_obj_set_width(cells[i-first],144);lv_label_set_text(cells[i-first],text);lv_obj_set_style_bg_opa(cells[i-first],LV_OPA_TRANSP,0);lv_obj_set_style_text_color(cells[i-first],lv_color_hex(0x202124),0);}}
+        lv_label_set_text_static(footer,"A:Use source B:Back");
+    }
+    else if(u.mode==NOTICE) { lv_label_set_text_static(body,u.notice?u.notice:""); lv_label_set_text_static(heading,u.notice_role==QUERY?"Pocket Search":"Wi-Fi"); lv_label_set_text_static(footer,u.image_error?"A:Retry B:Text":u.notice_role==QUERY?"A:Type B:Back":"A:Retype B:Wi-Fi"); }
     else if(u.mode==WIFI_LIST) {
         lv_label_set_text_static(heading,"Wi-Fi"); unsigned first=u.selection>3?(unsigned)u.selection-3:0;
         for(unsigned i=0;i<4 && first+i<(unsigned)u.wifi.count+2;++i) {
@@ -183,10 +191,10 @@ static void render(void) {
     } else if(u.mode==WIFI_CONFIRM) {
         lv_label_set_text_static(heading,"Connect Wi-Fi?"); snprintf(text,sizeof(text),"%s\n\nPassword: %u chars",u.ssid,count(u.draft)); lv_label_set_text(body,text); lv_label_set_text_static(footer,"A:Connect B:Edit");
     }
-    for(unsigned i=0;i<12;++i) lv_obj_set_width(cells[i],u.mode==WIFI_LIST?144:46);
+    for(unsigned i=0;i<12;++i) lv_obj_set_width(cells[i],u.mode==WIFI_LIST||u.mode==SOURCES?144:46);
     lv_obj_move_foreground(root); u.dirty=false;
     if(home){lv_obj_set_pos(status,104,5);lv_obj_set_width(status,48);lv_obj_set_style_text_align(status,LV_TEXT_ALIGN_RIGHT,0);}
-    if(u.mode!=RESULTS&&u.mode!=READER&&u.mode!=IMAGE_READER){lv_obj_set_pos(heading,8,4);lv_obj_set_style_text_color(heading,lv_color_hex(0x202124),0);}
+    if(u.mode!=RESULTS&&u.mode!=READER&&u.mode!=IMAGE_READER&&u.mode!=INFO){lv_obj_set_pos(heading,8,4);lv_obj_set_style_text_color(heading,lv_color_hex(0x202124),0);}
     unsigned large=0,small=0,bold=0,gaps=0;bool styled=u.mode==READER&&(u.rich||u.flow);
     if(styled){const unsigned sizes[]={12,16,14,10};small=16;unsigned row_count=u.flow?u.flow_view.row_count:u.rich_view.row_count;for(unsigned i=0;i<row_count;++i){unsigned glyphs=u.flow?u.flow_view.rows[i].codes.length:u.rich_view.rows[i].glyphs;if(!glyphs)++gaps;for(unsigned j=0;j<glyphs;++j){unsigned s=u.flow?(u.packet[u.flow_view.rows[i].codes.offset+j]&15):(u.packet[u.rich_view.rows[i].styles.offset+j/2]>>((j%2)*4))&15,n=sizes[s&3];if(n>large)large=n;if(n<small)small=n;if(s&4)++bold;}}}
     taskENTER_CRITICAL(&lock); observed_mode=(unsigned)u.mode; observed_bytes=(unsigned)strlen(u.query);observed_view=u.view;observed_verified=u.verified;observed_image_bytes=(unsigned)u.image_width*u.image_height*2;observed_back=u.back_count;observed_rich=styled;observed_probe=u.probe;observed_large=large;observed_small=small;observed_bold=bold;observed_gaps=gaps; taskEXIT_CRITICAL(&lock);
@@ -212,8 +220,11 @@ OSD_Result_t PocketUI_Button(Button_t b,ButtonState_t state,void *arg) {
         }
         return kOSD_Result_Ok;
     }
-    if(u.mode==LOADING||u.mode==IMAGE_LOADING||u.mode==RESULTS||u.mode==READER||u.mode==IMAGE_READER){
+    if(u.mode==LOADING||u.mode==IMAGE_LOADING||u.mode==RESULTS||u.mode==READER||u.mode==IMAGE_READER||u.mode==INFO){
         bool loading=u.mode==LOADING||u.mode==IMAGE_LOADING;
+        if(b==kButton_B&&(u.mode==IMAGE_LOADING||u.mode==IMAGE_READER)){cancel();u.verified=true;mode(READER);return kOSD_Result_Ok;}
+        if(b==kButton_Select&&(u.mode==RESULTS||u.mode==READER)&&u.view.document_id){u.info_document=u.view.document_id;u.info_position=u.view.page_index;u.info_results=u.mode==RESULTS;request(4,u.view.document_id,0);return kOSD_Result_Ok;}
+        if(u.mode==INFO){if(b==kButton_B)request(u.info_results?1:2,u.info_results?0:u.info_document,u.info_position);else if(b==kButton_Up&&u.view.page_index)request(4,u.info_document,u.view.page_index-1);else if(b==kButton_Down&&u.view.page_index+1<u.view.page_count)request(4,u.info_document,u.view.page_index+1);return kOSD_Result_Ok;}
         if(b==kButton_Select||(b==kButton_B&&(loading||u.mode==RESULTS))){cancel();u.back_count=0;mode(HOME);return kOSD_Result_Ok;}
         if(b==kButton_Start){cancel();u.back_count=0;keyboard(QUERY);return kOSD_Result_Ok;}
         if(loading)return kOSD_Result_Ok;
@@ -223,6 +234,7 @@ OSD_Result_t PocketUI_Button(Button_t b,ButtonState_t state,void *arg) {
             if(b==kButton_A&&u.view.document_id){u.back_count=0;request(2,u.view.document_id,0);}
             else if(b==kButton_Up&&u.view.page_index)request(1,0,u.view.page_index-1);
             else if(b==kButton_Down&&u.view.page_index+1<u.view.page_count)request(1,0,u.view.page_index+1);
+        }else if(b==kButton_A&&u.mode==READER&&visible_image()){request(3,u.view.document_id,u.view.page_index);
         }else if(b==kButton_A&&u.view.kind==4&&u.view.link_target){
             if(u.back_count==4){message("Link depth limit.\nB: Search home",QUERY);return kOSD_Result_Ok;}
             u.back[u.back_count].document=u.view.document_id;u.back[u.back_count++].page=u.view.page_index;request(2,u.view.link_target,0);
@@ -234,10 +246,16 @@ OSD_Result_t PocketUI_Button(Button_t b,ButtonState_t state,void *arg) {
     }
     if(u.mode==HOME) {
         if(b==kButton_A) keyboard(QUERY);
+        else if(b==kButton_Left){mode(SOURCES);u.selection=(int)PS_NetProfile();}
         else if(b==kButton_Start) submit_query();
+        else if(b==kButton_Up){request(5,0,0);}
         else if(b==kButton_Right) { if(PS_NetRefresh()) message("Collection cleared.\nEnter query to crawl.",QUERY); else message("Previous request\nfinishing. Try again.",QUERY); }
         else if(b==kButton_Select) { mode(WIFI_LIST); if(!u.wifi.scanning) (void)CW_Scan(); }
         else if(b==kButton_B) MenuMgr_SelectTab(kTabID_System);
+    } else if(u.mode==SOURCES){
+        if(delta){int count=(int)PS_NetProfileCount();u.selection=(u.selection+delta+count)%count;}
+        if(b==kButton_B)mode(HOME);
+        if(b==kButton_A){if(PS_NetSelectProfile((unsigned)u.selection))mode(HOME);else message("Could not change source.\nTry again when idle.",QUERY);}
     } else if(u.mode==KEYBOARD) {
         const char **g=groups();
         if(b==kButton_Select) { u.script=(u.script+1)%4; u.choosing=false; u.notice=NULL; }
@@ -256,7 +274,8 @@ OSD_Result_t PocketUI_Button(Button_t b,ButtonState_t state,void *arg) {
             else if(u.role==SSID && u.draft[0]) { memcpy(u.ssid,u.draft,33); keyboard(PASSWORD); }
             else if(u.role==PASSWORD) mode(WIFI_CONFIRM);
         }
-    } else if(u.mode==NOTICE) { if(b==kButton_A) keyboard(u.notice_role); else if(b==kButton_B||b==kButton_Select) mode(u.notice_role==QUERY?HOME:WIFI_LIST); }
+    } else if(u.mode==NOTICE&&u.image_error){if(b==kButton_A)request(3,u.requested_id,u.requested_page);else if(b==kButton_B){cancel();u.verified=true;mode(READER);}}
+    else if(u.mode==NOTICE) { if(b==kButton_A) keyboard(u.notice_role); else if(b==kButton_B||b==kButton_Select) mode(u.notice_role==QUERY?HOME:WIFI_LIST); }
     else if(u.mode==WIFI_LIST) {
         int n=(int)u.wifi.count+2; if(delta) u.selection=(u.selection+delta+n)%n;
         if(b==kButton_B) mode(HOME);
@@ -293,10 +312,15 @@ static int command(int argc,char **argv) {
 }
 void PocketUI_RegisterCommands(void) { const esp_console_cmd_t cmd={.command="search_ui",.help="Synthetic GUI input and bounded query; no page data over USB",.func=command}; ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));PS_NetRegister(); }
 void PocketUI_Poll(void) {
-    PS_Reply reply;
-    if(PS_NetPoll(&reply)&&reply.sequence==u.sequence&&(u.mode==LOADING||u.mode==IMAGE_LOADING)){
+    PS_Reply reply={0};
+    bool received=PS_NetPoll(&reply);
+    if(received&&reply.sequence==u.sequence&&(u.mode==LOADING||u.mode==IMAGE_LOADING)){
         bool valid=!reply.error&&reply.tls_verified&&reply.clock_synced;
-        if(u.mode==IMAGE_LOADING){
+        if(u.mode==IMAGE_LOADING&&reply.image_pixels){
+            valid=valid&&reply.finished&&reply.image_width&&reply.image_width<=160&&reply.image_height&&reply.image_height<=80;
+            if(valid){u.image_pixels=reply.image_pixels;reply.image_pixels=NULL;u.image_width=reply.image_width;u.image_height=reply.image_height;
+                image_descriptor.header.cf=LV_IMG_CF_TRUE_COLOR;image_descriptor.header.w=u.image_width;image_descriptor.header.h=u.image_height;image_descriptor.data_size=(uint32_t)u.image_width*u.image_height*2;image_descriptor.data=u.image_pixels;lv_img_set_src(picture,&image_descriptor);u.verified=true;mode(IMAGE_READER);}
+        }else if(u.mode==IMAGE_LOADING){
             PS_ImageView image;
             valid=valid&&ps_image_decode(reply.bytes,reply.length,&image)==0;
             if(valid&&(image.document_id!=u.requested_id||image.page_index!=u.requested_page||image.y!=u.image_rows||(u.image_rows&&(image.width!=u.image_width||image.height!=u.image_height))))valid=false;
@@ -316,11 +340,12 @@ void PocketUI_Poll(void) {
             if(valid){memcpy(u.packet,reply.bytes,reply.length);u.rich_view=rich;u.rich=true;u.flow=false;u.verified=true;u.view=(PS_View){.document_id=rich.document_id,.page_index=rich.position,.page_count=rich.positions,.kind=2,.title=rich.title};mode(READER);}
         }else{
             PS_View view;valid=valid&&reply.finished&&reply.length<=sizeof(u.packet)&&ps_packet_decode(reply.bytes,reply.length,&view)==0;
-            if(valid&&(view.page_index!=u.requested_page||(u.requested_kind==1?(view.kind!=1||view.page_count>256):(view.kind<2||view.kind>5||view.document_id!=u.requested_id))))valid=false;
-            if(valid){memcpy(u.generation,reply.generation,sizeof(u.generation));u.sample=reply.sample;memcpy(u.packet,reply.bytes,reply.length);u.view=view;u.rich=false;u.flow=false;u.verified=true;if(view.kind==1){u.result_index=view.page_index;mode(RESULTS);}else if(view.kind==3)request(3,view.document_id,view.page_index);else mode(READER);}
+            if(valid&&(view.page_index!=u.requested_page||((u.requested_kind==1||u.requested_kind==5)?(view.kind!=1||view.page_count>256):(view.kind<2||view.kind>5||view.document_id!=u.requested_id))))valid=false;
+            if(valid){memcpy(u.generation,reply.generation,sizeof(u.generation));u.sample=reply.sample;memcpy(u.packet,reply.bytes,reply.length);u.view=view;u.rich=false;u.flow=false;u.verified=true;if(view.kind==1){u.result_index=view.page_index;mode(RESULTS);}else if(view.kind==3)request(3,view.document_id,view.page_index);else mode(u.requested_kind==4?INFO:READER);}
         }
-        if(!valid){release_image();u.network_error=reply.error;u.verified=false;message(reply.error==PS_NET_STALE_COLLECTION?"Collection changed.\nA: Search again":reply.error==1?"Wi-Fi disconnected.\nSelect: Wi-Fi setup":reply.error==2?"Clock sync failed.\nTry again.":reply.error==12?"robots.txt blocks\nthis collection.":reply.error==13?"No usable pages.\nRight on home:\nRetry collection.":reply.error?"Connection failed.\nTry again.":"Invalid response.\nTry again.",QUERY);}
+        if(!valid){bool image_request=u.requested_kind==3;release_image();u.network_error=reply.error;u.verified=false;message(image_request?"Image unavailable.\nSupported: small JPEG.\nA:Retry B:Text":reply.error==PS_NET_STALE_COLLECTION?"Collection changed.\nA: Search again":reply.error==1?"Wi-Fi disconnected.\nSelect: Wi-Fi setup":reply.error==2?"Clock sync failed.\nTry again.":reply.error==12?"robots.txt blocks\nthis collection.":reply.error==13?"No usable pages.\nRight on home:\nRetry collection.":reply.error?"Connection failed.\nTry again.":"Invalid response.\nTry again.",QUERY);u.image_error=image_request;}
     }
+    if(received)free(reply.image_pixels);
     char query[97];taskENTER_CRITICAL(&lock); int key=pending_key; pending_key=0;bool set_query=pending_query_set;unsigned probe=pending_probe;pending_probe=0;if(set_query){memcpy(query,pending_query,sizeof(query));memset(pending_query,0,sizeof(pending_query));pending_query_set=false;}taskEXIT_CRITICAL(&lock);
     if(probe&&u.mode==READER&&u.verified&&!u.probe){u.probe_document=u.view.document_id;u.probe_position=u.view.page_index;
         if(probe==3){PS_FlowView flow;int n=ps_flow_probe(reply.bytes,0);if(n>0&&ps_flow_decode(reply.bytes,(size_t)n,&flow)==0){memcpy(u.packet,reply.bytes,(size_t)n);u.flow_view=flow;u.flow=true;u.rich=false;u.probe=true;u.view=(PS_View){.document_id=flow.document_id,.page_count=flow.positions,.kind=2,.title=flow.title};u.dirty=true;}return;}

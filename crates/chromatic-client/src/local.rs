@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! Bounded on-device crawl frontier, streaming HTML text and inverted index.
 //! No allocator, HTTP, JavaScript, external search API, or bundled page content.
+mod storage;
 use crate::{HEADER_BYTES, MAX_PACKET_BYTES, TEXT_COLUMNS, TEXT_ROWS};
+pub use storage::SNAPSHOT_BYTES;
 
 pub const MAX_DOCUMENTS: usize = 4;
 pub const BODY_BYTES: usize = 2560;
 pub const STATE_BUDGET: usize = 22272;
 pub const BASE: &str = "https://www-formal.stanford.edu/jmc/whatisai/";
 pub const SEED: &str = "https://www-formal.stanford.edu/jmc/whatisai/node1.html";
+include!("sources.rs");
 const URL_BYTES: usize = 128;
 const WORDS: usize = 256;
 const FRONTIER: usize = 8;
@@ -54,6 +57,64 @@ impl<const N: usize> Text<N> {
         }
     }
 }
+struct InfoText {
+    bytes: [u8; 384],
+    len: usize,
+}
+impl core::fmt::Write for InfoText {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        if s.len() > self.bytes.len() - self.len {
+            return Err(core::fmt::Error);
+        }
+        self.bytes[self.len..self.len + s.len()].copy_from_slice(s.as_bytes());
+        self.len += s.len();
+        Ok(())
+    }
+}
+fn utc(timestamp: u32) -> (u32, u32, u32, u32, u32, u32) {
+    fn leap(year: u32) -> bool {
+        year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+    }
+    let mut days = timestamp / 86400;
+    let mut year = 1970;
+    loop {
+        let n = if leap(year) { 366 } else { 365 };
+        if days < n {
+            break;
+        }
+        days -= n;
+        year += 1;
+    }
+    let months = [
+        31,
+        if leap(year) { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
+    let mut month = 0;
+    while days >= months[month] {
+        days -= months[month];
+        month += 1;
+    }
+    let seconds = timestamp % 86400;
+    (
+        year,
+        month as u32 + 1,
+        days + 1,
+        seconds / 3600,
+        (seconds / 60) % 60,
+        seconds % 60,
+    )
+}
+
 #[derive(Clone, Copy)]
 struct Document {
     title: Text<96>,
@@ -64,8 +125,24 @@ struct Document {
     run_count: u8,
     style_limited: u8,
     tree: crate::flow::Tree,
+    source_bytes: u32,
+    fetched_at: u32,
+    http_status: u16,
+    checked_at: u32,
+    flow_positions: u16,
+    etag: Text<96>,
+    modified: Text<64>,
 }
 impl Document {
+    fn content(&self) -> crate::flow::Content<'_> {
+        crate::flow::Content {
+            title: self.title.as_str(),
+            body: self.body.as_str(),
+            runs: &self.runs[..self.run_count as usize],
+            tree: &self.tree,
+            marker: u8::from(self.limited != 0) | (u8::from(self.style_limited != 0) << 1),
+        }
+    }
     const EMPTY: Self = Self {
         title: Text::EMPTY,
         body: Text::EMPTY,
@@ -75,6 +152,13 @@ impl Document {
         run_count: 0,
         style_limited: 0,
         tree: crate::flow::Tree::EMPTY,
+        source_bytes: 0,
+        fetched_at: 0,
+        http_status: 0,
+        checked_at: 0,
+        flow_positions: 0,
+        etag: Text::EMPTY,
+        modified: Text::EMPTY,
     };
 }
 
@@ -102,6 +186,11 @@ struct Parser {
     styles: [(u8, u8); 16],
     depth: u8,
     style: u8,
+    css_depth: u8,
+    css_quote: u8,
+    css_overflow: u8,
+    css_comment: u8,
+    css_prev: u8,
 }
 impl Parser {
     const EMPTY: Self = Self {
@@ -123,6 +212,11 @@ impl Parser {
         styles: [(0, 0); 16],
         depth: 0,
         style: 0,
+        css_depth: 0,
+        css_quote: 0,
+        css_overflow: 0,
+        css_comment: 0,
+        css_prev: 0,
     };
 }
 
@@ -139,7 +233,10 @@ pub struct LocalSearch {
     queued: u8,
     cursor: u8,
     active: u8,
+    target: u8,
+    updating: u8,
     full_index: u8,
+    profile: u8,
 }
 impl Default for LocalSearch {
     fn default() -> Self {
@@ -159,17 +256,47 @@ impl LocalSearch {
             queued: 0,
             cursor: 0,
             active: 0,
+            target: 0,
+            updating: 0,
             full_index: 0,
+            profile: 0,
         }
     }
     pub fn count(&self) -> usize {
         self.count as usize
     }
     pub fn seed(&mut self) {
-        self.enqueue(SEED);
+        self.enqueue(PROFILES[self.profile as usize].2);
+    }
+    pub fn set_profile(&mut self, profile: u8) -> bool {
+        if profile as usize >= PROFILES.len() {
+            return false;
+        }
+        // Reset the reachable collection and index without a whole-state copy.
+        // next_url clears each reused document before it can be published.
+        self.count = 0;
+        self.queued = 0;
+        self.cursor = 0;
+        self.active = 0;
+        self.target = 0;
+        self.updating = 0;
+        self.full_index = 0;
+        self.hashes.fill(0);
+        self.masks.fill(0);
+        self.parser = Parser::EMPTY;
+        self.sheet = crate::css::Sheet::EMPTY;
+        self.profile = profile;
+        self.seed();
+        true
+    }
+    pub fn profile(&self) -> u8 {
+        self.profile
     }
     fn enqueue(&mut self, url: &str) {
-        if !allowed_url(url) || self.queued as usize == FRONTIER {
+        if !allowed_profile_url(self.profile, url)
+            || url.len() >= URL_BYTES
+            || self.queued as usize == FRONTIER
+        {
             return;
         }
         if self.queue[..self.queued as usize]
@@ -181,10 +308,17 @@ impl LocalSearch {
         self.queue[self.queued as usize].set(url);
         self.queued += 1;
     }
+    pub fn cancel_transfer(&mut self) {
+        if self.active != 0 && self.updating == 0 {
+            self.active = 0;
+            self.cursor = self.cursor.saturating_sub(1);
+        }
+    }
     pub fn next_url(&mut self, out: &mut [u8]) -> usize {
         if self.active != 0 || self.count() == MAX_DOCUMENTS || self.cursor >= self.queued {
             return 0;
         }
+        self.target = self.count;
         let url = self.queue[self.cursor as usize].as_str();
         if out.len() <= url.len() {
             return 0;
@@ -192,8 +326,8 @@ impl LocalSearch {
         out[..url.len()].copy_from_slice(url.as_bytes());
         out[url.len()] = 0;
         let len = url.len();
-        self.documents[self.count as usize] = Document::EMPTY;
-        self.documents[self.count as usize].url = self.queue[self.cursor as usize];
+        self.documents[self.target as usize] = Document::EMPTY;
+        self.documents[self.target as usize].url = self.queue[self.cursor as usize];
         self.cursor += 1;
         self.active = 1;
         self.parser = Parser::EMPTY;
@@ -204,7 +338,7 @@ impl LocalSearch {
         if self.parser.skip != 0 || (self.parser.head != 0 && self.parser.title == 0) {
             return;
         }
-        let doc = &mut self.documents[self.count as usize];
+        let doc = &mut self.documents[self.target as usize];
         if self.parser.title != 0 {
             let _ = doc.title.push(c);
         } else {
@@ -242,7 +376,7 @@ impl LocalSearch {
         }
     }
     fn block_break(&mut self, wanted: usize) {
-        let doc = &mut self.documents[self.count as usize];
+        let doc = &mut self.documents[self.target as usize];
         while doc.body.as_str().ends_with(' ') {
             doc.body.len -= 1;
         }
@@ -303,7 +437,7 @@ impl LocalSearch {
         else {
             return;
         };
-        let doc = &mut self.documents[self.count as usize];
+        let doc = &mut self.documents[self.target as usize];
         if doc.style_limited != 0 {
             self.parser.style = 0;
             return;
@@ -390,9 +524,9 @@ impl LocalSearch {
     /// Reparse the active page after resource loading; published documents remain untouched.
     pub fn reparse(&mut self) {
         if self.active != 0 {
-            let url = self.documents[self.count as usize].url;
-            self.documents[self.count as usize] = Document::EMPTY;
-            self.documents[self.count as usize].url = url;
+            let url = self.documents[self.target as usize].url;
+            self.documents[self.target as usize] = Document::EMPTY;
+            self.documents[self.target as usize].url = url;
             self.parser = Parser::EMPTY;
             self.sheet.enable();
         }
@@ -401,12 +535,12 @@ impl LocalSearch {
         if self.active == 0 {
             return false;
         }
-        out.0 = self.documents[self.count as usize];
+        out.0 = self.documents[self.target as usize];
         true
     }
     pub fn restore_active(&mut self, saved: &SavedDocument) {
         if self.active != 0 {
-            self.documents[self.count as usize] = saved.0;
+            self.documents[self.target as usize] = saved.0;
             self.parser = Parser::EMPTY;
         }
     }
@@ -455,7 +589,7 @@ impl LocalSearch {
     }
     fn end_tag(&mut self) {
         if self.parser.overflow != 0 {
-            self.documents[self.count as usize].style_limited = 1;
+            self.documents[self.target as usize].style_limited = 1;
             return;
         }
         let tag = self.parser.tag;
@@ -472,7 +606,20 @@ impl LocalSearch {
             if closing {
                 self.parser.skip = 0;
             } else {
-                self.parser.skip = 1;
+                self.parser.skip = if name.eq_ignore_ascii_case("style")
+                    && attribute(text, "media").is_none_or(|v| {
+                        v.eq_ignore_ascii_case("all") || v.eq_ignore_ascii_case("screen")
+                    }) {
+                    2
+                } else {
+                    1
+                };
+                self.parser.tag_len = 0;
+                self.parser.css_depth = 0;
+                self.parser.css_quote = 0;
+                self.parser.css_overflow = 0;
+                self.parser.css_comment = 0;
+                self.parser.css_prev = 0;
             }
         } else if self.parser.skip == 0 {
             if name.eq_ignore_ascii_case("head") {
@@ -495,30 +642,30 @@ impl LocalSearch {
                 if let Some(href) = attribute(text, "href") {
                     if self.sheet.href().is_empty() {
                         self.sheet
-                            .discover(self.documents[self.count as usize].url.as_str(), href);
+                            .discover(self.documents[self.target as usize].url.as_str(), href);
                     }
                 }
             }
             if name.eq_ignore_ascii_case("a") && !closing {
                 if let Some(href) = attribute(text, "href") {
                     let href = href.split('#').next().unwrap_or("");
-                    let relative = href.strip_prefix(BASE).unwrap_or(href);
-                    if allowed_relative(relative) {
-                        let mut url = Text::<URL_BYTES>::EMPTY;
-                        url.set(BASE);
-                        for c in relative.chars() {
-                            let _ = url.push(c);
-                        }
-                        self.enqueue(url.as_str());
+                    let mut url = [0; crate::css::URL];
+                    let n = crate::css::resolve(
+                        self.documents[self.target as usize].url.as_str(),
+                        href,
+                        &mut url,
+                    );
+                    if let Ok(url) = core::str::from_utf8(&url[..n]) {
+                        self.enqueue(url);
                     }
                 }
             }
         }
         if self.parser.skip == 0 && self.parser.head == 0 && self.parser.title == 0 {
             if closing {
-                self.documents[self.count as usize]
+                self.documents[self.target as usize]
                     .tree
-                    .close(name, self.documents[self.count as usize].body.len);
+                    .close(name, self.documents[self.target as usize].body.len);
             }
             if matches_ignore_case(
                 name,
@@ -549,15 +696,15 @@ impl LocalSearch {
             }
             self.style_tag(name, closing, text);
             if !closing {
-                let at = self.documents[self.count as usize].body.len;
+                let at = self.documents[self.target as usize].body.len;
                 let opened =
-                    self.documents[self.count as usize]
+                    self.documents[self.target as usize]
                         .tree
                         .open(name, text, at, &self.sheet);
                 if name.eq_ignore_ascii_case("li") {
                     if let Some(i) = opened {
                         let number =
-                            self.documents[self.count as usize].tree.nodes[i as usize].number;
+                            self.documents[self.target as usize].tree.nodes[i as usize].number;
                         if number > 0 {
                             if number >= 10 {
                                 self.emit(char::from(b'0' + (number / 10).min(9)));
@@ -578,12 +725,61 @@ impl LocalSearch {
                         self.emit(c);
                     }
                     self.emit(']');
-                    let at = self.documents[self.count as usize].body.len;
-                    self.documents[self.count as usize].tree.close("img", at);
+                    let at = self.documents[self.target as usize].body.len;
+                    self.documents[self.target as usize].tree.close("img", at);
                     self.block_break(1);
                 }
             }
         }
+    }
+    fn embedded_byte(&mut self, b: u8) {
+        let p = &mut self.parser;
+        if p.css_comment != 0 {
+            if p.css_prev == b'*' && b == b'/' {
+                p.css_comment = 0;
+            }
+            p.css_prev = b;
+            return;
+        }
+        if p.css_quote == 0 && p.css_prev == b'/' && b == b'*' {
+            p.css_comment = 1;
+            p.tag_len = p.tag_len.saturating_sub(1);
+            p.css_prev = b;
+            return;
+        }
+        if p.css_quote != 0 {
+            if b == p.css_quote {
+                p.css_quote = 0;
+            }
+        } else if b == b'\'' || b == b'"' {
+            p.css_quote = b;
+        } else if b == b'{' {
+            p.css_depth = p.css_depth.saturating_add(1);
+            if p.css_depth > 1 {
+                p.css_overflow = 1;
+            }
+        } else if b == b'}' {
+            p.css_depth = p.css_depth.saturating_sub(1);
+        }
+        if b == b'\\' {
+            p.css_overflow = 1;
+        }
+        if (p.tag_len as usize) < p.tag.len() {
+            p.tag[p.tag_len as usize] = b;
+            p.tag_len += 1;
+        } else {
+            p.css_overflow = 1;
+        }
+        if b == b'}' && p.css_quote == 0 && p.css_depth == 0 {
+            if p.css_overflow == 0 {
+                self.sheet.embedded(&p.tag[..p.tag_len as usize]);
+            } else {
+                self.sheet.limited = 1;
+            }
+            p.tag_len = 0;
+            p.css_overflow = 0;
+        }
+        p.css_prev = b;
     }
     pub fn feed(&mut self, bytes: &[u8]) {
         if self.active == 0 {
@@ -621,6 +817,10 @@ impl LocalSearch {
                 } else {
                     self.parser.overflow = 1;
                 }
+                continue;
+            }
+            if self.parser.skip == 2 && b != b'<' {
+                self.embedded_byte(b);
                 continue;
             }
             if self.parser.in_entity != 0 {
@@ -668,19 +868,36 @@ impl LocalSearch {
             return false;
         }
         self.active = 0;
-        let doc = &mut self.documents[self.count as usize];
+        let doc = &mut self.documents[self.target as usize];
         doc.body.len = doc.body.as_str().trim_end().len() as u16;
         doc.tree.finish(doc.body.len);
         while doc.run_count > 0 && doc.runs[usize::from(doc.run_count - 1)].start >= doc.body.len {
             doc.run_count -= 1;
         }
-        if !complete || self.documents[self.count as usize].body.len == 0 {
+        if !complete || self.documents[self.target as usize].body.len == 0 {
             return false;
         }
-        let id = self.count as usize;
+        let id = self.target as usize;
         if self.documents[id].title.len == 0 {
             self.documents[id].title.set("Untitled page");
         }
+        self.documents[id].flow_positions =
+            crate::flow::positions(self.documents[id].content()) as u16;
+        if self.updating != 0 {
+            self.hashes.fill(0);
+            self.masks.fill(0);
+            self.full_index = 0;
+            for index in 0..self.count() {
+                self.index_document(index);
+            }
+            self.updating = 0;
+        } else {
+            self.index_document(id);
+            self.count += 1;
+        }
+        true
+    }
+    fn index_document(&mut self, id: usize) {
         // Build from the retained valid text only. The URL and hidden markup
         // never become terms. A saturated table falls back to exact scanning.
         for section in 0..2 {
@@ -705,8 +922,6 @@ impl LocalSearch {
                 }
             }
         }
-        self.count += 1;
-        true
     }
     fn ranking(&self, query: &str) -> ([u8; MAX_DOCUMENTS], usize) {
         let mut ids = [0; MAX_DOCUMENTS];
@@ -795,22 +1010,184 @@ impl LocalSearch {
             out,
         )
     }
+    pub fn metadata(&mut self, bytes: u32, fetched_at: u32, status: u16) -> bool {
+        if self.active == 0 || bytes > 65536 || status != 200 || fetched_at < 1609459200 {
+            return false;
+        }
+        let doc = &mut self.documents[self.target as usize];
+        doc.source_bytes = bytes;
+        doc.fetched_at = fetched_at;
+        doc.http_status = status;
+        doc.checked_at = fetched_at;
+        true
+    }
+    pub fn validators(&mut self, etag: &str, modified: &str) -> bool {
+        if self.active == 0
+            || etag.len() > 95
+            || modified.len() > 63
+            || etag
+                .bytes()
+                .chain(modified.bytes())
+                .any(|b| !(32..=126).contains(&b))
+        {
+            return false;
+        }
+        let d = &mut self.documents[self.target as usize];
+        d.etag.bytes[..etag.len()].copy_from_slice(etag.as_bytes());
+        d.etag.len = etag.len() as u16;
+        d.modified.bytes[..modified.len()].copy_from_slice(modified.as_bytes());
+        d.modified.len = modified.len() as u16;
+        true
+    }
+    pub fn begin_update(&mut self, id: usize, saved: &mut SavedDocument, out: &mut [u8]) -> usize {
+        if self.active != 0 || id == 0 || id > self.count() {
+            return 0;
+        }
+        let d = &self.documents[id - 1];
+        let url = d.url.as_str();
+        if out.len() <= url.len() {
+            return 0;
+        }
+        out[..url.len()].copy_from_slice(url.as_bytes());
+        out[url.len()] = 0;
+        let n = url.len();
+        saved.0 = *d;
+        self.target = (id - 1) as u8;
+        self.updating = 1;
+        self.active = 1;
+        self.documents[id - 1] = Document::EMPTY;
+        self.documents[id - 1].url = saved.0.url;
+        self.parser = Parser::EMPTY;
+        self.sheet.begin_page();
+        n
+    }
+    pub fn update_header(saved: &SavedDocument, modified: bool, out: &mut [u8]) -> usize {
+        let value = if modified {
+            saved.0.modified.as_str()
+        } else {
+            saved.0.etag.as_str()
+        };
+        if out.len() <= value.len() {
+            return 0;
+        }
+        out[..value.len()].copy_from_slice(value.as_bytes());
+        out[value.len()] = 0;
+        value.len()
+    }
+    pub fn restore_update(&mut self, saved: &SavedDocument, unchanged: bool, checked: u32) -> bool {
+        if self.updating == 0 {
+            return false;
+        }
+        self.documents[self.target as usize] = saved.0;
+        if unchanged && checked >= 1609459200 {
+            self.documents[self.target as usize].checked_at = checked;
+        }
+        self.active = 0;
+        self.updating = 0;
+        true
+    }
+    /// Full admitted URL and acquisition metadata; no query or browsing history.
+    pub fn info_packet(&self, id: usize, page: usize, out: &mut [u8]) -> usize {
+        use core::fmt::Write;
+        if id == 0 || id > self.count() {
+            return 0;
+        }
+        let doc = &self.documents[id - 1];
+        let mut text = InfoText {
+            bytes: [0; 384],
+            len: 0,
+        };
+        if writeln!(
+            text,
+            "{}\n{}",
+            PROFILES[self.profile as usize].0,
+            doc.url.as_str()
+        )
+        .is_err()
+        {
+            return 0;
+        }
+        if doc.http_status == 200 {
+            let (year, month, day, hour, minute, second) = utc(doc.fetched_at);
+            if writeln!(text,"HTTPS verified\nHTTP {}\nFetched UTC\n{year:04}-{month:02}-{day:02}\n{hour:02}:{minute:02}:{second:02}\nReceived {} B",doc.http_status,doc.source_bytes).is_err(){return 0;}
+        } else if writeln!(text, "Acquisition not recorded").is_err() {
+            return 0;
+        }
+        if doc.checked_at > doc.fetched_at {
+            let (y, m, d, h, min, sec) = utc(doc.checked_at);
+            if writeln!(
+                text,
+                "Unchanged check UTC\n{y:04}-{m:02}-{d:02}\n{h:02}:{min:02}:{sec:02}"
+            )
+            .is_err()
+            {
+                return 0;
+            }
+        }
+        if writeln!(
+            text,
+            "Retained {} B\n{}",
+            doc.body.len,
+            if doc.limited != 0 {
+                "Text limit reached"
+            } else {
+                "Complete retained text"
+            }
+        )
+        .is_err()
+        {
+            return 0;
+        }
+        let mut rows = [""; 32];
+        let count = wrapped(
+            core::str::from_utf8(&text.bytes[..text.len]).unwrap_or(""),
+            &mut rows,
+            0,
+        );
+        let pages = count.div_ceil(TEXT_ROWS);
+        if page >= pages {
+            return 0;
+        }
+        let begin = page * TEXT_ROWS;
+        packet(
+            5,
+            id as u32,
+            page,
+            pages,
+            "Source information",
+            &rows[begin..(begin + TEXT_ROWS).min(count)],
+            out,
+        )
+    }
+    /// Resolve the first image slot visible in a reading viewport.
+    pub fn image_url(&self, id: usize, offset: usize, out: &mut [u8]) -> usize {
+        if id == 0 || id > self.count() {
+            return 0;
+        }
+        let doc = &self.documents[id - 1];
+        let content = crate::flow::Content {
+            title: doc.title.as_str(),
+            body: doc.body.as_str(),
+            runs: &doc.runs[..doc.run_count as usize],
+            tree: &doc.tree,
+            marker: 0,
+        };
+        let Some(image) = crate::flow::visible_image(content, offset) else {
+            return 0;
+        };
+        crate::css::resolve(doc.url.as_str(), doc.tree.resource(image), out)
+    }
     /// Semantic 160px viewport; source images retain their slot/alt/source only.
     pub fn flow_packet(&self, id: usize, offset: usize, out: &mut [u8]) -> usize {
         if id == 0 || id > self.count() {
             return 0;
         }
         let doc = &self.documents[id - 1];
-        crate::flow::encode(
+        crate::flow::encode_cached(
             id,
-            crate::flow::Content {
-                title: doc.title.as_str(),
-                body: doc.body.as_str(),
-                runs: &doc.runs[..doc.run_count as usize],
-                tree: &doc.tree,
-                marker: u8::from(doc.limited != 0) | (u8::from(doc.style_limited != 0) << 1),
-            },
+            doc.content(),
             offset,
+            doc.flow_positions as usize,
             out,
             |link| {
                 let target = doc.tree.resource(link);
@@ -1033,6 +1410,192 @@ fn allowed_relative(value: &str) -> bool {
 pub fn allowed_url(url: &str) -> bool {
     url.strip_prefix(BASE).is_some_and(allowed_relative)
 }
+
+pub fn allowed_profile_url(profile: u8, url: &str) -> bool {
+    let Some(profile_data) = PROFILES.get(profile as usize) else {
+        return false;
+    };
+    url.strip_prefix(profile_data.1).is_some_and(|path| {
+        if NUMBERED_SCOPE[profile as usize] {
+            return allowed_relative(path);
+        }
+        !path.starts_with('/')
+            && !path.contains("..")
+            && !path.contains("//")
+            && path
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"/-_.".contains(&b))
+            && (path.is_empty() || path.ends_with('/') || path.ends_with(".html"))
+    })
+}
+
+#[cfg(test)]
+mod profile_tests {
+    extern crate std;
+    use super::*;
+
+    #[test]
+    fn embedded_styles_survive_all_chunks_without_leaking_to_next_page() {
+        let html=b"<head><style>/* note */ h1{font-size:16px;color:red} .card{background:#00ff00;padding:2px;border:1px solid blue}</style></head><h1>Heading</h1><p class='card'>Body words</p><a href='node2.html'>Next</a>";
+        for split in 1..=html.len() {
+            let mut s = LocalSearch::new();
+            s.seed();
+            assert!(s.next_url(&mut [0; 128]) > 0);
+            for chunk in html.chunks(split) {
+                s.feed(chunk);
+            }
+            assert!(s.finish(true));
+            assert!(
+                s.documents[0]
+                    .runs
+                    .iter()
+                    .any(|r| r.style & 3 == crate::rich::HEADING)
+            );
+            let p = s.documents[0]
+                .tree
+                .nodes
+                .iter()
+                .find(|n| n.kind == 17)
+                .unwrap();
+            assert_eq!(p.style.background, 0x07e0);
+            assert_eq!(p.style.padding, [2; 4]);
+            assert!(s.next_url(&mut [0; 128]) > 0);
+            s.feed(b"<p class='card'>No leaked rule</p>");
+            assert!(s.finish(true));
+            let p = s.documents[1]
+                .tree
+                .nodes
+                .iter()
+                .find(|n| n.kind == 17)
+                .unwrap();
+            assert_eq!(p.style.flags & crate::box_css::BACKGROUND, 0);
+        }
+    }
+    #[test]
+    fn nested_oversized_and_print_styles_do_not_apply_inner_rules() {
+        let mut s = LocalSearch::new();
+        s.seed();
+        s.next_url(&mut [0; 128]);
+        s.feed(b"<head><style media='print'>p{color:red}</style><style>@media screen{p{color:blue}}</style></head><p>Readable</p>");
+        assert!(s.finish(true));
+        assert_eq!(
+            s.documents[0].tree.nodes[0].style.color,
+            crate::box_css::Style::DEFAULT.color
+        );
+        assert!(core::mem::size_of::<LocalSearch>() <= STATE_BUDGET);
+    }
+    #[test]
+    fn provenance_keeps_complete_url_date_limits_and_valid_packet_pages() {
+        let mut state = LocalSearch::new();
+        state.seed();
+        state.next_url(&mut [0; 128]);
+        state.feed(b"<title>Original metadata test</title><p>AI body</p>");
+        assert!(!state.metadata(1, 0, 200));
+        assert!(!state.metadata(65537, 1791725950, 200));
+        assert!(!state.metadata(123, 1791725950, 404));
+        assert!(state.metadata(1234, 1791725950, 200));
+        assert!(state.finish(true));
+        let mut bytes = [0; 512];
+        let n = state.info_packet(1, 0, &mut bytes);
+        let view = crate::Packet::decode(&bytes[..n]).unwrap();
+        let mut joined = std::string::String::new();
+        for page in 0..view.page_count {
+            let n = state.info_packet(1, page as usize, &mut bytes);
+            let view = crate::Packet::decode(&bytes[..n]).unwrap();
+            assert_eq!(view.kind as u8, 5);
+            for line in view.lines.iter().take(view.line_count) {
+                joined.push_str(line);
+            }
+        }
+        assert!(joined.contains(SEED));
+        assert!(joined.contains("2026-10-11"));
+        assert!(joined.contains("1234 B"));
+        assert_eq!(state.info_packet(0, 0, &mut bytes), 0);
+        assert_eq!(state.info_packet(1, 99, &mut bytes), 0);
+        assert_eq!(utc(951782400), (2000, 2, 29, 0, 0, 0));
+        assert_eq!(utc(4107542400), (2100, 3, 1, 0, 0, 0));
+    }
+
+    #[test]
+    fn image_sources_match_only_visible_slots_and_keep_full_resolved_urls() {
+        let mut state = LocalSearch::new();
+        assert!(state.set_profile(1));
+        state.next_url(&mut [0; 128]);
+        state.feed(b"<title>Web images</title><p>Introductory text</p><img src='/Press/Stock/original.jpg' alt='Original test' height='40'><p>Article after the picture.</p>");
+        assert!(state.finish(true));
+        let mut packet = [0; 512];
+        let n = state.flow_packet(1, 0, &mut packet);
+        let positions = crate::flow::Packet::decode(&packet[..n]).unwrap().positions;
+        let mut visible = 0;
+        for position in 0..positions {
+            let n = state.flow_packet(1, position as usize, &mut packet);
+            let view = crate::flow::Packet::decode(&packet[..n]).unwrap();
+            let slot = view.rows[..view.row_count].iter().any(|r| r.flags & 4 != 0);
+            let mut url = [0; 256];
+            let n = state.image_url(1, position as usize, &mut url);
+            assert_eq!(n > 0, slot);
+            if slot {
+                assert_eq!(&url[..n], b"https://www.w3.org/Press/Stock/original.jpg");
+                visible += 1;
+            }
+        }
+        assert!(visible > 0);
+        assert_eq!(state.image_url(0, 0, &mut [0; 256]), 0);
+        assert_eq!(state.image_url(1, 65535, &mut [0; 256]), 0);
+    }
+
+    #[test]
+    fn profile_selection_is_explicit_invalid_choices_preserve_content() {
+        let mut state = LocalSearch::new();
+        state.seed();
+        assert!(state.next_url(&mut [0; 128]) > 0);
+        state.feed(b"<title>AI</title><p>Original retained article</p>");
+        assert!(state.finish(true));
+        assert!(!state.set_profile(255));
+        assert_eq!(state.count(), 1);
+        assert!(state.set_profile(1));
+        assert_eq!(state.count(), 0);
+        let mut url = [0; 128];
+        let n = state.next_url(&mut url);
+        assert_eq!(&url[..n], PROFILES[1].2.as_bytes());
+    }
+
+    #[test]
+    fn w3c_frontier_keeps_only_bounded_admitted_same_profile_links() {
+        let mut state = LocalSearch::new();
+        assert!(state.set_profile(1));
+        assert!(state.next_url(&mut [0; 128]) > 0);
+        state.feed(b"<title>Web</title><p>World Wide Web</p><a href='Biography.html'>Biography</a><a href='/People/Berners-Lee/FAQ.html'>FAQ</a><a href='https://www.w3.org@localhost/People/Berners-Lee/x.html'>bad</a><a href='//localhost/x.html'>bad</a><a href='../outside.html'>bad</a><a href='%2e%2e/escape.html'>bad</a><a href='https://other.example/page.html'>bad</a>");
+        assert!(state.finish(true));
+        assert_eq!(state.queued, 3);
+        assert!(
+            state.queue[..3]
+                .iter()
+                .all(|u| allowed_profile_url(1, u.as_str()))
+        );
+        assert_eq!(
+            state.queue[1].as_str(),
+            "https://www.w3.org/People/Berners-Lee/Biography.html"
+        );
+    }
+
+    #[test]
+    fn source_scope_rejects_private_authorities_ports_and_escaped_paths() {
+        for url in [
+            "http://www.w3.org/People/Berners-Lee/",
+            "https://www.w3.org:443/People/Berners-Lee/",
+            "https://www.w3.org@127.0.0.1/People/Berners-Lee/",
+            "https://www.w3.org/People/Berners-Lee/../outside.html",
+            "https://www.w3.org/People/Berners-Lee/%2e%2e/a.html",
+            "https://www.w3.org/People/Berners-Lee/x.html?query=1",
+            "https://www.w3.org/People/Berners-Lee//x.html",
+        ] {
+            assert!(!allowed_profile_url(1, url), "{url}");
+        }
+        assert!(!allowed_profile_url(1, SEED));
+        assert!(!allowed_profile_url(0, PROFILES[1].2));
+    }
+}
 pub(crate) fn attribute<'a>(text: &'a str, key: &str) -> Option<&'a str> {
     let bytes = text.as_bytes();
     let mut at = text.find(char::is_whitespace)?;
@@ -1205,7 +1768,7 @@ pub fn robots_allowed(body: &[u8], path: &str) -> bool {
     let Ok(body) = core::str::from_utf8(body) else {
         return false;
     };
-    if body.len() > 2048 || body.contains('%') {
+    if body.len() > 4096 || body.contains('%') {
         return false;
     }
     let specific = body.lines().filter_map(rule).any(|(key, value)| {
@@ -1566,7 +2129,7 @@ mod tests {
             "/jmc/whatisai/node1.html"
         ));
         assert!(!robots_allowed(&[255], "/"));
-        assert!(!robots_allowed(&[b' '; 2049], "/"));
+        assert!(!robots_allowed(&[b' '; 4097], "/"));
         assert!(robots_allowed(
             b"User-agent: *\nDisallow: /jmc/\nAllow: /jmc/",
             "/jmc/"

@@ -2,9 +2,9 @@
 
 # Pocket Search for ModRetro Chromatic
 
-A small, experimental **on-device web collector, search engine and text reader** for the ModRetro Chromatic MCU. The current native mode fetches public HTTPS pages directly, follows a bounded set of links, builds its own Rust index in RAM, and searches and reads that retained text on the console. **A Mac, companion search service, temporary tunnel and USB page proxy are not part of the native data path.**
+A small, experimental **on-device web collector, search engine and text reader** for the ModRetro Chromatic MCU. The current native mode fetches public HTTPS pages directly, follows a bounded set of links, builds its own Rust index and retains a bounded corpus in flash, and searches and reads that retained text on the console. **A Mac, companion search service, temporary tunnel and USB page proxy are not part of the native data path.**
 
-The first autonomous profile starts at Stanford's historical AI questions page and stays within its `whatisai/node*.html` pages. It admits at most four documents, not the entire Internet. The repository also retains optional host tools for broader crawling, DOM extraction, image preparation and browser development. Those tools do not expand the native profile automatically.
+The configured autonomous profiles cover small Stanford AI and W3C directories. The selected profile admits at most four documents, not the entire Internet. The repository also retains optional host tools for broader crawling, DOM extraction, image preparation and browser development. Those tools do not expand the native profile automatically.
 
 This is MCU/menu firmware, not a Game Boy cartridge ROM or a replacement Rust OS. Full reproducible firmware packaging and qualified physical E2E remain release requirements.
 
@@ -19,16 +19,16 @@ Chromatic MCU
   buttons → local Rust ranking → local reader pagination → 160 × 144 LCD
 ```
 
-Rust owns the restricted link frontier, text extraction, fixed-capacity term/document masks, ranking, PCS1 results and PFW1 semantic reader formatting. The existing ESP-IDF adapter owns HTTPS, cancellation, Wi-Fi and the display. Collection happens on the first submitted query after boot or a refresh. Later searches and reader navigation open no sockets; they use the device's retained collection, even if Wi-Fi is temporarily unavailable. Restart discards that RAM index and the next search collects again.
+Rust owns the restricted link frontier, text extraction, fixed-capacity term/document masks, ranking, PCS1 results and PFW1 semantic reader formatting. The existing ESP-IDF adapter owns HTTPS, cancellation, Wi-Fi and the display. Collection happens when there is no complete saved corpus or after an explicit clear. Later searches and reader navigation open no sockets; they use the device's retained collection, even if Wi-Fi is temporarily unavailable. Restart loads a validated retained collection and rebuilds its index. Explicit updates use HTTP validators; a partial collection can resume.
 
 | Component | Autonomous native mode | Current limit |
 | --- | --- | --- |
-| Crawler | Direct verified HTTPS, same-profile link discovery, one request at a time, robots policy check | One fixed public host/path profile, eight frontier entries, four retained pages, 90-second collection deadline |
-| HTML extraction | Streaming text/title and a bounded semantic tree: headings, paragraphs, nested lists, links and image slots; script/style/comment exclusion | Compact parser, not HTML5 layout, JavaScript or complete CSS layout |
+| Crawler | Direct verified HTTPS, same-profile link discovery, one request at a time, robots policy check | One selected reviewed public host/path profile, eight frontier entries, four retained pages, 90-second collection deadline |
+| HTML extraction | Streaming text/title and a bounded semantic tree: headings, paragraphs, nested lists, links and image slots; script/comment exclusion and bounded embedded CSS | Compact parser, not HTML5 layout, JavaScript or complete CSS layout |
 | Index / search | Allocation-free inverted term hashes with document masks; exact matching verifies candidates; a full table falls back to bounded text scanning | 256 term slots, ASCII word matching and non-ASCII substring matching; not the host BM25/Japanese tokenizer |
 | Reader | Results, A to open, up/down line scrolling, left/right screen jumps and B to return, all generated on the MCU | 2,560 retained UTF-8 bytes, 48 typography transitions and 24 semantic nodes per document; visible limit markers |
-| Typography resources | Basic text color, solid background, pixel margin/padding/border CSS; one cached external sheet and static TrueType ASCII atlas | One <=3 KiB sheet / eight selectors, raw TTF <=24 KiB; no WOFF2, shaping or proportional font metrics |
-| Images / video | Native image position/source/alt placeholders; earlier companion-mode still-image experiment remains in the host tools and evidence | Autonomous image decoding/resizing and video are not implemented |
+| Typography resources | Basic text color, solid background, pixel margin/padding/border CSS; one cached external sheet and static TrueType ASCII atlas | One <=3 KiB external sheet / eight selectors plus four <=256-byte embedded rules, raw TTF <=24 KiB; no WOFF2, shaping or proportional font metrics |
+| Images / video | Native verified acquisition, ESP32 ROM decoding, RGB565 resize and separate image viewer | Baseline JPEG only, <=24 KiB, <=160 x 80 output; progressive/PNG/GIF/video pending |
 
 See [semantic layout and CSS scope](docs/native-flow-layout.md), [native typography](docs/typography.md), [on-device scope and verification](docs/on-device-search.md), [architecture](docs/architecture.md), and the [product roadmap](docs/roadmap.md).
 
@@ -38,18 +38,18 @@ See [semantic layout and CSS scope](docs/native-flow-layout.md), [native typogra
 - One result per screen; every match in the admitted four-page collection is reachable.
 - Headings at **16/14 px**, body at **12 px**, annotations at **10 px**, inline bold and paragraph gaps. Up to eight variable-height rows fit each validated viewport.
 - **96-byte UTF-8 queries** and **512-byte locally generated text packets**.
-- A fixed **22,272-byte opaque Rust state region**, plus a **2,049-byte robots buffer**. TLS, task stacks, fonts and the 15 KiB display band have separate costs.
+- A fixed **22,272-byte opaque Rust state region**, plus a **4,097-byte robots buffer**. TLS, task stacks, fonts and the 15 KiB display band have separate costs.
 - No bookmarks, browsing history, restored reading position or Codex approval UI.
 - Source URLs are displayed in results. Unsupported active content is treated as data and never executed.
 
 | Button | Home | Results | Reader |
 | --- | --- | --- | --- |
-| A | Enter a query | Open selected document | Open the first visible already-collected link |
+| A | Enter a query | Open selected document | Open a visible image or retained link |
 | Start | Submit current query | Query entry | Query entry |
-| Up / down | Reserved | Previous / next result | Scroll up / down one text line |
-| Left / right | Right clears collection for the next query | Reserved | Jump up / down seven lines |
+| Up / down | Up checks retained pages for updates | Previous / next result | Scroll up / down one text line |
+| Left / right | Left selects source; Right clears collection | Reserved | Jump up / down seven lines |
 | B | System menu | Home | Results |
-| Select | Wi-Fi setup | Home | Home |
+| Select | Wi-Fi setup | Source information | Source information |
 
 USB diagnostics can queue synthetic input and read the MCU render buffer for development; they do not send pages or search results to the console. Physical-controls and battery-only acceptance are recorded separately from those diagnostics.
 
@@ -90,15 +90,15 @@ The companion admits up to 256 pages, can prepare PNG/JPEG images, and uses a ri
 
 ## Hardware evidence and limits
 
-The current on-device application is `0.13.21-css`, with semantic font sizes, inline bold, paragraph spacing and up/down line scrolling, plus a bounded external-CSS cascade and a small static TrueType web-font subset. Styles and font metrics are normalized for the small screen; this is not full browser fidelity. See [native CSS/web-font scope](docs/native-css-webfonts.md) and [typography evidence](docs/typography.md). The earlier `0.13.17-local` experiment established autonomous collection: With Mac services and tunnels stopped, it directly collected four public pages and returned four `AI` matches. The operator confirmed battery-only restart, query entry and A to read. One first collection took 18.241 seconds; local ranking/packet generation took 5.042 ms on the inspected console. See [measurements and acceptance limits](docs/on-device-search.md), [standalone evidence](docs/evidence/on-device-search/verification.json) and [scroll verification](docs/evidence/reader-scroll/verification.json).
+The current development source is `0.14.3`, with semantic font sizes, inline bold, paragraph spacing and up/down line scrolling, retained source profiles/corpus, conditional refresh, native baseline JPEG, bounded external/embedded CSS and a small static TrueType web-font subset. Styles and font metrics are normalized for the small screen; this is not full browser fidelity. See [native CSS/web-font scope](docs/native-css-webfonts.md) and [typography evidence](docs/typography.md). The earlier `0.13.17-local` experiment established autonomous collection: With Mac services and tunnels stopped, it directly collected four public pages and returned four `AI` matches. The operator confirmed battery-only restart, query entry and A to read. One first collection took 18.241 seconds; local ranking/packet generation took 5.042 ms on the inspected console. See [measurements and acceptance limits](docs/on-device-search.md), [standalone evidence](docs/evidence/on-device-search/verification.json) and [scroll verification](docs/evidence/reader-scroll/verification.json).
 
-App-only installation preserves the established partition table, bootloader, FPGA and Wi-Fi settings. The index is volatile; there is no flash cache yet. The source profile, parsing and memory limits are explicit, so the application does not claim general browser support or Internet-wide search.
+App-only installation preserves the established partition table, bootloader, FPGA and Wi-Fi settings. A validated two-bank cache retains published content and the crawl frontier. Storage failures preserve usable RAM content. The source profile, parsing and memory limits are explicit, so the application does not claim general browser support or Internet-wide search.
 
 Earlier [real-site companion evidence](docs/evidence/real-sites/verification.json) verified 13 externally collected pages, native Wi-Fi reader responses and a user-confirmed source image. That evidence describes `0.13.16-web`, whose Mac/tunnel dependency prompted the autonomous mode. It is not evidence of native image decoding or local indexing. Historical [service setup](docs/search-service.md) applies only to that older companion mode.
 
 ## Next milestone
 
-Qualify standalone collection, search, reading and errors with physical controls and battery power, then make the complete firmware integration reproducible. Next add configurable public source profiles and measured persistent storage, followed by on-device image decoding/resizing. The priority is autonomous, bounded operation on the console.
+Qualify the latest retained-content and baseline-image increment with physical controls, battery power and an isolated CI lab. The complete MCU build, source configuration, persistence, conditional refresh and bounded native JPEG path are implemented; see [scope and limits](docs/native-retained-content.md). The priority is autonomous, bounded operation on the console.
 
 ## Open-source development
 
@@ -116,7 +116,7 @@ The Rust search and decoder timings are host-only measurements on Apple M4. A se
 
 Development integrates through **`develop`**, then promotes to **`main`**. Stable releases use annotated **`vX.Y.Z`** tags matching the single workspace version. Development package names include the base version and commit and cannot be published as stable releases.
 
-Hosted CI checks versions, Rust behavior, bounded C/JavaScript input, and release-gate unit tests. Develop pushes record physical E2E as **not run** when the lab is explicitly disabled; once enabled they invoke qualification automatically. Main pushes, manual qualification, and release tags always require the real physical gate. Only a native Wi-Fi E2E result for the exact firmware/candidate permits release publication; missing or skipped hardware tests block it. The lab runner, complete native application, driver, and fixture origin are pending, so no physical E2E pass or firmware release is claimed.
+Hosted CI checks versions, Rust behavior, bounded C/JavaScript input, and release-gate unit tests. Develop pushes record physical E2E as **not run** when the lab is explicitly disabled; once enabled they invoke qualification automatically. Main pushes, manual qualification, and release tags always require the real physical gate. Only a native Wi-Fi E2E result for the exact firmware/candidate permits release publication; missing or skipped hardware tests block it. The lab runner, trusted physical driver, and deterministic native fixture origin are pending, so no physical E2E pass or firmware release is claimed.
 
 See [branches and release packages](docs/releases.md) and [physical E2E lab setup](docs/hardware-e2e.md). Packages carry source, companion and native image hashes, build identity, validated evidence, and checksums. Publication promotes tested assets without rebuilding them.
 

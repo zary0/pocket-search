@@ -106,11 +106,11 @@ dependencies = [
 
 [[package]]
 name = "chromatic-client"
-version = "0.14.0"
+version = "0.14.3"
 
 [[package]]
 name = "chromatic-ffi"
-version = "0.14.0"
+version = "0.14.3"
 dependencies = [
  "chromatic-client",
 ]
@@ -828,7 +828,7 @@ dependencies = [
 
 [[package]]
 name = "pocket-search"
-version = "0.14.0"
+version = "0.14.3"
 dependencies = [
  "chromatic-client",
  "image",

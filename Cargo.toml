@@ -13,7 +13,7 @@ members = ["crates/chromatic-client", "crates/chromatic-ffi"]
 resolver = "3"
 
 [workspace.package]
-version = "0.14.0"
+version = "0.14.3"
 
 [dependencies]
 chromatic-client = { path = "crates/chromatic-client" }
