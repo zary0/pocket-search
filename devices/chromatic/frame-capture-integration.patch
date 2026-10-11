@@ -1,0 +1,70 @@
+--- a/main/main.c
++++ b/main/main.c
+@@ -40,6 +40,7 @@
+ #include "pwrmgr.h"
+ #include "chromatic_wifi.h"
+ #include "pocket_search_ui.h"
++#include "pocket_frame_capture.h"
+ #include "esp_console.h"
+ #include "freertos/semphr.h"
+ #include <stdlib.h>
+@@ -73,8 +74,9 @@
+ static lv_disp_t *disp;
+ // Read-only USB diagnostics: capture a completed render, never a mock screen.
+ static portMUX_TYPE frame_lock = portMUX_INITIALIZER_UNLOCKED;
+-static uint8_t *frame_request;
+-static uint8_t *frame_capture;
++static PS_Frame *frame_request;
++static PS_Frame *frame_capture;
++static bool frame_capture_failed;
+ static SemaphoreHandle_t frame_ready;
+ static int pocket_screen_command(int argc, char **argv);
+ static int pocket_display_command(int argc, char **argv);
+@@ -84,8 +86,9 @@
+ static void capture_band(const lv_area_t *area, const lv_color_t *color, bool last)
+ {
+     if (!frame_capture) return;
+-    memcpy(frame_capture + area->y1 * 160 * 2, color,
+-           (area->y2 - area->y1 + 1) * 160 * 2);
++    if(area->x1!=0||area->x2!=159||area->y1<0||!PS_FrameWrite(frame_capture,(unsigned)area->y1,(unsigned)(area->y2-area->y1+1),(const uint8_t*)color)){
++        frame_capture_failed=true;frame_capture=NULL;xSemaphoreGive(frame_ready);return;
++    }
+     if (last) {
+         frame_capture = NULL;
+         xSemaphoreGive(frame_ready);
+@@ -351,12 +354,12 @@
+ static int pocket_screen_command(int argc,char **argv)
+ {
+     (void)argc;(void)argv;
+-    uint8_t *snapshot=malloc(160*144*2);
+-    if(!snapshot){printf("POCKETFRAME_ERROR no_memory\n");return 1;}
++    PS_Frame storage={0};PS_Frame *snapshot=&storage;
++    if(!PS_FrameInit(snapshot)){printf("POCKETFRAME_ERROR no_memory\n");return 1;}
+     // The periodic battery/status redraw triggers a completed flush within this interval.
+     xSemaphoreTake(frame_ready,0);
+     taskENTER_CRITICAL(&frame_lock);
+-    frame_request=snapshot;
++    frame_capture_failed=false;frame_request=snapshot;
+     taskEXIT_CRITICAL(&frame_lock);
+     if(xSemaphoreTake(frame_ready,pdMS_TO_TICKS(2000))!=pdTRUE){
+         taskENTER_CRITICAL(&frame_lock);
+@@ -365,13 +368,14 @@
+         taskEXIT_CRITICAL(&frame_lock);
+         // If a flush took ownership at the timeout boundary, wait for its completion.
+         if(!still_pending)xSemaphoreTake(frame_ready,portMAX_DELAY);
+-        else{free(snapshot);printf("POCKETFRAME_ERROR no_redraw\n");return 1;}
+-    }
++        else{PS_FrameFree(snapshot);printf("POCKETFRAME_ERROR no_redraw\n");return 1;}
++    }
++    if(frame_capture_failed){PS_FrameFree(snapshot);printf("POCKETFRAME_ERROR invalid_rows\n");return 1;}
+     printf("POCKETFRAME 160 144 RGB565\n");
+     for(unsigned y=0;y<144;y++){
+-        for(unsigned x=0;x<320;x++)printf("%02x",snapshot[y*320+x]);
++        for(unsigned x=0;x<320;x++)printf("%02x",PS_FrameRow(snapshot,y)[x]);
+         printf("\n");
+     }
+     printf("POCKETFRAME_END\n");
+-    free(snapshot);return 0;
+-}
++    PS_FrameFree(snapshot);return 0;
++}

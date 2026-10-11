@@ -49,3 +49,15 @@ Portable checks exercise every split of the original [HTML fixture](../examples/
 Native measurements and image identity will be recorded separately from operator LCD/button/battery observations. This change does not complete release qualification, physical CI E2E or reproducible distribution packaging.
 
 The inspected operator integration uses `pocket_frame_capture.h` for development-only frame readback: three separately allocated 15,360-byte bands retain one complete 160 × 144 RGB565 frame. This addresses contiguous-allocation failure; the total temporary pixel storage remains 46,080 bytes. Allocation failures clean up all bands, row copies are checked before writing, and the existing GUI ownership/completion handshake must finish before freeing them. This is render-buffer evidence, not USB-video or an LCD camera capture. The operator main integration remains a release-reproducibility dependency.
+
+## Inspected development-unit evidence — 0.13.25-flow
+
+The app-only image is **1,972,096 bytes**, with **125,056 bytes** remaining in the existing 2 MiB application partition. App readback, prior-app verification, unchanged partition table, preserved NVS and original recovery backup verification are recorded in [sanitized evidence](evidence/flow-layout/verification.json). The exact Rust/C inputs and operator main integration are identified separately; this is not a reproducible release package.
+
+One final direct collection retained four real pages in **37.144 seconds**, transferring **74,202 bytes** including the CSS/reparse path. Result generation took **4.139 ms**. A local reader sample took **31.818 ms**, transferred **zero bytes**, and had a **4,124-byte** worker-stack free margin. Collection sampled **33,764 minimum free heap bytes**, a **27,648-byte minimum largest block**, and **3,628 bytes** of worker-stack free margin. Rust uses **20,968 of 22,272 reserved bytes**. These are individual samples, not complete allocator tracing, endurance acceptance or speed guarantees.
+
+![Native MCU heading, inline bold, source link, background and bordered paragraph](evidence/flow-layout/heading-box-links.png)
+
+![Native MCU nested list and retained source-image placeholder](evidence/flow-layout/lists-image-slot.png)
+
+The original TEST layout was constructed and drawn on the MCU; the PNGs are actual render-buffer readbacks. They establish native drawing of this diagnostic, not a camera observation of the LCD or arbitrary-site CSS conformance. The final diagnostic has 11 scroll positions, reaches its last position, and B restores the real article. Portable HTML-stream tests separately connect extraction/cascade to the same layout path. Actual source-image decoding, operator panel/buttons/battery confirmation, native adversarial endurance and qualified physical CI E2E remain pending.
