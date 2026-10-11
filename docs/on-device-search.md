@@ -1,6 +1,6 @@
 # Autonomous Chromatic search
 
-The current native application collects, indexes, searches and paginates a small public-web collection on the Chromatic itself. A Mac search service, USB page proxy and temporary HTTPS tunnel are not part of its data path. The inspected development unit uses the existing FPGA `18.14`. The standalone collection measurement below belongs to `0.13.17-local`; `0.13.18-scroll` adds overlapping reader windows and updated controls. `0.13.19-type` adds semantic and inline typography with paragraph spacing. Each image has separate identity and acceptance evidence.
+The current native application collects, indexes, searches and paginates a small public-web collection on the Chromatic itself. A Mac search service, USB page proxy and temporary HTTPS tunnel are not part of its data path. The inspected development unit uses the existing FPGA `18.14`. The standalone collection measurement below belongs to `0.13.17-local`; `0.13.18-scroll` adds overlapping reader windows and updated controls. `0.13.19-type` adds semantic and inline typography with paragraph spacing. `0.13.21-css` adds bounded external CSS and a static TrueType subset; see [current scope](native-css-webfonts.md). Each image has separate identity and acceptance evidence.
 
 ## Collection and search
 
@@ -10,7 +10,7 @@ Collection retains at most four documents from an eight-entry frontier. One work
 
 The native crawler checks the source host's `robots.txt` before collecting pages. A verified HTTP 404/410 permits this limited collection; other failed requests, redirects and unsupported policies fail closed. The compact parser accepts at most 2,048 bytes of UTF-8 policy text, handles specific/wildcard groups and longest Allow/Disallow rules, and rejects percent-encoded policies. This conservative fixed-profile implementation is not a general RFC 9309 implementation. See the separate [companion crawler](crawling.md) for the richer host implementation.
 
-Rust extracts a title and visible text incrementally, decodes basic/numeric entities, and excludes comments, script, style and non-title head content. It preserves supported headings, inline size/weight and paragraph boundaries; see [native typography](typography.md). This is a small text parser, not HTML5 DOM layout. Selected inline size/weight declarations are interpreted as bounded styles; external stylesheets, JavaScript, downloads and active content are not executed. Navigation labels may still appear in extracted text.
+Rust extracts a title and visible text incrementally, decodes basic/numeric entities, and excludes comments, script, style and non-title head content. It preserves supported headings, inline size/weight and paragraph boundaries; see [native typography](typography.md). This is a small text parser, not HTML5 DOM layout. Selected inline size/weight declarations and the first bounded external stylesheet are interpreted as typography. Unsupported CSS layout, JavaScript and active content are not executed; explicit font assets use the separate bounded resource path. Navigation labels may still appear in extracted text.
 
 The local inverted index holds 256 term hashes and document masks. ASCII query words must all match; exact retained-text checks prevent a hash collision from producing a result. Title matches receive a greater weight than body matches, with stable ties. A full term table falls back to a bounded text scan. Non-ASCII queries use substring matching; Japanese keyboard and font coverage remain separate work. This device ranking differs from the optional host BM25/tokenizer implementation.
 
@@ -62,7 +62,7 @@ The next priorities are configurable bounded public source profiles, improved te
 
 ## Styled reader update
 
-`0.13.19-type` preserves supported heading/body/annotation sizes, inline bold and paragraph separation. It generates PSR1 viewports with variable row heights instead of fixed seven-row PCS1 windows. See [typography scope](typography.md) and [sanitized verification](evidence/typography/verification.json). External CSS and web fonts are not reproduced.
+`0.13.19-type` preserves supported heading/body/annotation sizes, inline bold and paragraph separation. It generates PSR1 viewports with variable row heights instead of fixed seven-row PCS1 windows. See [typography scope](typography.md) and [sanitized verification](evidence/typography/verification.json). That historical image did not reproduce external CSS or web fonts. The current increment is documented [separately](native-css-webfonts.md).
 
 On the inspected unit, the new Rust structure uses **15,632 bytes of the existing 16,384-byte state region**. The app is **1,915,248 bytes**, leaving 181,904 bytes in the established 2 MiB partition. Installation verified app readback, partition integrity and NVS preservation. The font wrappers use 328 bytes of glyph scratch/cache and a 112-byte borrowed rich view; these are separate from the Rust state and are not a complete firmware RAM budget.
 

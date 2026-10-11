@@ -1,0 +1,37 @@
+{
+  "application_version": "0.13.22-css",
+  "application_bytes": 1937568,
+  "application_sha256": "870b58789bf12018ceeb563a70773b375739b532327dae8e9db2ce2dcd0a63a5",
+  "component_source_sha256": {
+    "pocket_search_input.h": "0d167246a027d26210d40c980f77c8e8a57d006a35c9a3ec2837a48cf72a87ff",
+    "pocket_typography.c": "cd38363716a010d89788acab2ddfdd8601ef937512bbb304aba759eaa529ccae",
+    "pocket_search_net.h": "8c7bda33762740503011cad841b666d280c6894480f9a37814563564e7f37d7e",
+    "CMakeLists.txt": "311df041eecca01ff6b72b28399818cd6194764cc60372bcb3fef076ffd18716",
+    "pocket_search_origin.h": "48a70fb0e7b0dfc6a7790a8490ec80a1dbb2240fd879e9a6808375d18ff4637b",
+    "pocket_search_ui.h": "f67f6da562553c72d7488751deb5e3b80ab54fbffb3e71f6b8427104001c5076",
+    "pocket_typography.h": "a0fa47c97ca12317526175fc2303d4864e9d4a536cc51f945d6cc67d69e9634d",
+    "pocket_search_net.c": "42872b8b29d0414add6e8e5d1092de00e80608475a9b04d38b91a79998711734",
+    "pocket_search_origin.c": "4118e2d756347ab01818ef778696be31b76327e666b93acc9a95392768890fa3",
+    "pocket_search_collection.h": "c55fd86745f0eddad18423df20a13d9268f31311aa91053d60aee7021307ecc9",
+    "pocket_resource_policy.h": "a9fef63e4d2adec317f60078de6e218e5e08baea829a4714bead3bc3a346407b",
+    "pocket_search_ui.c": "d27dd7569a2871207d67cb07e81a07511f6efb55860697cd51a947d3df260efd"
+  },
+  "rust_archive_sha256": "54a4ee14a7e6f29c00e4f57eb0f7182ea12cd1746a77ca1b9842dc3af31cc36c",
+  "installed": false,
+  "implementation_commit": "3448ca2928002486f612a52c909c5dc1656c9b68",
+  "rust_source_sha256": {
+    "Cargo.toml": "ab7eb1a26308349ea5df48b9b9e9930313364b51b867331a71a2350b5d4d536a",
+    "Cargo.lock": "c487fbd26c923db05b876d9587999a8daef57659210fb5bd243589b04b427acf",
+    "crates/chromatic-client/Cargo.toml": "e999449ea3820df76e1586797be392729d3b6ab9bc5338f6483a0415fb700c2d",
+    "crates/chromatic-ffi/Cargo.toml": "d35def87890d72d0021498a4b9b81003190745577acf68ab4f0665648c66f1d4",
+    "crates/chromatic-client/src/css.rs": "d5717a074d62307ef7553be32107a7974fcb0912bbc4bc37a6e6798c1522b8fc",
+    "crates/chromatic-client/src/lib.rs": "a677a18a7edb098e274becdc7f59b40d512b31f89f49b5c338248e3f4570d61b",
+    "crates/chromatic-client/src/local.rs": "333f4771da1e495f86e169cebfc7d129313617e402bd5eaea9f3e05390b12827",
+    "crates/chromatic-client/src/rich.rs": "1754659859beb3e348aed3c720901352cbc1748170f29af0eeccda6e2797cf13",
+    "crates/chromatic-client/src/webfont.rs": "2518d3d5ebed80e7ad189711b547997b54a20b2de832e9e393bd327d6cfbba2e",
+    "crates/chromatic-ffi/src/lib.rs": "30db3a29e8a7d6ac6cee21279ef2a2aaf77da92ed666856dc47d3f310f8dec76"
+  },
+  "physical_test_performed": false,
+  "physical_status": "not installed: no Chromatic found in fresh plugin/serial discovery; prewrite assertion stopped before stub or flash write",
+  "qualified_release": false
+}

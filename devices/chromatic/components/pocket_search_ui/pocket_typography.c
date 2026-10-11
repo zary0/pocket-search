@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Scaled views of the existing OFL font; no new font tables or framebuffer.
+// Fixed-cell typography: built-in OFL font or a locally rasterized ASCII atlas.
 #include "pocket_typography.h"
 #include <string.h>
 #include <stdint.h>
+#include <stdatomic.h>
 LV_FONT_DECLARE(pocket_jp);
-static uint8_t glyphs[8][36]; /* one bounded scratch glyph per style; GUI-thread only */
-static uint32_t cached_codes[8];static bool cached[8];
+static uint8_t web_atlas[867];
+static atomic_bool web_ready=false;
+static uint8_t glyphs[16][36]; /* one bounded scratch glyph per style; GUI-thread only */
+static uint32_t cached_codes[16];static bool cached[16],cached_web[16];
 static unsigned size(unsigned style){const unsigned sizes[]={12,16,14,10};return sizes[style&3];}
 static unsigned width(uint32_t c,unsigned style){return size(style)/(c<128?2:1)+!!(style&4);}
 static bool describe(const lv_font_t *font,lv_font_glyph_dsc_t *d,uint32_t c,uint32_t next){
@@ -19,10 +22,16 @@ static bool ink(const uint8_t *source,unsigned sw,unsigned sh,unsigned x,unsigne
 }
 static const uint8_t *bitmap(const lv_font_t *font,uint32_t c){
     unsigned style=(uintptr_t)font->dsc,w=width(c,style),h=size(style),plain=w-!!(style&4);
-    if(cached[style]&&cached_codes[style]==c)return glyphs[style];
+    bool web=(style&8)&&PS_WebFontReady()&&c>=32&&c<=126&&(web_atlas[855+(c-32)/8]&(1<<((c-32)%8)));
+    if(cached[style]&&cached_codes[style]==c&&cached_web[style]==web)return glyphs[style];
     lv_font_glyph_dsc_t base={0};
+    const uint8_t *source=NULL;
+    if(web){
+        base.box_w=6;base.box_h=12;source=web_atlas+(c-32)*9;
+    }else{
     if(!lv_font_get_glyph_dsc(&pocket_jp,&base,c,0))return NULL;
-    const uint8_t *source=lv_font_get_glyph_bitmap(&pocket_jp,c);
+    source=lv_font_get_glyph_bitmap(&pocket_jp,c);
+    }
     if(!source)return NULL;
     if(!(style&4)&&base.box_w==w&&base.box_h==h)return source;
     uint8_t *out=glyphs[style];memset(out,0,sizeof(glyphs[0]));
@@ -31,11 +40,19 @@ static const uint8_t *bitmap(const lv_font_t *font,uint32_t c){
         if((style&4)&&x)on|=ink(source,base.box_w,base.box_h,x-1,y,plain,h);
         if(on){unsigned bit=y*w+x;out[bit/8]|=1<<(7-bit%8);}
     }
-    cached_codes[style]=c;cached[style]=true;return out;
+    cached_codes[style]=c;cached[style]=true;cached_web[style]=web;return out;
 }
 #define FONT(s,h) {.get_glyph_dsc=describe,.get_glyph_bitmap=bitmap,.line_height=h,.base_line=2,.subpx=LV_FONT_SUBPX_NONE,.dsc=(const void*)(uintptr_t)s}
-static const lv_font_t fonts[8]={FONT(0,14),FONT(1,18),FONT(2,16),FONT(3,12),FONT(4,14),FONT(5,18),FONT(6,16),FONT(7,12)};
+static const lv_font_t fonts[16]={FONT(0,14),FONT(1,18),FONT(2,16),FONT(3,12),FONT(4,14),FONT(5,18),FONT(6,16),FONT(7,12),FONT(8,14),FONT(9,18),FONT(10,16),FONT(11,12),FONT(12,14),FONT(13,18),FONT(14,16),FONT(15,12)};
 
+// One immutable face per boot. Acquire/release publication avoids GUI/worker races.
+bool PS_WebFontReady(void){return atomic_load_explicit(&web_ready,memory_order_acquire);}
+int PS_WebFontLoad(const uint8_t *bytes,size_t length){
+    if(PS_WebFontReady())return -1;
+    int n=ps_webfont(bytes,length,web_atlas);
+    if(n>0)atomic_store_explicit(&web_ready,true,memory_order_release);
+    return n;
+}
 void PS_TypographyDraw(lv_event_t *event,const uint8_t *packet,const PS_RichView *view){
     if(lv_event_get_code(event)!=LV_EVENT_DRAW_MAIN)return;
     lv_obj_t *object=lv_event_get_target(event);lv_area_t area;lv_obj_get_coords(object,&area);

@@ -41,7 +41,7 @@ static unsigned observed_mode, observed_bytes, observed_image_bytes, observed_ba
 static bool observed_rich,observed_probe;static unsigned observed_large,observed_small,observed_bold,observed_gaps;
 static PS_View observed_view;static bool observed_verified;
 static bool pending_query_set;static char pending_query[97];
-static bool pending_probe;
+static unsigned pending_probe;
 static const char *key_names[] = {"home","up","down","left","right","a","b","start","select"};
 static const Button_t buttons[] = {0,kButton_Up,kButton_Down,kButton_Left,kButton_Right,kButton_A,kButton_B,kButton_Start,kButton_Select};
 static const char **groups(void) { return u.script==0?kana:u.script==1?lower:u.script==2?upper:symbols; }
@@ -268,7 +268,7 @@ OSD_Result_t PocketEntry_Draw(void *screen) { if(!entry) { entry=label(screen,77
 OSD_Result_t PocketEntry_Button(Button_t b,ButtonState_t s,void *arg) { (void)arg; if(b==kButton_A && s==kButtonState_Pressed) MenuMgr_SelectTab(kTabID_Search); return kOSD_Result_Ok; }
 OSD_Result_t PocketEntry_Transition(void *arg) { (void)arg; if(entry) lv_obj_del(entry); entry=NULL; return kOSD_Result_Ok; }
 static int command(int argc,char **argv) {
-    if(argc==2&&!strcmp(argv[1],"typography")){taskENTER_CRITICAL(&lock);bool available=!pending_key&&!pending_query_set&&!pending_probe;if(available)pending_probe=true;taskEXIT_CRITICAL(&lock);if(available)printf("SEARCH_UI_QUEUED\n");return available?0:1;}
+    if(argc==2&&(!strcmp(argv[1],"typography")||!strcmp(argv[1],"webfont"))){taskENTER_CRITICAL(&lock);bool available=!pending_key&&!pending_query_set&&!pending_probe;if(!strcmp(argv[1],"webfont")&&!PS_WebFontReady())available=false;if(available)pending_probe=!strcmp(argv[1],"webfont")?2:1;taskEXIT_CRITICAL(&lock);if(available)printf("SEARCH_UI_QUEUED\n");return available?0:1;}
     if(argc==3&&!strcmp(argv[1],"query")){size_t n=strlen(argv[2]);if(n>96||!ps_valid(argv[2],n))return 1;taskENTER_CRITICAL(&lock);bool available=!pending_key&&!pending_query_set&&!pending_probe;if(available){memset(pending_query,0,sizeof(pending_query));memcpy(pending_query,argv[2],n);pending_query_set=true;}taskEXIT_CRITICAL(&lock);if(available)printf("SEARCH_UI_QUEUED\n");return available?0:1;}
     if(argc!=2) return 1;
     if(!strcmp(argv[1],"status")) {
@@ -308,8 +308,8 @@ void PocketUI_Poll(void) {
         }
         if(!valid){release_image();u.network_error=reply.error;u.verified=false;message(reply.error==PS_NET_STALE_COLLECTION?"Collection changed.\nA: Search again":reply.error==1?"Wi-Fi disconnected.\nSelect: Wi-Fi setup":reply.error==2?"Clock sync failed.\nTry again.":reply.error==12?"robots.txt blocks\nthis collection.":reply.error==13?"No usable pages.\nRight on home:\nRetry collection.":reply.error?"Connection failed.\nTry again.":"Invalid response.\nTry again.",QUERY);}
     }
-    char query[97];taskENTER_CRITICAL(&lock); int key=pending_key; pending_key=0;bool set_query=pending_query_set;bool probe=pending_probe;pending_probe=false;if(set_query){memcpy(query,pending_query,sizeof(query));memset(pending_query,0,sizeof(pending_query));pending_query_set=false;}taskEXIT_CRITICAL(&lock);
-    if(probe&&u.mode==READER&&u.verified&&!u.probe){u.probe_document=u.view.document_id;u.probe_position=u.view.page_index;int n=ps_rich_probe(reply.bytes);PS_RichView rich;if(n>0&&ps_rich_decode(reply.bytes,(size_t)n,&rich)==0){memcpy(u.packet,reply.bytes,(size_t)n);u.rich_view=rich;u.rich=true;u.probe=true;u.view=(PS_View){.document_id=rich.document_id,.page_count=rich.positions,.kind=2,.title=rich.title};u.dirty=true;}return;}
+    char query[97];taskENTER_CRITICAL(&lock); int key=pending_key; pending_key=0;bool set_query=pending_query_set;unsigned probe=pending_probe;pending_probe=0;if(set_query){memcpy(query,pending_query,sizeof(query));memset(pending_query,0,sizeof(pending_query));pending_query_set=false;}taskEXIT_CRITICAL(&lock);
+    if(probe&&u.mode==READER&&u.verified&&!u.probe){u.probe_document=u.view.document_id;u.probe_position=u.view.page_index;int n=probe==2?ps_webfont_probe(reply.bytes):ps_rich_probe(reply.bytes);PS_RichView rich;if(n>0&&ps_rich_decode(reply.bytes,(size_t)n,&rich)==0){memcpy(u.packet,reply.bytes,(size_t)n);u.rich_view=rich;u.rich=true;u.probe=true;u.view=(PS_View){.document_id=rich.document_id,.page_count=rich.positions,.kind=2,.title=rich.title};u.dirty=true;}return;}
     if(set_query){cancel();u.back_count=0;mode(HOME);memcpy(u.query,query,sizeof(u.query));MenuMgr_SelectTab(kTabID_Search);return;}if(!key)return;
     if(key==1) { cancel();u.back_count=0;mode(HOME); MenuMgr_SelectTab(kTabID_Search); }
     else (void)PocketUI_Button(buttons[key-1],kButtonState_Pressed,NULL);
