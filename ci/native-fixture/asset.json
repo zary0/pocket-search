@@ -1,0 +1,34 @@
+{
+  "license": "GPL-3.0-only",
+  "author": "Pocket Search contributors",
+  "width": 192,
+  "height": 128,
+  "format": "baseline JPEG",
+  "bytes": 1553,
+  "sha256": "3672a69a4d448e3c82d794e0ffbdd62622c90bf4459bf1c4b5501fecce4aac9c",
+  "description": "Original red, green and blue vertical bars. Generated as a deterministic lab source, never pre-resized for a device response.",
+  "generator": {
+    "library": "Pillow",
+    "quality": 90,
+    "subsampling": 0,
+    "optimize": false,
+    "progressive": false,
+    "rgb": [
+      [
+        232,
+        32,
+        32
+      ],
+      [
+        32,
+        192,
+        32
+      ],
+      [
+        32,
+        32,
+        232
+      ]
+    ]
+  }
+}

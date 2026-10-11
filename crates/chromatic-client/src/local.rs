@@ -1241,6 +1241,45 @@ mod flow_tests {
     use std::{boxed::Box, string::String};
     const HTML: &[u8] = include_bytes!("../../../examples/fixtures/flow.html");
     #[test]
+    fn native_lab_fixture_retains_complete_mixed_text_and_image_within_budgets() {
+        let html = include_bytes!("../../../examples/fixtures/native-lab.html");
+        for chunk in [1, 17, 512, html.len()] {
+            let mut state = Box::new(LocalSearch::new());
+            state.seed();
+            assert!(state.next_url(&mut [0; 128]) > 0);
+            for part in html.chunks(chunk) {
+                state.feed(part);
+            }
+            assert!(state.finish(true));
+            let doc = &state.documents[0];
+            assert_eq!(
+                (doc.limited, doc.style_limited, doc.tree.limited),
+                (0, 0, 0)
+            );
+            assert!(doc.body.as_str().contains("日本語とEnglishを読む。"));
+            assert!(doc.body.as_str().contains("End of document."));
+            assert!(doc.tree.nodes[..doc.tree.count as usize]
+                .iter()
+                .enumerate()
+                .any(|(i, node)| node.kind == flow::IMAGE && doc.tree.resource(i) == "bars.jpg"));
+            let mut bytes = [0; 512];
+            let mut tail = false;
+            for position in 0..doc.flow_positions {
+                let n = state.flow_packet(1, position as usize, &mut bytes);
+                let packet = flow::Packet::decode(&bytes[..n]).unwrap();
+                assert_eq!(packet.positions, doc.flow_positions);
+                tail |= packet.rows[..packet.row_count]
+                    .iter()
+                    .any(|r| r.text.contains("End of document."));
+            }
+            assert!(tail);
+            assert_eq!(
+                state.flow_packet(1, doc.flow_positions as usize, &mut bytes),
+                0
+            );
+        }
+    }
+    #[test]
     fn closing_nested_same_kind_keeps_outer_ranges_and_paint() {
         let html=b"<div style='color:red'><div style='color:blue'>inner</div>outer tail<ul><li>first<ul><li>inner item</li></ul>outer item tail</li><li>second item</li></ul></div>";
         for split in 0..=html.len() {

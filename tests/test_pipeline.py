@@ -18,14 +18,16 @@ class ReleaseGateTests(unittest.TestCase):
     def test_readiness_requires_complete_build_and_explicit_lab_configuration(self):
         with patch.dict(os.environ, {'CHROMATIC_E2E_READY':'false'},clear=True):
             with self.assertRaises(p.Invalid):p.readiness(p.ROOT)
-        configured={'CHROMATIC_E2E_READY':'true','CHROMATIC_LAB_DRIVER':'/opt/pocket-lab/driver','CHROMATIC_LAB_DRIVER_SHA256':'0'*64,'CHROMATIC_TEST_ORIGIN':'https://fixture.example.org'}
+        configured={'CHROMATIC_E2E_READY':'true','CHROMATIC_LAB_DRIVER':'/opt/pocket-lab/driver','CHROMATIC_LAB_DRIVER_SHA256':'0'*64,'CHROMATIC_TEST_ORIGIN':'https://www.w3.org'}
         with patch.dict(os.environ,configured,clear=True):
             p.readiness(p.ROOT)
             with tempfile.TemporaryDirectory() as folder:
                 with self.assertRaises(p.Invalid):p.readiness(Path(folder))
-        configured['CHROMATIC_TEST_ORIGIN']='http://fixture.example.org'
-        with patch.dict(os.environ,configured,clear=True):
-            with self.assertRaises(p.Invalid):p.readiness(p.ROOT)
+        for origin in ('http://fixture.example.org','https://fixture.example.org','https://www.w3.org:8443',
+                       'https://user@www.w3.org','https://127.0.0.1','https://www.w3.org/?key=private'):
+            configured['CHROMATIC_TEST_ORIGIN']=origin
+            with self.subTest(origin=origin), patch.dict(os.environ,configured,clear=True):
+                with self.assertRaises(p.Invalid):p.readiness(p.ROOT)
 
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
@@ -83,7 +85,7 @@ class ReleaseGateTests(unittest.TestCase):
                   "metrics": {**self.policy["maximum"], **self.policy["minimum"]}}
         report["readback_sha256"] = report["firmware_sha256"]
         p.write(self.frames / "report.json", report)
-        (self.frames / "junit.xml").write_text('<testsuite tests="5">' + ''.join('<testcase name="' + case + '" />' for case in sorted(p.CASES)) + '</testsuite>')
+        (self.frames / "junit.xml").write_text('<testsuite tests="' + str(len(p.CASES)) + '">' + ''.join('<testcase name="' + case + '" />' for case in sorted(p.CASES)) + '</testsuite>')
         def chunk(kind, value):
             return struct.pack(">I", len(value)) + kind + value + struct.pack(">I", zlib.crc32(kind + value) & 0xffffffff)
         # Explicit synthetic unit-test PNGs, never uploaded as physical evidence.
@@ -175,6 +177,26 @@ class ReleaseGateTests(unittest.TestCase):
     def test_missing_firmware_blocks_physical_qualification(self):
         self.make(release=True)
         with self.assertRaises(p.Invalid): p.evidence(self.folder, self.frames, self.policy)
+
+    def test_incomplete_native_acceptance_and_short_endurance_cannot_pass(self):
+        self.make(release=True); self.attach()
+        original = self.report()
+        additions = {"cancellation_retry", "persistent_cold_start", "native_image_processing",
+                     "battery_standalone", "endurance_30_minutes"}
+        for case in additions:
+            report = copy.deepcopy(original)
+            del report["cases"][case]
+            p.write(self.frames / "report.json", report)
+            with self.subTest(case=case), self.assertRaises(p.Invalid):
+                p.evidence(self.folder, self.frames, self.policy)
+        for key, value in [("endurance_seconds", 1799), ("battery_runtime_seconds", 119),
+                           ("unexpected_resets", 1), ("persistent_store_failures", 1),
+                           ("native_image_source_bytes", 0), ("native_decoded_image_bytes", 0)]:
+            report = copy.deepcopy(original)
+            report["metrics"][key] = value
+            p.write(self.frames / "report.json", report)
+            with self.subTest(metric=key), self.assertRaises(p.Invalid):
+                p.evidence(self.folder, self.frames, self.policy)
 
     def test_promote_keeps_exact_candidate_bytes_and_binds_manifest(self):
         self.make(release=True); self.attach(); self.report()

@@ -36,7 +36,7 @@ flowchart LR
 
 | Workflow | Trigger | Purpose |
 | --- | --- | --- |
-| CI | PRs and pushes for `develop` / `main` | Version/lock agreement, Python release-gate tests, Rust checks and host profile checks |
+| CI | PRs and pushes for `develop` / `main` | Version/lock agreement, Python release/fixture tests, Rust checks, host profiles and the complete pinned MCU build |
 | Hardware E2E | Trusted pushes to `develop` / `main`, or manual branch dispatch | Record explicitly disabled develop lab status, otherwise require real qualification; main/manual runs remain strict |
 | Chromatic qualification | Reusable workflow | Same build/physical-gate implementation for development and tags |
 | Release | Push of `v*` tag | Validate strict version and main provenance, qualify candidate, publish exact tested assets |
@@ -61,10 +61,10 @@ A qualified release has:
 
 The image is application-only. Partition migration, bootloader, FPGA, eFuse, cartridge data, NVS contents, device backups, and credentials are not release assets. A lab driver must preserve settings and a verified recovery backup when installing the intended image. Source distribution must include applicable upstream notices and complete build instructions before firmware is released.
 
-The initial pipeline packages one hosted Linux companion target. Additional targets need builds with their own verified `--build-info` and matching manifest entries; do not rename a binary to claim another architecture. The current native application is unimplemented, so development candidates contain source and companion files and cannot qualify as firmware releases.
+The initial pipeline packages one hosted Linux companion target. Additional targets need builds with their own verified `--build-info` and matching manifest entries; do not rename a binary to claim another architecture. The complete native MCU application now builds from pinned public sources. The hosted packaging phase initially contains source and companion files; the trusted lab must attach the exact native image before physical qualification. An unattached image, missing lab or incomplete physical evidence still prevents firmware release.
 
 ## Preparing a version
 
 On `develop`, update the workspace version, refresh `Cargo.lock` with Cargo, update release notes, and run CI. Only merge into `main` after real physical E2E succeeds. Create and push an annotated `vX.Y.Z` tag from that main commit. The release workflow checks all identities again before publication. Existing releases/assets are not overwritten automatically.
 
-Branch protection must require `ci` on `develop` and both `ci` and `qualify / chromatic-required` for `main`, with PRs and owner approval required, stale approvals dismissed, force pushes/deletions disabled, and administrator enforcement. The exact check names are confirmed from workflow runs. See [GitHub governance](github-governance.md) for reviewed API payloads, activation/read-back steps, and current enforcement status. Public repositories on GitHub Free support branch protection; the current private-plan restriction must be revisited at publication. Version/evidence gates execute inside the release workflow, but they do not substitute for repository access controls.
+Branch protection must require `ci` and `native-firmware` on `develop`, plus `qualify / chromatic-required` for `main`, with PRs and owner approval required, stale approvals dismissed, force pushes/deletions disabled, and administrator enforcement. The exact check names are confirmed from workflow runs. See [GitHub governance](github-governance.md) for reviewed API payloads, activation/read-back steps, and current enforcement status. Public repositories on GitHub Free support branch protection; the current private-plan restriction must be revisited at publication. Version/evidence gates execute inside the release workflow, but they do not substitute for repository access controls.

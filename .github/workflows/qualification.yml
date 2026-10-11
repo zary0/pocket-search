@@ -58,7 +58,7 @@ jobs:
     needs: [build, readiness]
     runs-on: [self-hosted, chromatic]
     environment: chromatic-lab
-    timeout-minutes: 35
+    timeout-minutes: 85
     concurrency:
       group: chromatic-physical-lab
       cancel-in-progress: false
