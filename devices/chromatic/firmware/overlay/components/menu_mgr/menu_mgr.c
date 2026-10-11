@@ -101,7 +101,12 @@ static OSD_Result_t MenuMgr_Draw(void* arg)
         lv_obj_align(pTab->pImgObj , LV_ALIGN_TOP_LEFT, _MenuOrigin_px.x, _MenuOrigin_px.y);
     }
 
-    lv_img_set_src(pTab->pImgObj, pTab->pImageDesc);
+    // The descriptor is immutable. Reassigning the same source invalidates its
+    // covered screen on every GUI poll, even while the reader is idle.
+    if (lv_img_get_src(pTab->pImgObj) != pTab->pImageDesc)
+    {
+        lv_img_set_src(pTab->pImgObj, pTab->pImageDesc);
+    }
 
     if (pTab->Widget.fnDraw != NULL)
     {
