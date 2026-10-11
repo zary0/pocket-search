@@ -529,6 +529,7 @@ pub unsafe extern "C" fn ps_local_packet(
         1 => index.search_packet(query, page as usize, out),
         2 => index.flow_packet(document as usize, page as usize, out),
         4 => index.info_packet(document as usize, page as usize, out),
+        6 => index.flow_packet_reference(document as usize, page as usize, out),
         _ => 0,
     }) as i32
 }

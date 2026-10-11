@@ -1178,7 +1178,13 @@ impl LocalSearch {
         crate::css::resolve(doc.url.as_str(), doc.tree.resource(image), out)
     }
     /// Semantic 160px viewport; source images retain their slot/alt/source only.
+    pub fn flow_packet_reference(&self, id: usize, offset: usize, out: &mut [u8]) -> usize {
+        self.flow_packet_impl(id, offset, out, false)
+    }
     pub fn flow_packet(&self, id: usize, offset: usize, out: &mut [u8]) -> usize {
+        self.flow_packet_impl(id, offset, out, true)
+    }
+    fn flow_packet_impl(&self, id: usize, offset: usize, out: &mut [u8], cached: bool) -> usize {
         if id == 0 || id > self.count() {
             return 0;
         }
@@ -1187,7 +1193,11 @@ impl LocalSearch {
             id,
             doc.content(),
             offset,
-            doc.flow_positions as usize,
+            if cached {
+                doc.flow_positions as usize
+            } else {
+                crate::flow::positions(doc.content())
+            },
             out,
             |link| {
                 let target = doc.tree.resource(link);
@@ -1342,6 +1352,13 @@ mod flow_tests {
             }
         }
         assert!(link && image && border && red && tail);
+        let mut reference = [0; 512];
+        for p in 0..positions {
+            let n = state.flow_packet(1, p as usize, &mut bytes);
+            let m = state.flow_packet_reference(1, p as usize, &mut reference);
+            assert_eq!(n, m);
+            assert_eq!(&bytes[..n], &reference[..m]);
+        }
         assert_eq!(state.flow_packet(1, positions as usize, &mut bytes), 0);
         let n = state.flow_packet(1, positions as usize - 1, &mut bytes);
         let last = flow::Packet::decode(&bytes[..n]).unwrap();

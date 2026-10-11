@@ -90,6 +90,8 @@ See [retained-content implementation and limits](native-retained-content.md).
   The custom FPGA image is not installed; no physical click is claimed.
 - [x] Cache immutable layout-position counts at publish/load and invalidate/rebuild
   after replacement; remove repeated whole-page counting from navigation.
+- [x] Implement explicit same-document reference/cached packet comparisons and
+  a thirty-second current-native-UI render/heap/stack window without a test scene.
 - [ ] Record latest CPU, heap/largest block, stack, TLS/image and drawing timings
   together; compare before/after under identical source and navigation workloads.
 - [ ] Extend endurance testing and optimize measured bottlenecks without weakening

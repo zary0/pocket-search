@@ -113,7 +113,7 @@ Embedded rules follow external rules at equal specificity; this bounded subset
 does not reproduce arbitrary stylesheet document order or retroactively restyle
 already emitted text. Supported computed styles survive persistence.
 
-The reader caches its total layout-position count when publishing/loading a
+The reader caches its total layout-position count when publishing/loading an
 immutable document. Navigation no longer repeats the complete page-count pass;
 its remaining work scans to the requested window and encodes that window. Cache
 values are recomputed after a changed document or snapshot load, not trusted from
@@ -121,3 +121,9 @@ flash. Keep the actual target timings and memory observations separate from host
 unit results. The retained core still fits the fixed 22,272-byte state region.
 WOFF2, Japanese downloaded faces, shaping, flex/grid/table layout and general
 browser conformance remain further staged work, not implied by these changes.
+
+## Explicit native measurement windows
+
+`search_local compare 1` runs thirty warm comparisons on core 0 between the full-count reference encoder and the optimized encoder for the same retained document/window. It rejects unequal packet bytes and reports CPU frequency, elapsed totals and local PFW decoder cycles. The core is allocator-free; its zero-allocation result comes from that code boundary, not a whole-system allocator trace. The diagnostic never changes the reader or uploads page text.
+
+`render_probe native` measures thirty seconds of the current GUI without installing a synthetic test scene. It reports handler time, actual band/DMA bytes and render-start to final-DMA frame time, local minimum heap and GUI stack headroom. It refuses an existing platform-test scene. This is MCU/driver timing, not LCD scanout latency or physical-video evidence. The historical idle/counter/page/full platform scenes remain separate.

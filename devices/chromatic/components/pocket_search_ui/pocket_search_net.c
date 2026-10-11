@@ -11,6 +11,8 @@
 #include "esp_crt_bundle.h"
 #include "esp_http_client.h"
 #include "esp_timer.h"
+#include "esp_cpu.h"
+#include "esp_private/esp_clk.h"
 #include "esp_log.h"
 #include "nvs.h"
 #include "esp_heap_caps.h"
@@ -275,6 +277,21 @@ static void worker(void *arg){
     }
 cached:
     if(!documents){r.error=crawl_error==ROBOTS_DENIED?ROBOTS_DENIED:NO_DOCUMENTS;goto done;}
+    if(job.request.kind==6){
+        uint64_t reference_us=0,cached_us=0,decode_cycles=0;bool equal=true;unsigned count=0;uint32_t cpu_before=esp_clk_cpu_freq();
+        for(unsigned i=0;i<31&&!cancelled();++i){
+            int64_t before=esp_timer_get_time();int n=ps_local_packet(local_state,sizeof(local_state),6,job.request.document,job.request.page,(const uint8_t*)"",0,r.bytes);unsigned ref=(unsigned)(esp_timer_get_time()-before);
+            before=esp_timer_get_time();int m=ps_local_packet(local_state,sizeof(local_state),2,job.request.document,job.request.page,(const uint8_t*)"",0,r.bytes+512);unsigned fast=(unsigned)(esp_timer_get_time()-before);
+            if(n<=0||n!=m||memcmp(r.bytes,r.bytes+512,(size_t)n)){equal=false;break;}
+            r.length=(size_t)m;
+            PS_FlowView view;uint32_t cycles=esp_cpu_get_cycle_count();int decoded=ps_flow_decode(r.bytes+512,(size_t)m,&view);cycles=esp_cpu_get_cycle_count()-cycles;
+            if(decoded){equal=false;break;}
+            if(i){reference_us+=ref;cached_us+=fast;decode_cycles+=cycles;++count;}memory(&r);
+        }
+        uint32_t cpu_after=esp_clk_cpu_freq();
+        printf("SEARCH_COMPARE {\"execution_mode\":\"physical-native-cpu\",\"repeats\":%u,\"identical_packets\":%s,\"reference_total_us\":%llu,\"cached_total_us\":%llu,\"decoder_total_cycles\":%llu,\"decoder_allocations\":0,\"cpu_hz_before\":%lu,\"cpu_hz_after\":%lu,\"core\":%u,\"packet_bytes\":%u,\"source_bytes_over_usb\":0}\n",count,equal?"true":"false",(unsigned long long)reference_us,(unsigned long long)cached_us,(unsigned long long)decode_cycles,(unsigned long)cpu_before,(unsigned long)cpu_after,(unsigned)xPortGetCoreID(),(unsigned)r.length);
+        r.error=equal&&count==30&&cpu_before==cpu_after?0:INCOMPLETE;goto done;
+    }
     if(job.request.kind==3){
         char url[256];if(ps_local_image_url(local_state,sizeof(local_state),job.request.document,job.request.page,(uint8_t*)url,sizeof(url))<=0){r.error=INVALID_IMAGE;goto done;}
         CW_Status wifi;CW_GetStatus(&wifi);if(wifi.state!=CW_CONNECTED){r.error=NO_WIFI;goto done;}
@@ -300,7 +317,7 @@ done:
 }
 bool PS_NetConfigured(void){return true;}
 bool PS_NetStart(const PS_Request *request){
-    if(!request||!memchr(request->query,0,sizeof(request->query))||request->kind<1||(request->kind>5&&request->kind!=255))return false;
+    if(!request||!memchr(request->query,0,sizeof(request->query))||request->kind<1||(request->kind>6&&request->kind!=255))return false;
     taskENTER_CRITICAL(&lock);bool allowed=!job.running&&!job.ready&&!job.configuring;if(allowed){job.running=true;job.cancelled=false;job.request=*request;}taskEXIT_CRITICAL(&lock);
     if(!allowed)return false;
     if(xTaskCreatePinnedToCore(worker,"local_search",10240,NULL,2,NULL,0)==pdPASS)return true;
@@ -332,6 +349,7 @@ bool PS_NetSelectProfile(unsigned value){
 }
 static int status(int argc,char **argv){
     if(argc==3&&!strcmp(argv[1],"profile")){char *end;unsigned long value=strtoul(argv[2],&end,10);return *argv[2]&&!*end&&value<PS_NetProfileCount()&&PS_NetSelectProfile((unsigned)value)?0:1;}
+    if(argc==3&&!strcmp(argv[1],"compare")){char *end;unsigned long id=strtoul(argv[2],&end,10);PS_Request request={.kind=6,.document=(uint32_t)id};return *argv[2]&&!*end&&id>0&&id<=4&&PS_NetStart(&request)?0:1;}
     if(argc==2&&!strcmp(argv[1],"fonts")){PS_Request request={.kind=255};return PS_NetStart(&request)?0:1;}
     if(argc==2&&!strcmp(argv[1],"refresh"))return PS_NetRefresh()?0:1;
     if(argc!=2||strcmp(argv[1],"status"))return 1;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// Physical LVGL platform probe. This is not a Pocket Search application/E2E.
+// Platform test scenes and opt-in actual native-UI rendering metrics; no E2E claim.
 #include "pocket_render_probe.h"
 #include <inttypes.h>
 #include <stdio.h>
@@ -31,7 +31,7 @@ static size_t buffer_bytes;
 static char counter_text[16];
 static uint32_t cpu_start, boot_minimum_before;
 
-static const char *case_names[] = {"none", "idle", "counter", "page", "full"};
+static const char *case_names[] = {"none", "idle", "counter", "page", "full", "restore", "show", "native"};
 static const char *pages[] = {
     "01 pocket search\n02 small display\n03 bounded packets\n04 native rendering\n05 button controls\n06 verified bytes\n07 reader page one",
     "01 page two\n02 original fixture\n03 text stays data\n04 no browser script\n05 fixed row budget\n06 same test device\n07 native SPI output",
@@ -45,6 +45,7 @@ static int command(int argc, char **argv) {
     }
     if (!strcmp(argv[1], "restore")) selected = 5;
     if (!strcmp(argv[1], "show")) selected = 6;
+    if (!strcmp(argv[1], "native")) selected = 7;
     if (!selected) return 1;
     taskENTER_CRITICAL(&lock);
     bool available = !requested && !active_case;
@@ -61,7 +62,7 @@ void pocket_render_probe_init(lv_disp_t *value, const lv_font_t *font,
     probe_font = font;
     render_mode = mode;
     buffer_bytes = draw_buffer_bytes;
-    const esp_console_cmd_t cmd = {.command="render_probe", .help="Physical LVGL probe: idle/counter/page/full/restore/show", .func=command};
+    const esp_console_cmd_t cmd = {.command="render_probe", .help="Physical LVGL probe: idle/counter/page/full/restore/show/native (30-second actual UI window)", .func=command};
     ESP_ERROR_CHECK(esp_console_cmd_register(&cmd));
 }
 
@@ -155,13 +156,21 @@ void pocket_render_probe_step(void) {
             taskEXIT_CRITICAL(&lock);
             return;
         }
+        if(value==7){
+            if(scene&&lv_disp_get_scr_act(display)==scene){taskENTER_CRITICAL(&lock);active_case=0;taskEXIT_CRITICAL(&lock);printf("RENDER_ERROR test_scene_active\n");return;}
+            previous_screen=lv_disp_get_scr_act(display);
+            boot_minimum_before=heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT);
+            ESP_ERROR_CHECK(heap_caps_monitor_local_minimum_free_size_start());
+            taskENTER_CRITICAL(&lock);metrics=(metrics_t){0};render_started=0;measuring=true;taskEXIT_CRITICAL(&lock);
+            cpu_start=(uint32_t)esp_clk_cpu_freq();window_start=now;warmup=0;updates=0;next_update=now+100000;return;
+        }
         begin_scene();
         warmup = 6;
         updates = 0;
         next_update = now + 100000;
     }
     if (!active_case) return;
-    if (lv_disp_get_scr_act(display) != scene) {
+    if (lv_disp_get_scr_act(display) != (active_case==7?previous_screen:scene)) {
         taskENTER_CRITICAL(&lock);
         bool was_measuring = measuring;
         measuring = false;
@@ -188,7 +197,7 @@ void pocket_render_probe_step(void) {
         }
         return;
     }
-    if (updates == 32) {
+    if ((active_case==7&&now-window_start>=30000000)||(active_case!=7&&updates==32)) {
         taskENTER_CRITICAL(&lock);
         measuring = false;
         metrics_t result = metrics;
@@ -196,8 +205,8 @@ void pocket_render_probe_step(void) {
         const esp_app_desc_t *app = esp_app_get_description();
         uint32_t window_minimum = heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT);
         ESP_ERROR_CHECK(heap_caps_monitor_local_minimum_free_size_stop());
-        printf("RENDER_REPORT {\"schema_version\":1,\"execution_mode\":\"physical-lvgl-platform-probe\",\"firmware_version\":\"%s\",\"mode\":\"%s\",\"case\":\"%s\",\"updates\":%u,\"draw_buffer_bytes\":%u,\"cpu_hz_before\":%"PRIu32",\"cpu_hz_after\":%lu,\"core\":%u,\"elapsed_us\":%"PRId64",\"handler_calls\":%"PRIu32",\"handler_total_us\":%"PRIu64",\"handler_max_us\":%"PRIu32",\"flushes\":%"PRIu32",\"transfer_bytes\":%"PRIu64",\"frames\":%"PRIu32",\"frame_total_us\":%"PRIu64",\"frame_max_us\":%"PRIu32",\"free_heap_bytes\":%u,\"largest_free_block_bytes\":%u,\"boot_min_before_window_bytes\":%u,\"window_min_free_bytes\":%u,\"gui_stack_free_bytes\":%u}\n",
-            app->version, render_mode, case_names[active_case], updates, (unsigned)buffer_bytes,
+        printf("RENDER_REPORT {\"schema_version\":1,\"execution_mode\":\"%s\",\"firmware_version\":\"%s\",\"mode\":\"%s\",\"case\":\"%s\",\"updates\":%u,\"draw_buffer_bytes\":%u,\"cpu_hz_before\":%"PRIu32",\"cpu_hz_after\":%lu,\"core\":%u,\"elapsed_us\":%"PRId64",\"handler_calls\":%"PRIu32",\"handler_total_us\":%"PRIu64",\"handler_max_us\":%"PRIu32",\"flushes\":%"PRIu32",\"transfer_bytes\":%"PRIu64",\"frames\":%"PRIu32",\"frame_total_us\":%"PRIu64",\"frame_max_us\":%"PRIu32",\"free_heap_bytes\":%u,\"largest_free_block_bytes\":%u,\"boot_min_before_window_bytes\":%u,\"window_min_free_bytes\":%u,\"gui_stack_free_bytes\":%u}\n",
+            active_case==7?"physical-native-ui-render":"physical-lvgl-platform-probe",app->version, render_mode, case_names[active_case], updates, (unsigned)buffer_bytes,
             cpu_start, (unsigned long)esp_clk_cpu_freq(), (unsigned)xPortGetCoreID(), now-window_start,
             result.handlers, result.handler_total_us, result.handler_max_us, result.flushes,
             result.bytes, result.frames, result.frame_total_us, result.frame_max_us,
@@ -210,6 +219,7 @@ void pocket_render_probe_step(void) {
         taskEXIT_CRITICAL(&lock);
         return;
     }
+    if(active_case==7){++updates;return;}
     if (active_case == 2 || active_case == 4) {
         snprintf(counter_text, sizeof(counter_text), "FRAME %02u", updates);
         lv_label_set_text_static(counter, counter_text);
