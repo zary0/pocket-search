@@ -14,7 +14,7 @@ fn main() {
         atlas.len(),
         std::mem::size_of::<chromatic_client::local::LocalSearch>()
     );
-    for code in [b'A', b'P', b'S'] {
+    for code in *b"APS" {
         let i = usize::from(code - 32);
         println!("glyph={}", code as char);
         for y in 0..12 {

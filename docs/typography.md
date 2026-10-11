@@ -33,7 +33,7 @@ Down advances one wrapped row; Up reverses it. Left/right jump seven row positio
 
 ## Bounded storage and validation
 
-Each document retains at most 2,560 UTF-8 body bytes and 48 style transitions. The parser's nesting stack has 16 frames. Both are held inside the 16,640-byte opaque Rust state region (16,424 bytes used). Exceeding style capacity falls back to body style for subsequent content, preserves retained text, and adds `[Style limit reached]`; text truncation retains its separate `[Text limit reached]` marker. No dynamic allocation is introduced in the Rust core.
+Each document retains at most 2,560 UTF-8 body bytes and 48 style transitions. The parser's nesting stack has 16 frames. Both are held inside the 16,640-byte opaque Rust state region (16,416 bytes used). Exceeding style capacity falls back to body style for subsequent content, preserves retained text, and adds `[Style limit reached]`; text truncation retains its separate `[Text limit reached]` marker. No dynamic allocation is introduced in the Rust core.
 
 [PSR1](chromatic-protocol.md#psr1-styled-reader-windows) has its own magic/version; PCS1 result and companion formats are unchanged. The decoder checks UTF-8, styles, dimensions, row continuity, packet consumption and navigation metadata before native drawing. Borrowed offsets remain valid only while the current packet buffer is retained. Invalid replies do not replace the displayed document.
 
