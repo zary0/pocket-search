@@ -27,7 +27,7 @@ The body occupies **144 × 92 pixels** at `(8, 34)`, leaving the existing title,
 
 ASCII advances are half the normalized size, other Unicode scalars advance one size, and bold adds one pixel. Thus a 16 px bold heading has nine-pixel Latin advances and seventeen-pixel non-ASCII advances. Rust validates the complete row width before drawing. The native font wrappers use the same advances.
 
-The renderer scales the existing bitmap font and adds one horizontal pixel for bold. The renderer can also use a downloaded 867-byte ASCII atlas. It adds no framebuffer or full-page text cache. Its sixteen single-glyph scratch/cache entries use 656 bytes. The borrowed C rich view is 112 bytes. These figures exclude the existing font, LVGL object, GUI/network stacks and display band.
+The renderer scales the existing bitmap font and adds one horizontal pixel for bold. The renderer can also use a downloaded 867-byte ASCII atlas. It adds no framebuffer or full-page text cache. Its sixteen single-glyph scratch/cache entries use 656 bytes in `0.13.21-css`; the review candidate adds source-aware cache keys and uses 672 bytes. The borrowed C rich view is 112 bytes. These figures exclude the existing font, LVGL object, GUI/network stacks and display band.
 
 Down advances one wrapped row; Up reverses it. Left/right jump seven row positions. The last valid position packs the retained tail against both pixel and packet limits, preventing empty overscroll or unreachable text. B returns to the selected search result. This is discrete row scrolling, not smooth pixel animation.
 
