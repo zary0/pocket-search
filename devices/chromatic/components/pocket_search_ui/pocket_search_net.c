@@ -137,25 +137,25 @@ done:
     free(body);r->wire_bytes+=(unsigned)total;taskENTER_CRITICAL(&lock);body_bytes+=(unsigned)total;taskEXIT_CRITICAL(&lock);
     memory(r);esp_http_client_cleanup(client);return error;
 }
-static bool load_face(PS_Reply *r,int64_t start){
-    char url[256];if(ps_local_resource(local_state,sizeof(local_state),1,(uint8_t*)url)<=0)return false;
+static bool load_face(PS_Reply *r,int64_t start,int *cause){
+    char url[256];if(ps_local_resource(local_state,sizeof(local_state),1,(uint8_t*)url)<=0){if(cause)*cause=WRONG_TYPE;return false;}
     // Existing readers retain the same immutable atlas, even during refresh.
-    if(PS_WebFontReady())return !strcmp(url,installed_font_url);
+    if(PS_WebFontReady()){bool same=!strcmp(url,installed_font_url);if(!same&&cause)*cause=WRONG_TYPE;return same;}
     uint8_t *body=NULL;size_t length=0;
-    int error=resource(url,true,&body,&length,r,start);if(error){++resource_fallbacks;return false;}
+    int error=resource(url,true,&body,&length,r,start);if(error){if(cause)*cause=error;++resource_fallbacks;return false;}
     int n=PS_WebFontLoad(body,length);free(body);
-    if(n<=0){++resource_fallbacks;return false;}
+    if(n<=0){if(cause)*cause=WRONG_TYPE;++resource_fallbacks;return false;}
     memcpy(installed_font_url,url,strlen(url)+1);font_glyphs=(unsigned)n;font_bytes=(unsigned)length;memory(r);return true;
 }
-static bool load_css(const char *url,PS_Reply *r,int64_t start,bool *ready){
+static bool load_css(const char *url,PS_Reply *r,int64_t start,bool *ready,int *cause){
     if(ps_local_css_cached(local_state,sizeof(local_state),(const uint8_t*)url,strlen(url))==1){
-        ++css_cache_hits;*ready=load_face(r,start);return ps_local_css_count(local_state,sizeof(local_state))>0||*ready;
+        ++css_cache_hits;*ready=load_face(r,start,cause);return ps_local_css_count(local_state,sizeof(local_state))>0||*ready;
     }
     uint8_t *body=NULL;size_t length=0;int error=resource(url,false,&body,&length,r,start);
-    if(error){++resource_fallbacks;return false;}
+    if(error){if(cause)*cause=error;++resource_fallbacks;return false;}
     int rules=ps_local_css(local_state,sizeof(local_state),body,length,(const uint8_t*)url,strlen(url));free(body);
-    if(rules<0){++resource_fallbacks;return false;}css_rules+=(unsigned)rules;
-    *ready=load_face(r,start);return rules>0||*ready;
+    if(rules<0){if(cause)*cause=WRONG_TYPE;++resource_fallbacks;return false;}css_rules+=(unsigned)rules;
+    *ready=load_face(r,start,cause);return rules>0||*ready;
 }
 static void worker(void *arg){
     (void)arg;PS_Reply r={.sequence=job.request.sequence,.local=true};int64_t start=esp_timer_get_time();int crawl_error=0;
@@ -170,7 +170,7 @@ static void worker(void *arg){
         r.clock_synced=true;
         if(job.request.kind==255){
             bool ready=false;
-            if(!load_css(probe_css,&r,start,&ready)||!ready)r.error=WRONG_TYPE;
+            int cause=0;if(!load_css(probe_css,&r,start,&ready,&cause)||!ready)r.error=cause?cause:WRONG_TYPE;
             goto done;
         }
         if(!robots_state){crawl_error=fetch(robots_url,true,&r,start);if(crawl_error)robots_state=3;}
@@ -186,7 +186,7 @@ static void worker(void *arg){
             if(cancelled()){(void)ps_local_finish(local_state,sizeof(local_state),0);break;}
             int error=fetch(url,false,&r,start);
             char css_url[256];bool ready=false;
-            if(!error&&ps_local_resource(local_state,sizeof(local_state),0,(uint8_t*)css_url)>0&&load_css(css_url,&r,start,&ready)){
+            if(!error&&ps_local_resource(local_state,sizeof(local_state),0,(uint8_t*)css_url)>0&&load_css(css_url,&r,start,&ready,NULL)){
                 // No retained DOM: refetch once with the bounded cascade, then publish.
                 size_t saved_length=ps_local_backup_bytes();uint8_t *saved=saved_length<=3072?calloc(1,saved_length):NULL;
                 if(saved&&ps_local_backup(local_state,sizeof(local_state),saved,saved_length,0)==0){

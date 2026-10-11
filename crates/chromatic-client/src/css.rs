@@ -26,6 +26,7 @@ impl Rule {
 pub struct Sheet {
     rules: [Rule; RULES],
     count: u8,
+    /// Limitation of the retained stylesheet, not a per-document status.
     pub limited: u8,
     href: [u8; URL],
     href_len: u16,
@@ -91,6 +92,7 @@ impl Sheet {
         core::str::from_utf8(&self.family[..self.family_len as usize]).unwrap_or("")
     }
     pub fn parse(&mut self, bytes: &[u8], base: &str) {
+        self.limited = 0;
         self.enabled = 0;
         self.cached = 0;
         self.loaded_href_len = 0;
@@ -299,7 +301,13 @@ fn declarations(body: &str, family: &str, rule: &mut Rule) {
         let Some((key, raw)) = d.split_once(':') else {
             continue;
         };
-        let (value, important) = if let Some(v) = raw.trim().strip_suffix("!important") {
+        let raw = raw.trim();
+        let suffix = raw.len().saturating_sub(10);
+        let (value, important) = if raw
+            .get(suffix..)
+            .is_some_and(|v| v.eq_ignore_ascii_case("!important"))
+        {
+            let v = &raw[..suffix];
             (v.trim(), true)
         } else {
             (raw.trim(), false)
@@ -455,6 +463,12 @@ pub fn resolve(base: &str, href: &str, out: &mut [u8]) -> usize {
         && !href.starts_with("//")
         && !href.split('/').any(|p| p == ".." || p == ".")
     {
+        if base
+            .strip_prefix("https://")
+            .is_none_or(|v| !v.contains('/'))
+        {
+            return 0;
+        }
         let Some(at) = base.rfind('/') else {
             return 0;
         };
@@ -509,6 +523,12 @@ mod tests {
         );
         assert_eq!(sheet.apply("small", "", "TINY", "", 0), CAPTION);
         assert_eq!(sheet.apply("big", "", "LARGE", "", 0), HEADING);
+        let mut importance = Sheet::EMPTY;
+        importance.parse(
+            b"p{font-size:16px !IMPORTANT} p{font-size:10px}",
+            "https://example.org/site.css",
+        );
+        assert_eq!(importance.apply("p", "", "", "font-size:10px", 0), HEADING);
         sheet.begin_page();
         sheet.discover("https://example.org/new/page.html", "/site.css");
         assert!(sheet.cached());
@@ -560,6 +580,8 @@ mod tests {
         assert_eq!(sheet.count(), 1);
         assert_eq!(sheet.limited, 1);
         assert_eq!(sheet.apply("p", "", "", "", 0), CAPTION);
+        sheet.parse(b"p{font-size:12px}", "https://example.org/site.css");
+        assert_eq!(sheet.limited, 0);
         let repeated=b"p{font-size:10px}p{font-size:10px}p{font-size:10px}p{font-size:10px}p{font-size:10px}p{font-size:10px}p{font-size:10px}p{font-size:10px}p{font-size:16px}";
         sheet.parse(repeated, "https://example.org/x.css");
         assert_eq!(sheet.count(), RULES);
@@ -585,6 +607,7 @@ mod tests {
         for bad in ["//evil/x", "http://evil/x", "data:x", "a#x", "a\\b", "a\nx"] {
             assert_eq!(resolve("https://example.org/p", bad, &mut out), 0);
         }
+        assert_eq!(resolve("https://example.org", "site.css", &mut out), 0);
         let n = resolve("https://example.org/path/page.html", "/site.css", &mut out);
         assert_eq!(&out[..n], b"https://example.org/site.css");
     }

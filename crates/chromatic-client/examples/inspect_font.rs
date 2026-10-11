@@ -1,10 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-only
 //! Inspect a local, operator-supplied TTF using exactly the native bounded rasterizer.
 fn main() {
+    use std::io::Read;
     let path = std::env::args()
         .nth(1)
         .expect("Usage: inspect_font FILE.ttf");
-    let bytes = std::fs::read(path).unwrap();
+    let mut bytes = Vec::with_capacity(chromatic_client::webfont::LIMIT + 1);
+    std::fs::File::open(path)
+        .unwrap()
+        .take((chromatic_client::webfont::LIMIT + 1) as u64)
+        .read_to_end(&mut bytes)
+        .unwrap();
+    assert!(
+        bytes.len() <= chromatic_client::webfont::LIMIT,
+        "Font exceeds the native input limit"
+    );
     let mut atlas = [0; chromatic_client::webfont::ATLAS_BYTES];
     let n = chromatic_client::webfont::rasterize(&bytes, &mut atlas);
     println!(
