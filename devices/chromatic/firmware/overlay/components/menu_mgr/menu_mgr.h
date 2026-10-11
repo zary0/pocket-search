@@ -47,3 +47,6 @@ typedef struct MenuTab {
 OSD_Result_t MenuMgr_Initialize(OSD_Widget_t* const pWidget, lv_obj_t *const pScreen);
 OSD_Result_t MenuMgr_AddTab(TabID_t eID, MenuTab_t *const pTab);
 OSD_Result_t MenuMgr_SelectTab(TabID_t id);
+
+// GUI-thread read for presentation visibility; not a cross-thread state API.
+TabID_t MenuMgr_CurrentTab(void);

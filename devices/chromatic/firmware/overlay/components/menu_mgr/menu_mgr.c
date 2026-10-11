@@ -30,6 +30,8 @@ static void MenuMgr_PrevTab(void);
 static bool MenuMgr_IsTabActive(TabID_t eID);
 static TabID_t MenuMgr_FindNextActiveTab(TabID_t eFrom, bool forward);
 
+TabID_t MenuMgr_CurrentTab(void) { return _Ctx.eCurTab; }
+
 OSD_Result_t MenuMgr_Initialize(OSD_Widget_t* const pWidget, lv_obj_t *const pScreen)
 {
     if (pScreen == NULL)

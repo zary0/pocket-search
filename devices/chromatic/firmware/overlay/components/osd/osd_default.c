@@ -46,6 +46,15 @@ static void CreateMenuSystem(lv_obj_t *const pScreen);
 static bool IsPaletteTabActive(void);
 static bool IsColorTempTabActive(void);
 
+static OSD_Result_t (*battery_draw)(void *);
+static OSD_Result_t DrawVisibleBattery(void *arg)
+{
+    // Pocket Search's opaque full-screen root covers the stock meter. Voltage
+    // sampling/charging callbacks continue; only its occluded paint is skipped.
+    if (MenuMgr_CurrentTab() == kTabID_Search) return kOSD_Result_Ok;
+    return battery_draw ? battery_draw(arg) : kOSD_Result_Err_NullDataPtr;
+}
+
 void OSD_Default_Init(lv_obj_t *const pScreen)
 {
     static OSD_Widget_t MenuMgr = {
@@ -69,6 +78,9 @@ void OSD_Default_Init(lv_obj_t *const pScreen)
         ESP_LOGE(TAG, "Battery widget init failed %d", eResult);
         return;
     }
+
+    battery_draw = Battery.fnDraw;
+    Battery.fnDraw = DrawVisibleBattery;
 
     CreateMenuStatus(pScreen);
     CreateMenuDisplay(pScreen);
