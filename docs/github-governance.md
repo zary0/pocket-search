@@ -28,7 +28,7 @@ GitHub supports protected branches in public repositories on **GitHub Free**, in
 | Changes through PRs | Required | Required |
 | Approving human reviews / owner review | One / required | One / required |
 | Dismiss approvals after changed commits | Enabled | Enabled |
-| Required checks, from GitHub Actions app ID 15368 | `ci` | `ci`, `qualify / chromatic-required` |
+| Required checks, from GitHub Actions app ID 15368 | `ci`, `native-firmware` | `ci`, `native-firmware`, `qualify / chromatic-required` |
 | Up to date with base / conversations resolved | Required | Required |
 | Force pushes / branch deletion | Disabled | Disabled |
 | Apply rules to administrators | Enabled | Enabled |

@@ -4,7 +4,7 @@ Pocket Search is intended for public open-source development under **GPL-3.0-onl
 
 ## Development priorities
 
-Chromatic is the primary target: 160 × 144 pixels, physical buttons, bounded memory, and a responsive MCU UI. Keep the device core dependency-free and allocation-free. Crawling, the corpus, ranking, and image preparation belong to the companion service.
+Chromatic is the primary target: 160 × 144 pixels, physical buttons, bounded memory, and a responsive MCU UI. Keep the device core dependency-free and allocation-free. Collection, indexing, ranking and reading run on the device. Keep the historical companion service optional. Native image processing must respect measured memory, byte, dimension and time budgets.
 
 Prefer measured changes with a clear behavior or resource benefit. Do not trade UTF-8 validation, packet bounds, certificate validation, result correctness, or source attribution for a faster number. Avoid CPU intrinsics or unsafe device code without an actual target measurement and a portable reference path.
 

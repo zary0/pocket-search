@@ -7,6 +7,10 @@
         "app_id": 15368
       },
       {
+        "context": "native-firmware",
+        "app_id": 15368
+      },
+      {
         "context": "qualify / chromatic-required",
         "app_id": 15368
       }

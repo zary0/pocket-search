@@ -127,3 +127,5 @@ See [GitHub governance](docs/github-governance.md) for review ownership, branch-
 Read the [security policy](SECURITY.md) for supported versions, confidential reporting, disclosure coordination, device credentials, and the service/device/CI trust boundaries. The policy distinguishes implemented packet and release checks from implemented experimental transport bounds and pending crawler/production protections.
 
 There is no production release or deployed public service yet. GitHub private vulnerability reporting is not currently available for this private repository. Until a confidential channel is enabled and verified, request a private reporting contact without posting vulnerability details, credentials, or device dumps in an issue. The security policy explains the current reporting route and public-release prerequisites.
+
+Build the complete ESP32 MCU application from pinned public sources using the [native firmware build guide](docs/native-firmware-build.md). Hosted `native-firmware` CI checks compilation; physical release qualification is separate.

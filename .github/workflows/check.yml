@@ -7,6 +7,39 @@ on:
 permissions:
   contents: read
 jobs:
+  native-firmware:
+    name: native-firmware
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install native build prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git wget flex bison gperf python3 python3-venv cmake ninja-build ccache libffi-dev libssl-dev dfu-util libusb-1.0-0
+          python3 scripts/setup_chromatic_firmware.py "$RUNNER_TEMP/chromatic-tools"
+      - name: Build the complete MCU application from this checkout
+        run: |
+          export IDF_TOOLS_PATH="$RUNNER_TEMP/chromatic-tools/idf-tools"
+          source "$RUNNER_TEMP/chromatic-tools/idf/export.sh"
+          python3 scripts/build_chromatic_firmware.py \
+            --upstream "$RUNNER_TEMP/chromatic-tools/mcu" \
+            --idf "$RUNNER_TEMP/chromatic-tools/idf" \
+            --lvgl "$RUNNER_TEMP/chromatic-tools/lvgl" \
+            --output "$RUNNER_TEMP/chromatic-firmware" \
+            --cargo "$RUNNER_TEMP/chromatic-tools/rust/bin/cargo" \
+            --rustc "$RUNNER_TEMP/chromatic-tools/rust/bin/rustc" \
+            --idf-python "$IDF_PYTHON_ENV_PATH/bin/python"
+      - name: Retain candidate identity (no physical qualification)
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-build-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/chromatic-firmware/firmware.json
+          if-no-files-found: error
+          retention-days: 14
   ci:
     runs-on: ubuntu-latest
     steps:

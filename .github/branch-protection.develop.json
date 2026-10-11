@@ -5,6 +5,10 @@
       {
         "context": "ci",
         "app_id": 15368
+      },
+      {
+        "context": "native-firmware",
+        "app_id": 15368
       }
     ]
   },
