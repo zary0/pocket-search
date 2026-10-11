@@ -10,7 +10,7 @@ permissions:
   actions: read
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -42,7 +42,7 @@ jobs:
           retention-days: 14
   readiness:
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -89,7 +89,7 @@ jobs:
   chromatic-required:
     if: always()
     needs: [build, readiness, hardware]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: A missing or skipped physical run is a failure
         env:

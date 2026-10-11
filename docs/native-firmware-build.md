@@ -57,7 +57,7 @@ or with another toolchain must retain their own checksum and verification.
 
 ## CI and release boundary
 
-Hosted CI now includes `native-firmware` on pull requests and develop/main pushes.
+Hosted CI uses Ubuntu 24.04 and includes `native-firmware` on pull requests and develop/main pushes. The explicit OS label avoids a moving `ubuntu-latest` baseline; tool/source pins remain mandatory.
 It builds in an isolated GitHub-hosted machine with read-only repository access.
 Its artifact contains build identity metadata only; binaries remain outside public
 CI artifacts until distribution and physical qualification are complete. Require
