@@ -18,7 +18,9 @@ The primary outcome is **Chromatic directly collects a small public-web corpus, 
 - [x] Generate results and text pages locally without sockets or external formatting after collection. Exclude sample content from the autonomous index.
 - [x] Build the Xtensa Rust archive and an app-only native image within the existing 2 MiB partition.
 - [x] Verify standalone direct collection/search with the Mac services/tunnels stopped, all 18 retained pages of one reader document, and installation/settings integrity. The operator confirmed battery-only restart, four `AI` results and A to read; see [scoped evidence](on-device-search.md).
-- [x] Preserve supported heading/body/annotation sizes, inline bold and paragraph breaks in bounded native reading windows; verify the actual MCU rendering and scrolling. This does not reproduce external CSS/web fonts or qualify a physical release. See [typography scope](typography.md).
+- [x] Preserve supported heading/body/annotation sizes, inline bold and paragraph breaks in bounded native reading windows; verify the actual MCU rendering and scrolling. The following increment covers a bounded CSS/font subset and does not qualify a physical release. See [typography scope](typography.md).
+- [x] Add a bounded external-CSS typography cascade and an on-device static TrueType ASCII rasterizer. Full CSS, WOFF2, variable fonts, shaping and proportional layout remain future work; see [scope and acceptance](native-css-webfonts.md).
+- [ ] Expand source profiles and CSS resource acceptance with measured native adversarial inputs before broadening stylesheet/font formats.
 - [ ] Complete physical input, battery-only, empty/error/cancellation and endurance acceptance, and make the complete firmware build reproducible for release.
 
 No standalone image support is claimed by the earlier host-prepared source-image experiment. Bookmarks, history and Codex approval remain outside scope. Retained text has a visible fixed-capacity limit; a persistent, complete-page storage path is P1 work. The checked standalone evidence does not complete the broader release-qualification checkbox.

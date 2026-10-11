@@ -5,7 +5,7 @@ use crate::{HEADER_BYTES, MAX_PACKET_BYTES, TEXT_COLUMNS, TEXT_ROWS};
 
 pub const MAX_DOCUMENTS: usize = 4;
 pub const BODY_BYTES: usize = 2560;
-pub const STATE_BUDGET: usize = 16384;
+pub const STATE_BUDGET: usize = 16640;
 pub const BASE: &str = "https://www-formal.stanford.edu/jmc/whatisai/";
 pub const SEED: &str = "https://www-formal.stanford.edu/jmc/whatisai/node1.html";
 const URL_BYTES: usize = 128;
@@ -76,6 +76,10 @@ impl Document {
     };
 }
 
+/// Temporary, integer-only snapshot owned by the adapter during one CSS reparse.
+/// Not part of the retained index. Zero is a valid empty snapshot representation.
+pub struct SavedDocument(Document);
+
 #[derive(Clone, Copy)]
 struct Parser {
     tag: [u8; 256],
@@ -128,6 +132,7 @@ pub struct LocalSearch {
     hashes: [u64; WORDS],
     masks: [u8; WORDS],
     parser: Parser,
+    sheet: crate::css::Sheet,
     count: u8,
     queued: u8,
     cursor: u8,
@@ -147,6 +152,7 @@ impl LocalSearch {
             hashes: [0; WORDS],
             masks: [0; WORDS],
             parser: Parser::EMPTY,
+            sheet: crate::css::Sheet::EMPTY,
             count: 0,
             queued: 0,
             cursor: 0,
@@ -189,6 +195,7 @@ impl LocalSearch {
         self.cursor += 1;
         self.active = 1;
         self.parser = Parser::EMPTY;
+        self.sheet.begin_page();
         len
     }
     fn emit(&mut self, c: char) {
@@ -282,6 +289,10 @@ impl LocalSearch {
             "div",
             "blockquote",
             "caption",
+            "body",
+            "a",
+            "li",
+            "big",
         ];
         let Some(tag) = tags
             .iter()
@@ -325,18 +336,21 @@ impl LocalSearch {
         self.parser.depth += 1;
         use crate::rich::{BOLD, CAPTION, HEADING, SUBHEADING};
         if tag == 1 {
-            self.parser.style = HEADING | BOLD;
+            self.parser.style = (self.parser.style & crate::rich::WEBFONT) | HEADING | BOLD;
         } else if tag <= 3 {
-            self.parser.style = SUBHEADING | BOLD;
+            self.parser.style = (self.parser.style & crate::rich::WEBFONT) | SUBHEADING | BOLD;
         } else if tag <= 6 {
-            self.parser.style = BOLD;
+            self.parser.style = (self.parser.style & crate::rich::WEBFONT) | BOLD;
         } else if tag <= 8 {
             self.parser.style |= BOLD;
         } else if tag <= 14 || tag == 20 {
-            self.parser.style = (self.parser.style & BOLD) | CAPTION;
+            self.parser.style = (self.parser.style & (BOLD | crate::rich::WEBFONT)) | CAPTION;
+        }
+        if tag == 24 {
+            self.parser.style = (self.parser.style & (BOLD | crate::rich::WEBFONT)) | SUBHEADING;
         }
         if let Some(value) = attribute(attributes, "size").filter(|_| tag == 15) {
-            self.parser.style = (self.parser.style & BOLD)
+            self.parser.style = (self.parser.style & (BOLD | crate::rich::WEBFONT))
                 | match value {
                     "1" | "-1" | "-2" => CAPTION,
                     "4" | "+1" => SUBHEADING,
@@ -344,49 +358,57 @@ impl LocalSearch {
                     _ => 0,
                 };
         }
-        if let Some(css) = attribute(attributes, "style") {
-            for declaration in css.split(';') {
-                let Some((key, value)) = declaration.split_once(':') else {
-                    continue;
-                };
-                let key = key.trim();
-                let value = value.trim();
-                if key.eq_ignore_ascii_case("font-weight") {
-                    if value.eq_ignore_ascii_case("bold")
-                        || value.eq_ignore_ascii_case("bolder")
-                        || value.parse::<u16>().is_ok_and(|n| n >= 600)
-                    {
-                        self.parser.style |= BOLD;
-                    } else if value.eq_ignore_ascii_case("normal") || value == "400" {
-                        self.parser.style &= !BOLD;
-                    }
-                } else if key.eq_ignore_ascii_case("font-size") {
-                    let class = if value.eq_ignore_ascii_case("small")
-                        || value.eq_ignore_ascii_case("smaller")
-                    {
-                        Some(CAPTION)
-                    } else if value.eq_ignore_ascii_case("large")
-                        || value.eq_ignore_ascii_case("larger")
-                    {
-                        Some(HEADING)
-                    } else {
-                        value
-                            .strip_suffix("px")
-                            .and_then(|n| n.trim().parse::<u16>().ok())
-                            .map(|n| match n {
-                                0..=11 => CAPTION,
-                                12..=13 => 0,
-                                14..=15 => SUBHEADING,
-                                _ => HEADING,
-                            })
-                    };
-                    if let Some(class) = class {
-                        self.parser.style = (self.parser.style & BOLD) | class;
-                    }
-                }
-            }
+        self.parser.style = self.sheet.apply(
+            name,
+            attribute(attributes, "id").unwrap_or(""),
+            attribute(attributes, "class").unwrap_or(""),
+            attribute(attributes, "style").unwrap_or(""),
+            self.parser.style,
+        );
+    }
+    pub fn resource(&self, font: bool) -> &str {
+        if font {
+            self.sheet.font_url()
+        } else {
+            self.sheet.href()
         }
     }
+    pub fn stylesheet(&mut self, bytes: &[u8], base: &str) {
+        self.sheet.parse(bytes, base);
+    }
+    pub fn font_ready(&mut self) {
+        self.sheet.font_ready = 1;
+    }
+    pub fn css_cached(&self) -> bool {
+        self.sheet.cached()
+    }
+    pub fn css_count(&self) -> usize {
+        self.sheet.count()
+    }
+    /// Reparse the active page after resource loading; published documents remain untouched.
+    pub fn reparse(&mut self) {
+        if self.active != 0 {
+            let url = self.documents[self.count as usize].url;
+            self.documents[self.count as usize] = Document::EMPTY;
+            self.documents[self.count as usize].url = url;
+            self.parser = Parser::EMPTY;
+            self.sheet.enable();
+        }
+    }
+    pub fn save_active(&self, out: &mut SavedDocument) -> bool {
+        if self.active == 0 {
+            return false;
+        }
+        out.0 = self.documents[self.count as usize];
+        true
+    }
+    pub fn restore_active(&mut self, saved: &SavedDocument) {
+        if self.active != 0 {
+            self.documents[self.count as usize] = saved.0;
+            self.parser = Parser::EMPTY;
+        }
+    }
+
     fn scalar(&mut self, b: u8) {
         if b < 128 {
             if self.parser.scalar_len != 0 {
@@ -456,6 +478,24 @@ impl LocalSearch {
             }
             if name.eq_ignore_ascii_case("title") {
                 self.parser.title = u8::from(!closing);
+            }
+            if name.eq_ignore_ascii_case("link")
+                && !closing
+                && self.parser.head != 0
+                && attribute(text, "rel").is_some_and(|v| {
+                    v.split_ascii_whitespace()
+                        .any(|v| v.eq_ignore_ascii_case("stylesheet"))
+                })
+                && attribute(text, "media").is_none_or(|v| {
+                    v.eq_ignore_ascii_case("all") || v.eq_ignore_ascii_case("screen")
+                })
+            {
+                if let Some(href) = attribute(text, "href") {
+                    if self.sheet.href().is_empty() {
+                        self.sheet
+                            .discover(self.documents[self.count as usize].url.as_str(), href);
+                    }
+                }
             }
             if name.eq_ignore_ascii_case("a") && !closing {
                 if let Some(href) = attribute(text, "href") {
@@ -1280,5 +1320,69 @@ mod tests {
             b"User-agent: *\nDisallow: /jmc/\nAllow: /jmc/",
             "/jmc/"
         ));
+    }
+}
+
+#[cfg(test)]
+mod css_pipeline_tests {
+    use super::*;
+    #[test]
+    fn every_html_chunk_boundary_discovers_css_reparses_and_keeps_font_inheritance() {
+        let html=b"<head><link rel='stylesheet' href='/site.css'><title>AI</title></head><body><h1>Heading</h1><p class='note'>AI body <strong>bold</strong>.</p></body>";
+        let css=b"body{font-family:Test}.note{font-size:10px}h1{font-size:14px;font-weight:normal}@font-face{font-family:Test;src:url(font.ttf)}";
+        for chunk in 1..=html.len() {
+            let mut index = LocalSearch::new();
+            index.seed();
+            let mut url = [0; 128];
+            assert!(index.next_url(&mut url) > 0);
+            for part in html.chunks(chunk) {
+                index.feed(part);
+            }
+            assert_eq!(
+                index.resource(false),
+                "https://www-formal.stanford.edu/site.css"
+            );
+            index.stylesheet(css, "https://www-formal.stanford.edu/site.css");
+            index.font_ready();
+            index.reparse();
+            for part in html.chunks(chunk) {
+                index.feed(part);
+            }
+            assert!(index.finish(true));
+            let mut packet = [0; 512];
+            let n = index.reader_packet(1, 0, &mut packet);
+            assert_eq!(packet[4], 2);
+            let decoded = crate::rich::Packet::decode(&packet[..n]).unwrap();
+            assert_eq!(
+                decoded.rows[0].style(0),
+                crate::rich::SUBHEADING | crate::rich::WEBFONT
+            );
+            assert!(decoded.rows.iter().any(|r| r.text.contains("AI body")
+                && r.style(0) == crate::rich::CAPTION | crate::rich::WEBFONT));
+            assert!(decoded.rows.iter().any(|r| {
+                r.text.chars().enumerate().any(|(i, _)| {
+                    r.style(i) == crate::rich::CAPTION | crate::rich::WEBFONT | crate::rich::BOLD
+                })
+            }));
+            assert_eq!(index.count(), 1);
+        }
+    }
+    #[test]
+    fn failed_second_fetch_restores_only_the_complete_original_document() {
+        let mut index = LocalSearch::new();
+        index.seed();
+        let mut url = [0; 128];
+        index.next_url(&mut url);
+        index.feed(b"<p>AI complete original</p>");
+        let mut saved = SavedDocument(Document::EMPTY);
+        assert!(index.save_active(&mut saved));
+        index.stylesheet(b"p{font-size:16px}", BASE);
+        index.reparse();
+        index.feed(b"<p>partial replaced");
+        index.restore_active(&saved);
+        assert!(index.finish(true));
+        assert_eq!(index.documents[0].body.as_str(), "AI complete original");
+        assert!(!index.save_active(&mut saved));
+        assert!(core::mem::size_of::<SavedDocument>() <= 3072);
     }
 }

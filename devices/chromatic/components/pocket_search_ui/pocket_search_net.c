@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // On-device HTTPS collection and Rust search. No companion service or USB proxy.
 #include "pocket_search_net.h"
+#include "pocket_typography.h"
+#include "pocket_resource_policy.h"
 #include "chromatic_wifi.h"
 #include "network_time.h"
 #include "esp_console.h"
@@ -14,8 +16,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <strings.h>
+#include <stdlib.h>
+#include <stdatomic.h>
 
-#define LOCAL_STATE_BYTES 16384
+#define LOCAL_STATE_BYTES 16640
 #define HTML_LIMIT 65536
 #define ROBOTS_LIMIT 2048
 #define COLLECTION_US 90000000
@@ -27,9 +31,12 @@ static uint8_t robots[ROBOTS_LIMIT+1];
 static size_t robots_length;
 static unsigned robots_state,documents,requests,body_bytes;
 static bool collected;
+static char installed_font_url[256];
+static _Atomic unsigned css_cache_hits,css_fetches,font_fetches,font_glyphs,font_bytes,css_rules,resource_fallbacks;
+static const char probe_css[]="https://fonts.googleapis.com/css?family=VT323&text=WEB%20FONT%20TEST%20Pocket%20Search%20ABC%20xyz%20012345%20Small%20caption%20Downloaded%20TTF";
 static struct {bool running,ready,cancelled,configuring;PS_Request request;PS_Reply reply;} job;
 enum {NO_WIFI=1,NO_CLOCK,NO_MEMORY,CONNECT_FAILED,HTTP_FAILED,TOO_LARGE,INCOMPLETE,WRONG_TYPE,CANCELLED,INVALID_IMAGE,STALE_COLLECTION,ROBOTS_DENIED,NO_DOCUMENTS};
-typedef struct {PS_Reply *reply;bool html,plain,identity;} Events;
+typedef struct {PS_Reply *reply;bool html,plain,css,font,identity;} Events;
 size_t ps_local_state_bytes(void);
 int32_t ps_local_init(uint8_t*,size_t);
 int32_t ps_local_next(uint8_t*,size_t,uint8_t*,size_t);
@@ -39,12 +46,20 @@ int32_t ps_local_count(uint8_t*,size_t);
 int32_t ps_local_packet(uint8_t*,size_t,uint32_t,uint32_t,uint32_t,const uint8_t*,size_t,uint8_t*);
 int32_t ps_local_robots(const uint8_t*,size_t,const uint8_t*,size_t);
 
+int32_t ps_local_resource(uint8_t*,size_t,int32_t,uint8_t*);
+int32_t ps_local_css(uint8_t*,size_t,const uint8_t*,size_t,const uint8_t*,size_t);
+int32_t ps_local_reparse(uint8_t*,size_t,int32_t);
+int32_t ps_local_css_cached(uint8_t*,size_t,const uint8_t*,size_t);
+int32_t ps_local_css_count(uint8_t*,size_t);
+size_t ps_local_backup_bytes(void);
+int32_t ps_local_backup(uint8_t*,size_t,uint8_t*,size_t,int32_t);
+
 static bool media(const char *value,const char *type){size_t n=strlen(type);return value&&!strncasecmp(value,type,n)&&(value[n]==0||value[n]==';'||value[n]==' ');}
 static esp_err_t event(esp_http_client_event_t *e){
     Events *v=e->user_data;
     if(e->event_id==HTTP_EVENT_ON_CONNECTED)v->reply->tls_verified=true;
     if(e->event_id==HTTP_EVENT_ON_HEADER&&e->header_key){
-        if(!strcasecmp(e->header_key,"Content-Type")){v->html=media(e->header_value,"text/html");v->plain=media(e->header_value,"text/plain");}
+        if(!strcasecmp(e->header_key,"Content-Type")){v->html=media(e->header_value,"text/html");v->plain=media(e->header_value,"text/plain");v->css=media(e->header_value,"text/css");v->font=media(e->header_value,"font/ttf")||media(e->header_value,"application/octet-stream")||media(e->header_value,"application/x-font-ttf")||media(e->header_value,"application/font-sfnt");}
         if(!strcasecmp(e->header_key,"Content-Encoding")&&(!e->header_value||strcasecmp(e->header_value,"identity")))v->identity=false;
     }return ESP_OK;
 }
@@ -93,17 +108,71 @@ done:
     taskENTER_CRITICAL(&lock);body_bytes+=(unsigned)total;taskEXIT_CRITICAL(&lock);
     r->wire_bytes+=(unsigned)total;memory(r);esp_http_client_cleanup(client);return error;
 }
+// Exact public authorities, no redirect, port, userinfo, local address or arbitrary host.
+static int resource(const char *url,bool font,uint8_t **out,size_t *out_length,PS_Reply *r,int64_t start){
+    *out=NULL;*out_length=0;if(!PS_ResourceURL(url,font))return WRONG_TYPE;
+    Events events={.reply=r,.identity=true};int error=0;size_t total=0;uint8_t *body=NULL;
+    size_t limit=font?24576:3072;
+    esp_http_client_config_t config={.url=url,.timeout_ms=8000,.crt_bundle_attach=esp_crt_bundle_attach,.skip_cert_common_name_check=false,.disable_auto_redirect=true,.buffer_size=512,.buffer_size_tx=512,.event_handler=event,.user_data=&events};
+    esp_http_client_handle_t client=esp_http_client_init(&config);if(!client)return NO_MEMORY;
+    esp_http_client_set_header(client,"Accept",font?"font/ttf,application/octet-stream":"text/css");
+    esp_http_client_set_header(client,"Accept-Encoding","identity");esp_http_client_set_header(client,"User-Agent","PocketSearchBot/0.1");
+    taskENTER_CRITICAL(&lock);++requests;if(font)++font_fetches;else ++css_fetches;taskEXIT_CRITICAL(&lock);
+    if(cancelled()||esp_timer_get_time()-start>=COLLECTION_US){error=CANCELLED;goto done;}
+    if(esp_http_client_open(client,0)!=ESP_OK){error=CONNECT_FAILED;goto done;}
+    int64_t length=esp_http_client_fetch_headers(client);r->http_status=esp_http_client_get_status_code(client);memory(r);
+    if(r->http_status!=200){error=HTTP_FAILED;goto done;}
+    if(!events.identity||(font?!events.font:!events.css)){error=WRONG_TYPE;goto done;}
+    if(length>(int64_t)limit){error=TOO_LARGE;goto done;}
+    // Allocate after the TLS handshake, and release raw font bytes before the next socket.
+    size_t capacity=length>0?(size_t)length:limit;body=malloc(capacity);if(!body){error=NO_MEMORY;goto done;}
+    while(!cancelled()&&esp_timer_get_time()-start<COLLECTION_US){
+        int n=esp_http_client_read(client,(char*)r->bytes,512);if(n<0){error=INCOMPLETE;goto done;}if(!n)break;
+        if(total+(size_t)n>capacity){error=TOO_LARGE;goto done;}memcpy(body+total,r->bytes,(size_t)n);total+=(size_t)n;memory(r);
+    }
+    if(cancelled()){error=CANCELLED;goto done;}
+    if(!esp_http_client_is_complete_data_received(client)){error=INCOMPLETE;goto done;}
+    *out=body;*out_length=total;body=NULL;
+done:
+    free(body);r->wire_bytes+=(unsigned)total;taskENTER_CRITICAL(&lock);body_bytes+=(unsigned)total;taskEXIT_CRITICAL(&lock);
+    memory(r);esp_http_client_cleanup(client);return error;
+}
+static bool load_face(PS_Reply *r,int64_t start){
+    char url[256];if(ps_local_resource(local_state,sizeof(local_state),1,(uint8_t*)url)<=0)return false;
+    // Existing readers retain the same immutable atlas, even during refresh.
+    if(PS_WebFontReady())return !strcmp(url,installed_font_url);
+    uint8_t *body=NULL;size_t length=0;
+    int error=resource(url,true,&body,&length,r,start);if(error){++resource_fallbacks;return false;}
+    int n=PS_WebFontLoad(body,length);free(body);
+    if(n<=0){++resource_fallbacks;return false;}
+    memcpy(installed_font_url,url,strlen(url)+1);font_glyphs=(unsigned)n;font_bytes=(unsigned)length;memory(r);return true;
+}
+static bool load_css(const char *url,PS_Reply *r,int64_t start,bool *ready){
+    if(ps_local_css_cached(local_state,sizeof(local_state),(const uint8_t*)url,strlen(url))==1){
+        ++css_cache_hits;*ready=load_face(r,start);return ps_local_css_count(local_state,sizeof(local_state))>0||*ready;
+    }
+    uint8_t *body=NULL;size_t length=0;int error=resource(url,false,&body,&length,r,start);
+    if(error){++resource_fallbacks;return false;}
+    int rules=ps_local_css(local_state,sizeof(local_state),body,length,(const uint8_t*)url,strlen(url));free(body);
+    if(rules<0){++resource_fallbacks;return false;}css_rules+=(unsigned)rules;
+    *ready=load_face(r,start);return rules>0||*ready;
+}
 static void worker(void *arg){
     (void)arg;PS_Reply r={.sequence=job.request.sequence,.local=true};int64_t start=esp_timer_get_time();int crawl_error=0;
     r.heap_before=(unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT);r.minimum_free_heap_bytes=r.heap_before;r.largest_free_block_bytes=(unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
     // Cached search/reader work never requires a socket, Wi-Fi, clock sync or
     // another device. Verified flags describe the retained source provenance.
-    if(!collected&&job.request.kind==1){
+    if((!collected&&job.request.kind==1)||job.request.kind==255){
         CW_Status wifi;CW_GetStatus(&wifi);if(wifi.state!=CW_CONNECTED){r.error=NO_WIFI;goto done;}
         esp_err_t clock_error;int64_t clock_deadline=start+20000000;
         do{if(cancelled()){r.error=CANCELLED;goto done;}clock_error=CW_TimeWait(200);}while(clock_error==ESP_ERR_TIMEOUT&&esp_timer_get_time()<clock_deadline);
         if(clock_error!=ESP_OK){r.error=NO_CLOCK;goto done;}
         r.clock_synced=true;
+        if(job.request.kind==255){
+            bool ready=false;
+            if(!load_css(probe_css,&r,start,&ready)||!ready)r.error=WRONG_TYPE;
+            goto done;
+        }
         if(!robots_state){crawl_error=fetch(robots_url,true,&r,start);if(crawl_error)robots_state=3;}
         if(robots_state==3){r.error=ROBOTS_DENIED;goto done;}
         char url[128];
@@ -116,6 +185,20 @@ static void worker(void *arg){
             for(unsigned i=0;i<10&&!cancelled();++i)vTaskDelay(pdMS_TO_TICKS(100));
             if(cancelled()){(void)ps_local_finish(local_state,sizeof(local_state),0);break;}
             int error=fetch(url,false,&r,start);
+            char css_url[256];bool ready=false;
+            if(!error&&ps_local_resource(local_state,sizeof(local_state),0,(uint8_t*)css_url)>0&&load_css(css_url,&r,start,&ready)){
+                // No retained DOM: refetch once with the bounded cascade, then publish.
+                size_t saved_length=ps_local_backup_bytes();uint8_t *saved=saved_length<=3072?calloc(1,saved_length):NULL;
+                if(saved&&ps_local_backup(local_state,sizeof(local_state),saved,saved_length,0)==0){
+                    ps_local_reparse(local_state,sizeof(local_state),ready?1:0);
+                    for(unsigned i=0;i<10&&!cancelled();++i)vTaskDelay(pdMS_TO_TICKS(100));
+                    error=fetch(url,false,&r,start);
+                    if(error&&!cancelled()){
+                        ps_local_backup(local_state,sizeof(local_state),saved,saved_length,1);++resource_fallbacks;error=0;
+                    }
+                }else ++resource_fallbacks;
+                free(saved);
+            }
             (void)ps_local_finish(local_state,sizeof(local_state),error==0);
             taskENTER_CRITICAL(&lock);documents=(unsigned)ps_local_count(local_state,sizeof(local_state));taskEXIT_CRITICAL(&lock);
             if(error)crawl_error=error;
@@ -138,7 +221,7 @@ done:
 }
 bool PS_NetConfigured(void){return true;}
 bool PS_NetStart(const PS_Request *request){
-    if(!request||!memchr(request->query,0,sizeof(request->query))||request->kind<1||request->kind>2)return false;
+    if(!request||!memchr(request->query,0,sizeof(request->query))||request->kind<1||(request->kind>2&&request->kind!=255))return false;
     taskENTER_CRITICAL(&lock);bool allowed=!job.running&&!job.ready&&!job.configuring;if(allowed){job.running=true;job.cancelled=false;job.request=*request;}taskEXIT_CRITICAL(&lock);
     if(!allowed)return false;
     if(xTaskCreatePinnedToCore(worker,"local_search",10240,NULL,2,NULL,0)==pdPASS)return true;
@@ -153,15 +236,16 @@ bool PS_NetRefresh(void){
     taskENTER_CRITICAL(&lock);documents=requests=body_bytes=robots_state=0;robots_length=0;collected=false;job.configuring=false;taskEXIT_CRITICAL(&lock);return error==0;
 }
 static int status(int argc,char **argv){
+    if(argc==2&&!strcmp(argv[1],"fonts")){PS_Request request={.kind=255};return PS_NetStart(&request)?0:1;}
     if(argc==2&&!strcmp(argv[1],"refresh"))return PS_NetRefresh()?0:1;
     if(argc!=2||strcmp(argv[1],"status"))return 1;
     taskENTER_CRITICAL(&lock);unsigned count=documents,attempts=requests,bytes=body_bytes;bool running=job.running;taskEXIT_CRITICAL(&lock);
-    printf("SEARCH_LOCAL {\"execution_mode\":\"on-device\",\"service_required\":false,\"documents\":%u,\"requests\":%u,\"body_bytes\":%u,\"running\":%s,\"state_bytes\":%u,\"state_used_bytes\":%u,\"robots_buffer_bytes\":%u,\"maximum_documents\":4,\"text_bytes_per_document\":2560,\"persistent_index\":false,\"native_images\":false}\n",count,attempts,bytes,running?"true":"false",(unsigned)sizeof(local_state),(unsigned)ps_local_state_bytes(),(unsigned)sizeof(robots));return 0;
+    printf("SEARCH_LOCAL {\"execution_mode\":\"on-device\",\"service_required\":false,\"documents\":%u,\"requests\":%u,\"body_bytes\":%u,\"running\":%s,\"state_bytes\":%u,\"state_used_bytes\":%u,\"robots_buffer_bytes\":%u,\"maximum_documents\":4,\"text_bytes_per_document\":2560,\"persistent_index\":false,\"native_images\":false}\n",count,attempts,bytes,running?"true":"false",(unsigned)sizeof(local_state),(unsigned)ps_local_state_bytes(),(unsigned)sizeof(robots));printf("SEARCH_RESOURCES {\"css_cache_hits\":%u,\"css_requests\":%u,\"font_requests\":%u,\"css_rules\":%u,\"font_ready\":%s,\"font_glyphs\":%u,\"font_source_bytes\":%u,\"atlas_bytes\":867,\"fallbacks\":%u,\"server_required\":false}\n",css_cache_hits,css_fetches,font_fetches,css_rules,PS_WebFontReady()?"true":"false",font_glyphs,font_bytes,resource_fallbacks);return 0;
 }
 static int legacy(int argc,char **argv){if(argc!=2||strcmp(argv[1],"status"))return 1;printf("SEARCH_ENDPOINT_STATE {\"configured\":true,\"service_required\":false,\"execution_mode\":\"on-device\"}\n");return 0;}
 void PS_NetRegister(void){
     ESP_ERROR_CHECK(ps_local_init(local_state,sizeof(local_state))?ESP_FAIL:ESP_OK);
-    const esp_console_cmd_t local={.command="search_local",.help="On-device collection status or refresh; no page data over USB",.func=status};
+    const esp_console_cmd_t local={.command="search_local",.help="On-device status/refresh/fonts (explicit public font diagnostic); no page data over USB",.func=status};
     const esp_console_cmd_t old={.command="search_endpoint",.help="Legacy status only; no companion service is used",.func=legacy};
     ESP_ERROR_CHECK(esp_console_cmd_register(&local));ESP_ERROR_CHECK(esp_console_cmd_register(&old));esp_log_level_set("HTTP_CLIENT",ESP_LOG_ERROR);
 }

@@ -9,6 +9,160 @@ pub extern "C" fn ps_local_state_bytes() -> usize {
     core::mem::size_of::<LocalSearch>()
 }
 
+#[unsafe(no_mangle)]
+pub extern "C" fn ps_local_backup_bytes() -> usize {
+    core::mem::size_of::<chromatic_client::local::SavedDocument>()
+}
+/// # Safety
+/// Exclusive initialized state; saved is a zero-initialized or previously written,
+/// aligned region of ps_local_backup_bytes writable bytes, disjoint from state.
+/// Restore may be 1 only after this function has initialized that same snapshot;
+/// the adapter must not modify its contents. The current document stays active.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_backup(
+    state: *mut u8,
+    size: usize,
+    saved: *mut u8,
+    length: usize,
+    restore: i32,
+) -> i32 {
+    use chromatic_client::local::SavedDocument;
+    if !state_valid(state, size)
+        || saved.is_null()
+        || length != core::mem::size_of::<SavedDocument>()
+        || (saved as usize) % core::mem::align_of::<SavedDocument>() != 0
+    {
+        return -1;
+    }
+    let state = unsafe { &mut *state.cast::<LocalSearch>() };
+    if restore == 1 {
+        state.restore_active(unsafe { &*saved.cast::<SavedDocument>() });
+    } else {
+        if !state.save_active(unsafe { &mut *saved.cast::<SavedDocument>() }) {
+            return -2;
+        }
+    }
+    0
+}
+
+/// # Safety
+/// Exclusive initialized state; url owns length readable bytes, disjoint from state.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_css_cached(
+    state: *mut u8,
+    size: usize,
+    url: *const u8,
+    length: usize,
+) -> i32 {
+    if !state_valid(state, size) {
+        return -1;
+    }
+    if url.is_null() || length > 255 {
+        return -1;
+    }
+    let index = unsafe { &*state.cast::<LocalSearch>() };
+    i32::from(
+        index.css_cached()
+            && index.resource(false).as_bytes()
+                == unsafe { core::slice::from_raw_parts(url, length) },
+    )
+}
+/// # Safety
+/// Exclusive initialized state, initialized as for ps_local_init.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_css_count(state: *mut u8, size: usize) -> i32 {
+    if !state_valid(state, size) {
+        return -1;
+    }
+    unsafe { &*state.cast::<LocalSearch>() }.css_count() as i32
+}
+/// # Safety
+/// Exclusive initialized state; out owns 256 writable bytes, disjoint from state.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_resource(
+    state: *mut u8,
+    size: usize,
+    font: i32,
+    out: *mut u8,
+) -> i32 {
+    if !state_valid(state, size) || out.is_null() {
+        return -1;
+    }
+    let s = unsafe { &*state.cast::<LocalSearch>() }
+        .resource(font != 0)
+        .as_bytes();
+    unsafe {
+        core::ptr::copy_nonoverlapping(s.as_ptr(), out, s.len());
+        *out.add(s.len()) = 0;
+    }
+    s.len() as i32
+}
+/// # Safety
+/// Exclusive initialized state; bytes owns length readable bytes (<=3072), base
+/// owns base_len readable UTF-8 bytes (<=255); all regions must be disjoint.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_css(
+    state: *mut u8,
+    size: usize,
+    bytes: *const u8,
+    length: usize,
+    base: *const u8,
+    base_len: usize,
+) -> i32 {
+    if !state_valid(state, size)
+        || bytes.is_null()
+        || base.is_null()
+        || length > chromatic_client::css::BYTES
+        || base_len > 255
+    {
+        return -1;
+    }
+    let Ok(base) = core::str::from_utf8(unsafe { core::slice::from_raw_parts(base, base_len) })
+    else {
+        return -1;
+    };
+    let state = unsafe { &mut *state.cast::<LocalSearch>() };
+    state.stylesheet(unsafe { core::slice::from_raw_parts(bytes, length) }, base);
+    state.css_count() as i32
+}
+/// # Safety
+/// Exclusive initialized state. Reparse only the active unpublished document.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_reparse(state: *mut u8, size: usize, ready: i32) -> i32 {
+    if !state_valid(state, size) {
+        return -1;
+    }
+    let state = unsafe { &mut *state.cast::<LocalSearch>() };
+    if ready == 1 {
+        state.font_ready();
+    }
+    state.reparse();
+    0
+}
+/// # Safety
+/// bytes owns length readable bytes (<=24576); atlas owns 867 writable bytes;
+/// buffers are disjoint and exclusively owned until return. Publish only on success.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_webfont(bytes: *const u8, length: usize, atlas: *mut u8) -> i32 {
+    if bytes.is_null() || atlas.is_null() || length > chromatic_client::webfont::LIMIT {
+        return -1;
+    }
+    chromatic_client::webfont::rasterize(
+        unsafe { core::slice::from_raw_parts(bytes, length) },
+        unsafe { &mut *atlas.cast::<[u8; chromatic_client::webfont::ATLAS_BYTES]>() },
+    ) as i32
+}
+/// # Safety
+/// out owns 512 writable bytes, exclusively.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_webfont_probe(out: *mut u8) -> i32 {
+    if out.is_null() {
+        return -1;
+    }
+    chromatic_client::rich::webfont_probe(unsafe { core::slice::from_raw_parts_mut(out, 512) })
+        as i32
+}
+
 fn state_valid(state: *mut u8, size: usize) -> bool {
     !state.is_null()
         && size >= core::mem::size_of::<LocalSearch>()
@@ -352,7 +506,7 @@ mod tests {
                 chromatic_client::rich::CAPTION
             );
             let prior = view;
-            bytes[4] = 2;
+            bytes[4] = 3;
             assert_eq!(ps_rich_decode(bytes.as_ptr(), n as usize, &mut view), -2);
             assert_eq!(view, prior);
             assert_eq!(ps_rich_decode(core::ptr::null(), n as usize, &mut view), -1);

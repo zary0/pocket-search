@@ -8,6 +8,7 @@ pub const HEIGHT: usize = 92;
 pub const GLYPHS: usize = 28;
 pub const TEXT_BYTES: usize = 64;
 pub const BOLD: u8 = 4;
+pub const WEBFONT: u8 = 8;
 pub const HEADING: u8 = 1;
 pub const SUBHEADING: u8 = 2;
 pub const CAPTION: u8 = 3;
@@ -50,7 +51,7 @@ impl<'a> Packet<'a> {
         if !(20..=MAX_PACKET_BYTES).contains(&bytes.len()) {
             return Err(Error::Size);
         }
-        if &bytes[..4] != b"PSR1" || bytes[4] != 1 || bytes[18..20] != [0, 0] {
+        if &bytes[..4] != b"PSR1" || !matches!(bytes[4], 1 | 2) || bytes[18..20] != [0, 0] {
             return Err(Error::Header);
         }
         let document_id = u32::from_le_bytes(bytes[8..12].try_into().unwrap());
@@ -105,7 +106,7 @@ impl<'a> Packet<'a> {
             let (mut width, mut tallest) = (0, 0);
             for (i, c) in text.chars().enumerate() {
                 let style = row.style(i);
-                if style > 7 {
+                if bytes[4] == 1 && style > 7 {
                     return Err(Error::Text);
                 }
                 width += advance(c, style);
@@ -306,7 +307,11 @@ pub(crate) fn encode(
     }
     out[..20].fill(0);
     out[..4].copy_from_slice(b"PSR1");
-    out[4] = 1;
+    out[4] = if runs.iter().any(|r| r.style & WEBFONT != 0) {
+        2
+    } else {
+        1
+    };
     out[5] = u8::from(position > 0) | (u8::from(position + 1 < positions) << 1);
     out[7] = title.len() as u8;
     out[8..12].copy_from_slice(&(id as u32).to_le_bytes());
@@ -338,6 +343,29 @@ pub(crate) fn encode(
     at
 }
 
+/// Original external-font diagnostic, never indexed.
+pub fn webfont_probe(out: &mut [u8]) -> usize {
+    let text = "WEB FONT TEST\nPocket Search\nABC xyz 012345\n\nSmall caption\nDownloaded TTF";
+    let runs = [
+        Run {
+            start: 0,
+            style: WEBFONT | HEADING | BOLD,
+        },
+        Run {
+            start: 14,
+            style: WEBFONT,
+        },
+        Run {
+            start: text.find("Small").unwrap() as u16,
+            style: WEBFONT | CAPTION,
+        },
+        Run {
+            start: text.find("Downloaded").unwrap() as u16,
+            style: WEBFONT,
+        },
+    ];
+    encode(1, "Webfont TEST", text, &runs, 0, 0, out)
+}
 /// Original diagnostic content, never inserted into the autonomous collection.
 pub fn probe(out: &mut [u8]) -> usize {
     let text = "Large heading\nNormal body text.\nNormal and bold text.\n\nSmall annotation.\nA new paragraph.";
@@ -416,7 +444,7 @@ mod tests {
         for end in 0..n {
             assert!(Packet::decode(&out[..end]).is_err());
         }
-        for (at, value) in [(4, 2), (5, 3), (6, 9), (18, 1), (8, 0), (12, 255)] {
+        for (at, value) in [(4, 3), (5, 3), (6, 9), (18, 1), (8, 0), (12, 255)] {
             let mut bad = out;
             bad[at] = value;
             assert!(Packet::decode(&bad[..n]).is_err());
