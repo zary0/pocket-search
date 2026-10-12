@@ -87,9 +87,14 @@ See [retained-content implementation and limits](native-retained-content.md).
   isolation and streaming/chunk-boundary tests. Persist supported computed styles.
 - [ ] Extend selector/document-order behavior and measured layout incrementally;
   flex, grid, table layout and complete HTML5/CSS conformance are not implemented.
-- [ ] Add WOFF2, downloaded Japanese faces and shaping only with bounded native
-  decoders, font licensing and measured memory/cancellation acceptance. Built-in
-  Pocket JP and static TrueType ASCII are the present font paths.
+- [x] Bounded native static WOFF2/TrueType and downloaded Japanese subset faces,
+  four-level grayscale, preserved outline aspect and horizontal kana clusters.
+  OFL/MIT notices, source/atlas reference hashes, 39,083-byte decoder peak and
+  native transport/decode/raster cancel/retry acceptance on 0.14.13. Built-in
+  Pocket JP retains all 16,077 original glyphs. See [font scope and evidence](native-webfonts.md).
+- [ ] Extend multiple/larger downloaded faces, composite/variable/CFF/color
+  fonts, cmap coverage and general GSUB/GPOS/complex-script shaping within
+  independently qualified memory, licensing and cancellation limits.
 
 ## P3 — Physical feedback and measured efficiency
 
