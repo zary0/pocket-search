@@ -35,8 +35,8 @@ a checked implementation item does not qualify a firmware release.
 
 The [physical lab contract](hardware-e2e.md) remains a hard release boundary.
 Hosted CI checks actual complete MCU compilation and behavior, not a fabricated
-hardware pass. The project is still private; this work does not change visibility,
-register a personal machine as a runner or automatically merge a PR.
+hardware pass. Public source availability does not qualify firmware, register a personal
+machine as a runner or authorize automatic PR merging.
 
 ## P1 — Useful sources and durable local content
 

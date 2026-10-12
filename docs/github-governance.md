@@ -4,31 +4,46 @@
 
 The initial maintainer is [@zary0](https://github.com/zary0). [CODEOWNERS](https://github.com/zary0/pocket-search/blob/develop/.github/CODEOWNERS) assigns review responsibility, including CI/release infrastructure, licensing, and security policy. Accepted contributions and support limits are in [CONTRIBUTING.md](../CONTRIBUTING.md).
 
-A CODEOWNERS file alone does not require an approval. GitHub must enforce required owner reviews. Authors cannot approve their own PRs: add an independent maintainer with write access to the appropriate CODEOWNERS entries before enabling this rule for maintainer-authored changes. Do not count automated review as the required human approval or add an administrator bypass to resolve that staffing gap.
+A CODEOWNERS file records responsibility but does not itself enforce approval.
+During sole-maintainer operation, `main` and `develop` require PRs and passing CI,
+with approving reviews set to **zero** and mandatory CODEOWNER approval disabled.
+The maintainer performs merges manually; agents and CI do not merge PRs or enable
+auto-merge. Add an independent reviewer before requiring one approving owner
+review, because authors cannot approve their own PRs. Do not add an administrator
+bypass to solve that staffing gap.
 
-## Current verified status
+This manual-merge policy is not human identity attestation: a holder of the
+maintainer's credentials can invoke GitHub APIs. Repository auto-merge is disabled,
+workflow tokens are read-only and cannot approve PRs, and [agent rules](../AGENTS.md)
+prohibit merging. Keep owner credentials out of workflows and public artifacts.
 
-As checked on **2026-10-10**, `zary0/pocket-search` is **private**, with `develop` as its default branch. Reading branch protection returns HTTP 403 with GitHub's message requiring GitHub Pro or a public repository. No branch-protection rule is currently enforced. This is a limitation of the current private setup, not a limitation of public repositories on Free.
+## Pre-publication audit and activation record
 
-| Control | Status |
-| --- | --- |
-| Branch PR/CI/owner-review requirements, force-push/deletion prevention | Prepared payloads; not enabled because of the current private-repository restriction |
-| Weekly Cargo and GitHub Actions version updates | Configuration targets `develop`; becomes active from the default branch |
-| Dependabot alerts and security-update PRs | Enabled and read back via GitHub API; security updates are not paused |
-| Repository secret scanning and push protection | Not enabled in the current private setup; enable and verify on public activation |
-| Private vulnerability reporting | Not enabled/verified; existing confidential-contact fallback in SECURITY.md remains in force |
-| Physical release gate | Workflow/evidence validation exists; complete native build passes; provisioned lab and physical E2E remain pending |
+The 2026-10-13 audit covers all fetched branch/tag/PR histories and the 84 source
+commits referenced by the 107 existing CI runs, plus all 107 available current run-log
+archives plus the one earlier rerun attempt, 30 artifacts and published Issue/review content. Reports and raw logs
+are retained privately outside Git. Candidate matches are reviewed rather than
+silently ignored. See the [sanitized pre-publication record](evidence/public-readiness/prepublication.json).
 
-GitHub supports protected branches in public repositories on **GitHub Free**, including Free organizations; private branches require a supported paid plan. CODEOWNERS is also available for Free public repositories. See [protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches) and [code owners](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners). Do not retain the private-plan limitation as a claim after publication.
+The pre-publication record is a dated snapshot, not a claim that future settings
+or repository contents remain unchanged. Before public activation, apply and
+read back the controls below. After activation, verify both branch protections,
+secret scanning, push protection and the private report form. Configuration files
+are not proof that GitHub enforces them. Physical release qualification remains
+blocked independently of source publication.
+
+GitHub supports protected branches in public repositories on **GitHub Free**,
+including Free organizations; the earlier private-plan restriction does not apply
+after publication. See [protected branches](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches).
 
 ## Branch rules to enforce
 
 | Setting | `develop` | `main` |
 | --- | --- | --- |
 | Changes through PRs | Required | Required |
-| Approving human reviews / owner review | One / required | One / required |
+| Approving reviews / mandatory owner review while sole-maintained | Zero / disabled | Zero / disabled |
 | Dismiss approvals after changed commits | Enabled | Enabled |
-| Required checks, from GitHub Actions app ID 15368 | `ci`, `native-firmware` | `ci`, `native-firmware`, `qualify / chromatic-required` |
+| Required checks, from GitHub Actions app ID 15368 | `ci`, `native-firmware`, `secret-scan` | `ci`, `native-firmware`, `secret-scan`, `qualify / chromatic-required` |
 | Up to date with base / conversations resolved | Required | Required |
 | Force pushes / branch deletion | Disabled | Disabled |
 | Apply rules to administrators | Enabled | Enabled |
@@ -39,7 +54,7 @@ The committed payloads are [develop](https://github.com/zary0/pocket-search/blob
 
 ## Activation after public publication or a supported plan
 
-Changing visibility and buying a plan are separate owner decisions. Before activation, confirm the independent review owner, inspect any existing rules, and compare these payloads with them. The PUT operation replaces the named branch's protection configuration; preserve any stronger existing controls rather than blindly replacing them.
+Public activation is an owner-authorized publishing action. Inspect any existing rules and compare these sole-maintainer payloads before activation. The PUT operation replaces the named branch's protection configuration; preserve any stronger existing controls rather than blindly replacing them.
 
 From the source checkout, apply the reviewed payloads:
 
@@ -67,3 +82,7 @@ Stable `v*` tag immutability and the `chromatic-lab` environment's trusted-ref r
 ## Dependency maintenance
 
 Dependabot checks Cargo and pinned GitHub Actions weekly and targets `develop`, matching the default branch used for security-update PRs. Updates are reviewed rather than auto-merged. Review changed behavior, minimum toolchain compatibility, upstream action SHA provenance, and licenses; refresh [third-party notices](../THIRD_PARTY_NOTICES.md) and copied license/copyright texts for changed packages. A dependency update does not waive CI or physical release qualification.
+
+## Ongoing secret checks
+
+The `secret-scan` check uses checksum-pinned official Gitleaks 8.30.1, full available checkout history, default provider/generic rules, archive decoding and fully redacted diagnostics. The only source exception requires both the exact SDK configuration path and the exact upstream public default for disabled OpenThread. It does not ignore that entire file, source hashes, or arbitrary credentials. Native repository secret scanning and push protection are enabled separately; CI scanning does not replace them.

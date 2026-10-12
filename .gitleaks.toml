@@ -1,0 +1,10 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+condition = "AND"
+targetRules = ["generic-api-key"]
+description = "Pinned ESP-IDF public demo master key; OpenThread is disabled, not an operator credential"
+regexTarget = "match"
+paths = ['''(^|/)devices/chromatic/firmware/sdkconfig\.defaults$''']
+regexes = ['''^CONFIG_OPENTHREAD_NETWORK_MASTERKEY="00112233445566778899aabbccddeeff"$''']

@@ -2,7 +2,7 @@
 # Add an independent owner before requiring approval of maintainer-authored PRs.
 * @zary0
 
-# Changes to governance, CI, release gates, and licensing require owner review.
+# Governance, CI, release gates and licensing require manual maintainer assessment.
 /.github/ @zary0
 /ci/ @zary0
 /scripts/ @zary0

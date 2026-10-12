@@ -1,0 +1,45 @@
+{
+  "scope": "Pre-publication scan of current GitHub-visible source histories and all available CI/comment surfaces; not a security proof or hardware qualification",
+  "date": "2026-10-13",
+  "repository": "zary0/pocket-search",
+  "scanner_version": "8.30.1",
+  "git": {
+    "branch_tag_pr_refs_fetched": true,
+    "ci_head_commits": 84,
+    "unique_reachable_blobs": 987,
+    "raw_candidates": 1,
+    "verified_secret_findings": 0,
+    "reviewed_false_positive": "Exact pinned ESP-IDF public default for disabled OpenThread module; source scoped, no live operator key"
+  },
+  "github": {
+    "run_logs": 107,
+    "artifacts": 30,
+    "download_failures": 0,
+    "archive_members": 340,
+    "archive_bytes": 40849590,
+    "issues_and_pulls": 19,
+    "review_comments": 57,
+    "raw_candidates": 176,
+    "verified_secret_findings": 0,
+    "reviewed_false_positives": "Every match is a 64-hex source-file SHA-256 in firmware.json, not a credential",
+    "previous_attempt_log_archives": 1
+  },
+  "known_device_identifier_matches": 0,
+  "operator_password_screenshot_review": "Masked or empty entry; no password disclosed",
+  "limitations": [
+    "Pattern matching is not proof that all unknown secret formats or vulnerabilities are absent.",
+    "Raw logs and redacted reports are private and excluded from Git.",
+    "New commits, runs, comments and artifacts require scanning too."
+  ],
+  "publication": {
+    "visibility_changed": false,
+    "settings_read_back": false,
+    "pr_merge_by_agent": false,
+    "sole_maintainer_approving_reviews": 0
+  },
+  "checks": {
+    "existing_python_tests": 44,
+    "gitleaks_exception_scope_cases": 3,
+    "all_ref_scan_after_review": "passed"
+  }
+}
