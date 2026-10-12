@@ -1,0 +1,62 @@
+{
+  "scope": "USB-powered native MCU framebuffer and console-queued GUI controls; not independent physical buttons/video/battery or release qualification",
+  "installed_candidate": {
+    "source_commit": "ac4b7d7779e41bdccf79599bbb8eedd8a55eae99",
+    "application_version": "0.14.14",
+    "application_sha256": "5a8846ea7f9b251ece755416b0d19e7535395a3fdbb62a660edcd46804e54b32",
+    "application_bytes": 2073888,
+    "application_readback_verified": true,
+    "previous_application_verified": true,
+    "partition_table_verified_unchanged": true,
+    "nvs_preserved": true,
+    "corpus_preserved_during_install": true,
+    "original_recovery_backup_verified": true,
+    "bootloader_modified": false,
+    "fpga_modified": false,
+    "efuse_modified": false
+  },
+  "captures": [
+    {
+      "file": "quiet-result-one.png",
+      "sha256": "362b8206871b16bc1669b64ca1b180ff6e6a1aeb1bc62009b9e5fd6fd772d58e",
+      "size": [
+        160,
+        144
+      ],
+      "footer_rows_128_to_143_all_white": true
+    },
+    {
+      "file": "quiet-result-two.png",
+      "sha256": "2599f9839c95892829a5a36118e6fc7c0c48ed4d25faa7ddb238ec9a1534ad18",
+      "size": [
+        160,
+        144
+      ],
+      "footer_rows_128_to_143_all_white": true
+    }
+  ],
+  "acceptance": {
+    "saved_corpus_documents": 4,
+    "store_generation": 13,
+    "store_failures": 0,
+    "up_down_result_selection": true,
+    "a_opens_native_reader": true,
+    "b_restores_native_results_after_pending_image_cancel": true,
+    "input_transport": "console-queued native GUI controls",
+    "operator_lcd_confirmed": false,
+    "physical_qualified": false
+  },
+  "checks": {
+    "node_tests": 18,
+    "local_complete_native_build": "success",
+    "hosted_ci": "success",
+    "hosted_native_firmware": "success",
+    "ci_url": "https://github.com/zary0/pocket-search/actions/runs/38266950612"
+  },
+  "storage_research": {
+    "devday_microsd_connector": "unverified",
+    "sd_mount_support_in_current_application": false,
+    "mcu_flash_bytes": 4194304,
+    "reference": "https://support.modretro.com/en_us/chromatic-devday-edition-quickstart-guid-By1iOlcMg"
+  }
+}

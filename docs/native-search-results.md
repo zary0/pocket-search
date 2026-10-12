@@ -74,3 +74,19 @@ Controls were queued through the native GUI diagnostic path under USB power.
 This scoped presentation check does not qualify battery operation, independent
 physical button actuation, image endurance on this newer candidate or a complete
 release. The earlier `0.14.9` image measurements retain their own identity.
+
+## Quiet result screens on 0.14.14
+
+The installed application uses source `ac4b7d7779e41bdccf79599bbb8eedd8a55eae99`,
+SHA-256 `5a8846ea7f9b251ece755416b0d19e7535395a3fdbb62a660edcd46804e54b32`,
+and 2,073,888 bytes. App-only readback passes; the partition table, Wi-Fi settings
+and four-document generation-13 corpus are preserved. Both hosted CI jobs pass.
+
+Both one- and two-line titles have an empty footer: every pixel in rows 128–143
+of the native 160 x 144 readback is white. Console-queued Up/Down selects results,
+A opens the reader, and B restores results after cancelling a pending image.
+These controls and MCU render-buffer observations use USB power; independent
+buttons/panel/video, battery and full release qualification remain unverified.
+See [candidate-bound evidence](evidence/native-search-results/quiet-results-verification.json).
+
+![Native result without the button legend](evidence/native-search-results/quiet-result-one.png)
