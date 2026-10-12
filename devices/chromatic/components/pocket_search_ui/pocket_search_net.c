@@ -309,7 +309,7 @@ cached:
         if(job.request.kind==7){
             // Diagnostic-only original public source files. No caller URL, proxy
             // pixels or host resizing. The selected authority/robots still apply.
-            const char *probes[]={"https://www.w3.org/People/Raggett/dsr-46c.jpg","https://www.w3.org/Icons/w3c_home.png","https://www.w3.org/People/Raggett/rib.jpg"};
+            const char *probes[]={"https://www.w3.org/People/Raggett/dsr-46c.jpg","https://www.w3.org/assets/logos/w3c-2025-transitional/w3c-72x48.png","https://www.w3.org/People/Raggett/rib.jpg"};
             if(job.request.document>=3){r.error=INVALID_IMAGE;goto done;}strcpy(url,probes[job.request.document]);
         }else if(ps_local_image_url(local_state,sizeof(local_state),job.request.document,job.request.page,(uint8_t*)url,sizeof(url))<=0){r.error=INVALID_IMAGE;goto done;}
         CW_Status wifi;CW_GetStatus(&wifi);if(wifi.state!=CW_CONNECTED){r.error=NO_WIFI;goto done;}

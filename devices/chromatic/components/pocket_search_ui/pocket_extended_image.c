@@ -63,8 +63,9 @@ static __attribute__((unused)) void *bounded_realloc(void *ptr,size_t size){
 #define STBI_MALLOC bounded_malloc
 #define STBI_REALLOC bounded_realloc
 #define STBI_FREE bounded_free
-#define STB_IMAGE_STATIC
-#define STBIDEF static __attribute__((unused))
+// Keep unused upstream public declarations legal in JPEG-only builds. Hidden
+// visibility and function-section GC keep this private implementation unexported.
+#define STBIDEF __attribute__((visibility("hidden")))
 #define STB_IMAGE_IMPLEMENTATION
 // Upstream static API includes unused entry points in this private translation unit.
 #if defined(__GNUC__)
