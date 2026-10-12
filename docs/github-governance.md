@@ -83,6 +83,21 @@ Stable `v*` tag immutability and the `chromatic-lab` environment's trusted-ref r
 
 Dependabot checks Cargo and pinned GitHub Actions weekly and targets `develop`, matching the default branch used for security-update PRs. Updates are reviewed rather than auto-merged. Review changed behavior, minimum toolchain compatibility, upstream action SHA provenance, and licenses; refresh [third-party notices](../THIRD_PARTY_NOTICES.md) and copied license/copyright texts for changed packages. A dependency update does not waive CI or physical release qualification.
 
+## Maintainer-only merging and immutable version tags
+
+The separate [update ruleset](../.github/ruleset.manual-merges.json) restricts
+updates to `main` and `develop` to the named maintainer user, through PRs only.
+No GitHub App or workflow actor is granted that bypass. This bypass covers only
+the update rule in this separate ruleset; the classic branch protections still
+require CI and conversation resolution and apply to administrators. It is not a
+bypass of failed checks. Owner credentials remain capable of acting as the owner,
+so agents must follow the manual-merge rule and workflows receive no such token.
+
+The [stable-tag ruleset](../.github/ruleset.version-tags.json) prohibits updates
+and deletions of `v*` tags without bypass actors. Creating a new annotated tag
+still requires the source/version/main and physical release checks. Neither
+ruleset publishes a firmware release.
+
 ## Ongoing secret checks
 
 The `secret-scan` check uses checksum-pinned official Gitleaks 8.30.1, full available checkout history, default provider/generic rules, archive decoding and fully redacted diagnostics. The only source exception requires both the exact SDK configuration path and the exact upstream public default for disabled OpenThread. It does not ignore that entire file, source hashes, or arbitrary credentials. Native repository secret scanning and push protection are enabled separately; CI scanning does not replace them.

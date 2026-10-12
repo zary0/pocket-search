@@ -41,5 +41,20 @@
     "existing_python_tests": 44,
     "gitleaks_exception_scope_cases": 3,
     "all_ref_scan_after_review": "passed"
+  },
+  "prepared_controls": {
+    "branch_pr_ci_required": [
+      "ci",
+      "native-firmware",
+      "secret-scan"
+    ],
+    "main_additional_check": "qualify / chromatic-required",
+    "approving_reviews": 0,
+    "mandatory_codeowner_approval": false,
+    "administrator_enforcement": true,
+    "force_pushes": false,
+    "branch_deletions": false,
+    "merge_actor": "zary0 user via PR only, separate update ruleset",
+    "stable_tag_updates_deletions": false
   }
 }
