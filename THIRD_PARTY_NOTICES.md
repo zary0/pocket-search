@@ -241,3 +241,16 @@ See [complete native MCU build](docs/native-firmware-build.md) for compiler/depe
 ## ESP32 ROM JPEG path
 
 The native baseline JPEG adapter calls the existing ESP32 ROM TinyJPEG API declared in pinned ESP-IDF `esp32/rom/tjpgd.h`. That header attributes TinyJPEG to ChaN, 2012. The ROM decoder is resident device code; no JPEG decoder implementation or third-party source photograph is vendored by Pocket Search. The repository-authored admission policy, resizing callback and adapter are GPL-3.0-only. Preserve the pinned upstream ESP-IDF header notices and platform licensing with distributed corresponding source. This use does not establish general decoder conformance or a security audit.
+
+## Vendored native progressive-JPEG decoder
+
+`devices/chromatic/components/pocket_search_ui/vendor/stb_image.h` is unmodified
+stb_image v2.30 from [nothings/stb](https://github.com/nothings/stb) commit
+`013ac3beddff3dbffafd5177e7972067cd2b5083`, copyright 2017 Sean Barrett.
+This distribution selects MIT; the complete upstream grant remains in the source
+and in [the retained MIT text](devices/chromatic/components/pocket_search_ui/vendor/LICENSE-MIT.txt).
+The adjacent `stb-image.json` pins source identity and SHA-256, checked by CI.
+Only the JPEG implementation is compiled. Original GPL project glue bounds all
+private allocation and uses decoded component planes directly. PNG uses the
+ESP32 ROM miniz inflater and original project chunk/filter/palette code; no stb
+PNG decoder or full-image interleaved RGB allocation is used.

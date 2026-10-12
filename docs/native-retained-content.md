@@ -1,6 +1,6 @@
 # Retained sources, updates and native images
 
-The `0.14.7` increment keeps collection, storage, search, layout and baseline JPEG
+The `0.14.8` increment keeps collection, storage, search, layout and bounded JPEG/PNG
 processing on the ESP32. No companion service, tunnel, host image preparation or
 USB page proxy participates. It is an experimental increment; physical release
 qualification, current battery acceptance and a dedicated CI lab remain required.
@@ -96,24 +96,20 @@ pixels at no more than 160 x 80. Raw bytes, the 4 KiB decoder pool and the outpu
 are temporary; leaving/cancelling/error frees them. Decode has a five-second
 cooperative deadline. Source pixels are not processed on the Mac.
 
-Supported: bounded, single-scan, eight-bit **baseline JPEG**, one or three
-components, dimensions no larger than 1024 x 1024. Progressive JPEG, PNG, GIF,
-SVG, WebP, ICC color management, animation and video remain unsupported. Image
-failure keeps the text and alt text readable, with a compact reason in the footer.
-A opens details or retries. Successful images appear inside the first visible
-semantic slot; A also opens the larger separate viewer. The original ROM-decoded
-RGB565 buffer is reused for both sizes. Only one slot is cached in RAM; scroll
-windows sharing its document/node identity do not fetch it again. Leaving the
-article frees the cache. Images are not persisted to flash. Failed or cancelled
-slots do not automatically retry on each scroll; A explicitly retries, and a Wi-Fi
-reconnection can retry an offline failure. This is a bounded preview, not arbitrary
-browser image compositing. W3C's Tim Berners-Lee photograph was acquired directly
-but is progressive and correctly rejected. The W3C People profile supplies a small
-baseline source for the native acceptance case.
+Supported baseline JPEG is bounded, single-scan, eight-bit, one or three
+components, dimensions at most 1024 x 1024. PNG and progressive JPEG now use
+separate strict geometry, format and allocation envelopes; see
+[native formats and qualification](native-image-formats.md). GIF, SVG, WebP,
+ICC color management, animation and video remain unsupported. W3C's large
+Tim Berners-Lee progressive photograph still exceeds the new progressive limit.
 
-The ROM envelope tests exercise bounds and rejection, not a general image-decoder
-security audit. Keep the small reviewed source scope until malformed entropy and
-long-duration native decoding have broader acceptance.
+Image failure keeps text and alt text readable, with a compact reason in the
+footer. A retries or expands the first visible image. One RGB565 buffer is reused
+for inline and expanded viewing and cached by document/node identity across
+scroll windows. Leaving the article frees it. Images are not persisted. A failed
+or cancelled slot does not automatically retry on every scroll; A retries, and
+Wi-Fi reconnection can retry an offline failure. This is a bounded preview,
+not arbitrary browser image compositing or a general decoder security audit.
 
 ## CSS and performance increment
 

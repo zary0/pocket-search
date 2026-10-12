@@ -11,6 +11,7 @@
 #include "esp_crt_bundle.h"
 #include "esp_http_client.h"
 #include "esp_timer.h"
+#include "mbedtls/sha256.h"
 #include "esp_cpu.h"
 #include "esp_private/esp_clk.h"
 #include "esp_log.h"
@@ -47,7 +48,7 @@ static _Atomic unsigned css_cache_hits,css_fetches,font_fetches,font_glyphs,font
 static const char probe_css[]="https://fonts.googleapis.com/css?family=VT323&text=WEB%20FONT%20TEST%20Pocket%20Search%20ABC%20xyz%20012345%20Small%20caption%20Downloaded%20TTF";
 static struct {bool running,ready,cancelled,configuring;PS_Request request;PS_Reply reply;} job;
 enum {NO_WIFI=1,NO_CLOCK,NO_MEMORY,CONNECT_FAILED,HTTP_FAILED,TOO_LARGE,INCOMPLETE,WRONG_TYPE,CANCELLED,INVALID_IMAGE,STALE_COLLECTION,ROBOTS_DENIED,NO_DOCUMENTS};
-typedef struct {PS_Reply *reply;bool html,plain,css,font,jpeg,identity;char etag[96],modified[64];} Events;
+typedef struct {PS_Reply *reply;bool html,plain,css,font,jpeg,png,identity;char etag[96],modified[64];} Events;
 size_t ps_local_state_bytes(void);
 int32_t ps_local_init(uint8_t*,size_t);
 int32_t ps_local_next(uint8_t*,size_t,uint8_t*,size_t);
@@ -81,7 +82,7 @@ static esp_err_t event(esp_http_client_event_t *e){
     Events *v=e->user_data;
     if(e->event_id==HTTP_EVENT_ON_CONNECTED)v->reply->tls_verified=true;
     if(e->event_id==HTTP_EVENT_ON_HEADER&&e->header_key){
-        if(!strcasecmp(e->header_key,"Content-Type")){v->jpeg=media(e->header_value,"image/jpeg");v->html=media(e->header_value,"text/html");v->plain=media(e->header_value,"text/plain");v->css=media(e->header_value,"text/css");v->font=media(e->header_value,"font/ttf")||media(e->header_value,"application/octet-stream")||media(e->header_value,"application/x-font-ttf")||media(e->header_value,"application/font-sfnt");}
+        if(!strcasecmp(e->header_key,"Content-Type")){v->jpeg=media(e->header_value,"image/jpeg");v->png=media(e->header_value,"image/png");v->html=media(e->header_value,"text/html");v->plain=media(e->header_value,"text/plain");v->css=media(e->header_value,"text/css");v->font=media(e->header_value,"font/ttf")||media(e->header_value,"application/octet-stream")||media(e->header_value,"application/x-font-ttf")||media(e->header_value,"application/font-sfnt");}
         if(!strcasecmp(e->header_key,"ETag"))validator(v->etag,sizeof(v->etag),e->header_value);
         if(!strcasecmp(e->header_key,"Last-Modified"))validator(v->modified,sizeof(v->modified),e->header_value);
         if(!strcasecmp(e->header_key,"Content-Encoding")&&(!e->header_value||strcasecmp(e->header_value,"identity")))v->identity=false;
@@ -149,14 +150,14 @@ static int resource(const char *url,bool font,bool image,uint8_t **out,size_t *o
     size_t limit=image?PS_NATIVE_IMAGE_WIRE:font?24576:3072;
     esp_http_client_config_t config={.url=url,.timeout_ms=8000,.crt_bundle_attach=esp_crt_bundle_attach,.skip_cert_common_name_check=false,.disable_auto_redirect=true,.buffer_size=512,.buffer_size_tx=512,.event_handler=event,.user_data=&events};
     esp_http_client_handle_t client=esp_http_client_init(&config);if(!client)return NO_MEMORY;
-    esp_http_client_set_header(client,"Accept",image?"image/jpeg":font?"font/ttf,application/octet-stream":"text/css");
+    esp_http_client_set_header(client,"Accept",image?"image/jpeg,image/png":font?"font/ttf,application/octet-stream":"text/css");
     esp_http_client_set_header(client,"Accept-Encoding","identity");esp_http_client_set_header(client,"User-Agent","PocketSearchBot/0.1");
     taskENTER_CRITICAL(&lock);++requests;if(!image){if(font)++font_fetches;else ++css_fetches;}taskEXIT_CRITICAL(&lock);
     if(cancelled()||esp_timer_get_time()-start>=COLLECTION_US){error=CANCELLED;goto done;}
     if(esp_http_client_open(client,0)!=ESP_OK){error=CONNECT_FAILED;goto done;}
     int64_t length=esp_http_client_fetch_headers(client);r->http_status=esp_http_client_get_status_code(client);memory(r);
     if(r->http_status!=200){error=HTTP_FAILED;goto done;}
-    if(!events.identity||(image?!events.jpeg:font?!events.font:!events.css)){error=WRONG_TYPE;goto done;}
+    if(!events.identity||(image?!(events.jpeg||events.png):font?!events.font:!events.css)){error=WRONG_TYPE;goto done;}
     if(length>(int64_t)limit){error=TOO_LARGE;goto done;}
     // Allocate after the TLS handshake, and release raw font bytes before the next socket.
     size_t capacity=length>0?(size_t)length:limit;if(image&&heap_caps_get_free_size(MALLOC_CAP_8BIT)<capacity+16384){error=NO_MEMORY;goto done;}body=malloc(capacity);if(!body){error=NO_MEMORY;goto done;}
@@ -166,6 +167,7 @@ static int resource(const char *url,bool font,bool image,uint8_t **out,size_t *o
     }
     if(cancelled()){error=CANCELLED;goto done;}
     if(!esp_http_client_is_complete_data_received(client)){error=INCOMPLETE;goto done;}
+    if(image&&((events.jpeg&&(total<2||body[0]!=255||body[1]!=216))||(events.png&&(total<8||memcmp(body,"\x89PNG\r\n\x1a\n",8))))){error=WRONG_TYPE;goto done;}
     *out=body;*out_length=total;body=NULL;
 done:
     free(body);r->wire_bytes+=(unsigned)total;taskENTER_CRITICAL(&lock);body_bytes+=(unsigned)total;taskEXIT_CRITICAL(&lock);
@@ -195,8 +197,16 @@ int32_t ps_local_image_url(uint8_t*,size_t,uint32_t,uint32_t,uint8_t*,size_t);
 int32_t ps_local_image_slot(uint8_t*,size_t,uint32_t,uint32_t);
 static bool image_cancelled(void *context){(void)context;return cancelled();}
 static void image_memory(void *context){memory(context);}
+static bool image_digest(const uint8_t *bytes,size_t length,char hex[65]){
+    uint8_t digest[32];if(mbedtls_sha256(bytes,length,digest,0))return false;
+    const char digits[]="0123456789abcdef";for(unsigned i=0;i<32;++i){hex[i*2]=digits[digest[i]>>4];hex[i*2+1]=digits[digest[i]&15];}hex[64]=0;return true;
+}
 static void worker(void *arg){
     (void)arg;PS_Reply r={.sequence=job.request.sequence,.local=true};int64_t start=esp_timer_get_time();int crawl_error=0;
+    // ESP-IDF records each heap's low watermark at allocation time. Their sum
+    // is a conservative phase minimum, unlike the periodic sample above.
+    bool phase_monitor=false;
+    if(job.request.kind==3||job.request.kind==7){r.tls_heap_window=heap_caps_monitor_local_minimum_free_size_start()==ESP_OK;phase_monitor=r.tls_heap_window;}
     conditional_etag[0]=conditional_modified[0]=0;
     r.heap_before=(unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT);r.minimum_free_heap_bytes=r.heap_before;r.largest_free_block_bytes=(unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
     // Cached search/reader work never requires a socket, Wi-Fi, clock sync or
@@ -294,13 +304,24 @@ cached:
         printf("SEARCH_COMPARE {\"execution_mode\":\"physical-native-cpu\",\"repeats\":%u,\"identical_packets\":%s,\"reference_total_us\":%llu,\"cached_total_us\":%llu,\"decoder_total_cycles\":%llu,\"decoder_allocations\":0,\"cpu_hz_before\":%lu,\"cpu_hz_after\":%lu,\"core\":%u,\"packet_bytes\":%u,\"source_bytes_over_usb\":0}\n",count,equal?"true":"false",(unsigned long long)reference_us,(unsigned long long)cached_us,(unsigned long long)decode_cycles,(unsigned long)cpu_before,(unsigned long)cpu_after,(unsigned)xPortGetCoreID(),(unsigned)r.length);
         r.error=equal&&count==30&&cpu_before==cpu_after?0:INCOMPLETE;goto done;
     }
-    if(job.request.kind==3){
-        char url[256];if(ps_local_image_url(local_state,sizeof(local_state),job.request.document,job.request.page,(uint8_t*)url,sizeof(url))<=0){r.error=INVALID_IMAGE;goto done;}
+    if(job.request.kind==3||job.request.kind==7){
+        char url[256];
+        if(job.request.kind==7){
+            // Diagnostic-only original public source files. No caller URL, proxy
+            // pixels or host resizing. The selected authority/robots still apply.
+            const char *probes[]={"https://www.w3.org/People/Raggett/dsr-46c.jpg","https://www.w3.org/Icons/w3c_home.png","https://www.w3.org/People/Raggett/rib.jpg"};
+            if(job.request.document>=3){r.error=INVALID_IMAGE;goto done;}strcpy(url,probes[job.request.document]);
+        }else if(ps_local_image_url(local_state,sizeof(local_state),job.request.document,job.request.page,(uint8_t*)url,sizeof(url))<=0){r.error=INVALID_IMAGE;goto done;}
         CW_Status wifi;CW_GetStatus(&wifi);if(wifi.state!=CW_CONNECTED){r.error=NO_WIFI;goto done;}
         if(CW_TimeWait(1000)!=ESP_OK){r.error=NO_CLOCK;goto done;}
         r.clock_synced=true;if(!robots_state){r.error=fetch(robots_url,true,&r,start);if(r.error)goto done;}uint8_t *body=NULL;size_t length=0;r.error=resource(url,false,true,&body,&length,&r,start);
-        if(!r.error){PS_NativeImage image={0};int64_t decode_start=esp_timer_get_time();int error=PS_NativeJPEG(body,length,&image,image_cancelled,image_memory,&r);r.compute_us=(unsigned)(esp_timer_get_time()-decode_start);
-            if(!error){r.image_pixels=image.pixels;r.image_width=image.width;r.image_height=image.height;}
+        if(!r.error){
+            if(phase_monitor){r.tls_allocator_minimum=(unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT);heap_caps_monitor_local_minimum_free_size_stop();phase_monitor=false;}
+            if(!image_digest(body,length,r.image_source_sha256)){r.error=INVALID_IMAGE;free(body);goto done;}
+            r.decode_heap_window=heap_caps_monitor_local_minimum_free_size_start()==ESP_OK;phase_monitor=r.decode_heap_window;r.decode_heap_before=(unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT);
+            PS_NativeImage image={0};int64_t decode_start=esp_timer_get_time();int error=PS_NativeDecode(body,length,&image,image_cancelled,image_memory,&r);r.compute_us=(unsigned)(esp_timer_get_time()-decode_start);r.image_format=image.format;r.decoder_peak_bytes=image.decoder_peak_bytes;r.decoder_allocations=image.decoder_allocations;
+            if(phase_monitor){r.decode_allocator_minimum=(unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT);heap_caps_monitor_local_minimum_free_size_stop();phase_monitor=false;}
+            if(!error){r.image_pixels=image.pixels;r.image_width=image.width;r.image_height=image.height;image_digest(image.pixels,(size_t)image.width*image.height*2,r.image_pixels_sha256);}
             else r.error=error==PS_IMAGE_CANCELLED?CANCELLED:error==PS_IMAGE_MEMORY?NO_MEMORY:error==PS_IMAGE_LIMIT?TOO_LARGE:error==PS_IMAGE_UNSUPPORTED?PS_NET_IMAGE_UNSUPPORTED:INVALID_IMAGE;
         }free(body);goto done;
     }
@@ -312,9 +333,10 @@ cached:
     if(n<=0){r.error=INCOMPLETE;goto done;}r.length=(size_t)n;
     if(job.request.kind==2){int slot=ps_local_image_slot(local_state,sizeof(local_state),job.request.document,job.request.page);if(slot>0&&slot<=24)r.image_slot=(uint8_t)slot;}
 done:
+    if(phase_monitor){r.tls_allocator_minimum=(unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT);heap_caps_monitor_local_minimum_free_size_stop();}
     if(cancelled()){if(r.image_pixels){free(r.image_pixels);r.image_pixels=NULL;}r.error=CANCELLED;}
     memory(&r);r.finished=true;r.elapsed_ms=(unsigned)((esp_timer_get_time()-start)/1000);
-    printf("SEARCH_NET {\"sequence\":%u,\"execution_mode\":\"on-device\",\"service_required\":false,\"error\":%d,\"http_status\":%d,\"bytes\":%u,\"wire_bytes\":%u,\"documents\":%u,\"image_bytes\":%u,\"compute_us\":%u,\"tls_verified\":%s,\"clock_synced\":%s,\"elapsed_ms\":%u,\"heap_before\":%u,\"minimum_free_heap_bytes\":%u,\"minimum_largest_free_block_bytes\":%u,\"stack_hwm\":%u}\n",r.sequence,r.error,r.http_status,(unsigned)r.length,r.wire_bytes,documents,(unsigned)r.image_width*r.image_height*2,r.compute_us,r.tls_verified?"true":"false",r.clock_synced?"true":"false",r.elapsed_ms,r.heap_before,r.minimum_free_heap_bytes,r.largest_free_block_bytes,r.stack_hwm);
+    printf("SEARCH_NET {\"sequence\":%u,\"execution_mode\":\"on-device\",\"service_required\":false,\"error\":%d,\"http_status\":%d,\"bytes\":%u,\"wire_bytes\":%u,\"documents\":%u,\"image_bytes\":%u,\"image_format\":%u,\"image_width\":%u,\"image_height\":%u,\"image_source_sha256\":\"%s\",\"image_pixels_sha256\":\"%s\",\"decoder_peak_bytes\":%u,\"decoder_allocations\":%u,\"tls_heap_window\":%s,\"tls_allocator_minimum_free_bytes\":%u,\"decode_heap_window\":%s,\"decode_heap_before_bytes\":%u,\"decode_allocator_minimum_free_bytes\":%u,\"compute_us\":%u,\"tls_verified\":%s,\"clock_synced\":%s,\"elapsed_ms\":%u,\"heap_before\":%u,\"minimum_free_heap_bytes\":%u,\"minimum_largest_free_block_bytes\":%u,\"stack_hwm\":%u}\n",r.sequence,r.error,r.http_status,(unsigned)r.length,r.wire_bytes,documents,(unsigned)r.image_width*r.image_height*2,r.image_format,r.image_width,r.image_height,r.image_source_sha256,r.image_pixels_sha256,r.decoder_peak_bytes,r.decoder_allocations,r.tls_heap_window?"true":"false",r.tls_allocator_minimum,r.decode_heap_window?"true":"false",r.decode_heap_before,r.decode_allocator_minimum,r.compute_us,r.tls_verified?"true":"false",r.clock_synced?"true":"false",r.elapsed_ms,r.heap_before,r.minimum_free_heap_bytes,r.largest_free_block_bytes,r.stack_hwm);
     taskENTER_CRITICAL(&lock);memset(job.request.query,0,sizeof(job.request.query));taskEXIT_CRITICAL(&lock);
     publish(&r);vTaskDelete(NULL);
 }
@@ -324,7 +346,7 @@ bool PS_NetReadViewport(uint32_t document,uint16_t page,uint8_t bytes[512],size_
     if(!bytes||!length||!slot)return false;
     // Image jobs only read LocalSearch. Hold a read reservation across both
     // encodings so console refresh/profile/start cannot publish a new corpus.
-    taskENTER_CRITICAL(&lock);bool allowed=!job.configuring&&!reading&&(!job.running||job.request.kind==3);if(allowed)reading=true;taskEXIT_CRITICAL(&lock);
+    taskENTER_CRITICAL(&lock);bool allowed=!job.configuring&&!reading&&(!job.running||job.request.kind==3||job.request.kind==7);if(allowed)reading=true;taskEXIT_CRITICAL(&lock);
     if(!allowed)return false;
     int n=ps_local_packet(local_state,sizeof(local_state),2,document,page,(const uint8_t*)"",0,bytes);
     int key=n>0?ps_local_image_slot(local_state,sizeof(local_state),document,page):0;
@@ -333,7 +355,7 @@ bool PS_NetReadViewport(uint32_t document,uint16_t page,uint8_t bytes[512],size_
     *length=(size_t)n;*slot=(uint8_t)key;return true;
 }
 bool PS_NetStart(const PS_Request *request){
-    if(!request||!memchr(request->query,0,sizeof(request->query))||request->kind<1||(request->kind>6&&request->kind!=255))return false;
+    if(!request||!memchr(request->query,0,sizeof(request->query))||request->kind<1||(request->kind>7&&request->kind!=255))return false;
     taskENTER_CRITICAL(&lock);bool allowed=!reading&&!job.running&&!job.ready&&!job.configuring;if(allowed){job.running=true;job.cancelled=false;job.request=*request;}taskEXIT_CRITICAL(&lock);
     if(!allowed)return false;
     if(xTaskCreatePinnedToCore(worker,"local_search",10240,NULL,2,NULL,0)==pdPASS)return true;
@@ -370,7 +392,7 @@ static int status(int argc,char **argv){
     if(argc==2&&!strcmp(argv[1],"refresh"))return PS_NetRefresh()?0:1;
     if(argc!=2||strcmp(argv[1],"status"))return 1;
     taskENTER_CRITICAL(&lock);unsigned count=documents,attempts=requests,bytes=body_bytes;bool running=job.running;taskEXIT_CRITICAL(&lock);
-    printf("SEARCH_LOCAL {\"execution_mode\":\"on-device\",\"service_required\":false,\"documents\":%u,\"requests\":%u,\"body_bytes\":%u,\"running\":%s,\"state_bytes\":%u,\"state_used_bytes\":%u,\"robots_buffer_bytes\":%u,\"maximum_documents\":4,\"text_bytes_per_document\":2560,\"persistent_index\":%s,\"store_generation\":%u,\"store_failures\":%u,\"native_images\":true,\"native_image_formats\":\"baseline-jpeg\",\"source_profile\":%u}\n",count,attempts,bytes,running?"true":"false",(unsigned)sizeof(local_state),(unsigned)ps_local_state_bytes(),(unsigned)sizeof(robots),PS_StoreReady()?"true":"false",PS_StoreGeneration(),store_failures,PS_NetProfile());printf("SEARCH_RESOURCES {\"css_cache_hits\":%u,\"css_requests\":%u,\"font_requests\":%u,\"css_rules\":%u,\"font_ready\":%s,\"font_glyphs\":%u,\"font_source_bytes\":%u,\"atlas_bytes\":867,\"fallbacks\":%u,\"server_required\":false}\n",css_cache_hits,css_fetches,font_fetches,css_rules,PS_WebFontReady()?"true":"false",font_glyphs,font_bytes,resource_fallbacks);return 0;
+    printf("SEARCH_LOCAL {\"execution_mode\":\"on-device\",\"service_required\":false,\"documents\":%u,\"requests\":%u,\"body_bytes\":%u,\"running\":%s,\"state_bytes\":%u,\"state_used_bytes\":%u,\"robots_buffer_bytes\":%u,\"maximum_documents\":4,\"text_bytes_per_document\":2560,\"persistent_index\":%s,\"store_generation\":%u,\"store_failures\":%u,\"native_images\":true,\"native_image_formats\":\"baseline-jpeg,png,progressive-jpeg\",\"source_profile\":%u}\n",count,attempts,bytes,running?"true":"false",(unsigned)sizeof(local_state),(unsigned)ps_local_state_bytes(),(unsigned)sizeof(robots),PS_StoreReady()?"true":"false",PS_StoreGeneration(),store_failures,PS_NetProfile());printf("SEARCH_RESOURCES {\"css_cache_hits\":%u,\"css_requests\":%u,\"font_requests\":%u,\"css_rules\":%u,\"font_ready\":%s,\"font_glyphs\":%u,\"font_source_bytes\":%u,\"atlas_bytes\":867,\"fallbacks\":%u,\"server_required\":false}\n",css_cache_hits,css_fetches,font_fetches,css_rules,PS_WebFontReady()?"true":"false",font_glyphs,font_bytes,resource_fallbacks);return 0;
 }
 static int legacy(int argc,char **argv){if(argc!=2||strcmp(argv[1],"status"))return 1;printf("SEARCH_ENDPOINT_STATE {\"configured\":true,\"service_required\":false,\"execution_mode\":\"on-device\"}\n");return 0;}
 void PS_NetRegister(void){

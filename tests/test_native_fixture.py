@@ -74,6 +74,17 @@ class NativeFixture(unittest.TestCase):
         self.assertEqual(struct.unpack(">HH", image[i + 5:i + 9]), (128, 192))
         self.assertNotIn(b"\xff\xc2", image)
 
+    def test_extended_images_and_source_modes(self):
+        asset=json.loads((f.ROOT / "ci/native-fixture/extended-assets.json").read_text())
+        for name, info in asset["assets"].items():
+            value=f.reply(f.BASE+name,{})
+            self.assertEqual(value.status,200)
+            self.assertEqual(len(value.body),info["bytes"])
+            self.assertEqual(hashlib.sha256(value.body).hexdigest(),info["sha256"])
+            self.assertLess(len(value.body),24576)
+        for mode,name in (("png",b"bars.png"),("progressive",b"bars-progressive.jpg")):
+            self.assertIn(name,f.reply(f.BASE+"node1.html",{},mode).body)
+
     def test_local_http_transport_preserves_headers_and_redacts_trace(self):
         trace = io.StringIO()
         # Plain loopback is a host transport unit fixture, not a native TLS test.

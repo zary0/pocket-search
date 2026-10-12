@@ -30,7 +30,7 @@ int32_t ps_flow_decode(const uint8_t*,size_t,PS_FlowView*);
 int32_t ps_flow_probe(uint8_t*,uint32_t);
 int32_t ps_image_decode(const uint8_t *bytes,size_t length,PS_ImageView *out);
 typedef struct {unsigned sequence;uint8_t kind;uint32_t document;uint16_t page;char query[97],generation[PS_GENERATION_BYTES];} PS_Request;
-typedef struct {unsigned sequence;int error,http_status;unsigned elapsed_ms,wire_bytes,heap_before,minimum_free_heap_bytes,largest_free_block_bytes,stack_hwm,compute_us;bool tls_verified,clock_synced,finished,sample,local;char generation[PS_GENERATION_BYTES];size_t length;uint8_t bytes[PS_IMAGE_PACKET_BYTES];uint8_t *image_pixels;uint16_t image_width,image_height;uint8_t image_slot;} PS_Reply;
+typedef struct {unsigned sequence;int error,http_status;unsigned elapsed_ms,wire_bytes,heap_before,minimum_free_heap_bytes,largest_free_block_bytes,stack_hwm,compute_us,decoder_peak_bytes,decoder_allocations,tls_allocator_minimum,decode_heap_before,decode_allocator_minimum;bool tls_verified,clock_synced,finished,sample,local,tls_heap_window,decode_heap_window;char generation[PS_GENERATION_BYTES],image_source_sha256[65],image_pixels_sha256[65];size_t length;uint8_t bytes[PS_IMAGE_PACKET_BYTES];uint8_t *image_pixels;uint16_t image_width,image_height;uint8_t image_slot,image_format;} PS_Reply;
 bool PS_NetStart(const PS_Request *request);
 bool PS_NetBusy(void);
 // Read an immutable retained viewport while an image socket is being cancelled.

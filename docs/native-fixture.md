@@ -85,3 +85,12 @@ TLS, power interruption, battery operation, physical switches/video or JPEG entr
 decoding. The origin is implemented but not deployed here; the dedicated runner,
 trusted physical driver, approved candidate profile and public HTTPS ingress are
 still required by the [physical lab contract](hardware-e2e.md).
+
+## Extended image sources
+
+The `png` and `progressive` modes point the same original HTML at `bars.png` or
+`bars-progressive.jpg`. `palette.png` exercises packed indices and transparency.
+`extended-assets.json` records original GPL-3.0-only provenance and source hashes.
+The PNG contains all five row filters and short IDAT chunks; the progressive
+JPEG is 64 x 128. These are encoded source fixtures, never display-ready pixels.
+A host HTTP unit test or decoder pass is not native acquisition evidence.

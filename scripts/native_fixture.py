@@ -19,7 +19,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE = "/pocket-fixture/"
-MODES = ("normal", "changed", "timeout", "unavailable", "oversized", "wrong-type", "truncated", "malformed-image")
+MODES = ("normal", "changed", "timeout", "unavailable", "oversized", "wrong-type", "truncated", "malformed-image", "png", "progressive")
 MODIFIED = "Thu, 01 Jan 2026 00:00:00 GMT"
 
 
@@ -80,6 +80,8 @@ def reply(path, headers, mode="normal"):
             if mode == "truncated":
                 return Reply(200, "text/html; charset=utf-8", page(number)[:64], declared_extra=256)
         body = page(number, mode == "changed")
+        if mode in ("png", "progressive"):
+            body = body.replace(b"bars.jpg", b"bars.png" if mode == "png" else b"bars-progressive.jpg")
         etag = '"' + hashlib.sha256(body).hexdigest()[:24] + '"'
         normalized = {k.lower(): v for k, v in headers.items()}
         unchanged = normalized.get("if-none-match") == etag
@@ -89,6 +91,9 @@ def reply(path, headers, mode="normal"):
     if path == BASE + "bars.jpg":
         body = b"\xff\xd8\xff\xd9" if mode == "malformed-image" else (ROOT / "ci/native-fixture/bars.jpg").read_bytes()
         return Reply(200, "image/jpeg", body)
+    if path in (BASE + "bars.png", BASE + "palette.png", BASE + "bars-progressive.jpg"):
+        name = path[len(BASE):]
+        return Reply(200, "image/png" if name.endswith(".png") else "image/jpeg", (ROOT / "ci/native-fixture" / name).read_bytes())
     return Reply(404, "text/plain", b"Not a fixture resource\n")
 
 

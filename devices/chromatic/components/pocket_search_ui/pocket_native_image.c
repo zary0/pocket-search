@@ -37,6 +37,10 @@ static UINT output(JDEC *jpeg,void *pixels,JRECT *rect){
     }return 1;
 }
 void PS_NativeImageFree(PS_NativeImage *image){if(image){free(image->pixels);memset(image,0,sizeof(*image));}}
+int PS_NativeDecode(const uint8_t *bytes,size_t length,PS_NativeImage *out,PS_ImageCancelled cancel,PS_ImageMemory observe,void *context){
+    if(bytes&&PS_JPEGPolicy(bytes,length))return PS_NativeJPEG(bytes,length,out,cancel,observe,context);
+    return PS_ExtendedImage(bytes,length,out,cancel,observe,context);
+}
 int PS_NativeJPEG(const uint8_t *bytes,size_t length,PS_NativeImage *out,PS_ImageCancelled cancelled,PS_ImageMemory observe,void *context){
     if(!out||!bytes||length<4)return PS_IMAGE_MALFORMED;
     memset(out,0,sizeof(*out));
@@ -57,6 +61,7 @@ int PS_NativeJPEG(const uint8_t *bytes,size_t length,PS_NativeImage *out,PS_Imag
     if(!w)w=1;
     if(!h)h=1;
     d.image.width=(uint16_t)w;d.image.height=(uint16_t)h;
+    d.image.format=PS_FORMAT_BASELINE;d.image.decoder_peak_bytes=4096+w*h*2;d.image.decoder_allocations=2;
     d.image.pixels=malloc((size_t)w*h*2);if(!d.image.pixels){error=PS_IMAGE_MEMORY;goto done;}
     memset(d.image.pixels,0xff,(size_t)w*h*2);if(observe)observe(context);
     result=jd_decomp(&jpeg,output,0);
