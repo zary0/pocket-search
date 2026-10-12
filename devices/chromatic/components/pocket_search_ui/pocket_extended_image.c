@@ -64,6 +64,7 @@ static __attribute__((unused)) void *bounded_realloc(void *ptr,size_t size){
 #define STBI_REALLOC bounded_realloc
 #define STBI_FREE bounded_free
 #define STB_IMAGE_STATIC
+#define STBIDEF static __attribute__((unused))
 #define STB_IMAGE_IMPLEMENTATION
 // Upstream static API includes unused entry points in this private translation unit.
 #if defined(__GNUC__)

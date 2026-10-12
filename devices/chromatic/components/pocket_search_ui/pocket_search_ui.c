@@ -359,7 +359,8 @@ static int command(int argc,char **argv) {
     if(argc==3&&!strcmp(argv[1],"image")){
         unsigned index=!strcmp(argv[2],"baseline")?1:!strcmp(argv[2],"png")?2:!strcmp(argv[2],"progressive")?3:0;
         taskENTER_CRITICAL(&lock);bool available=index&&observed_mode==READER&&observed_verified&&!pending_key&&!pending_query_set&&!pending_probe&&!pending_image;if(available)pending_image=index;taskEXIT_CRITICAL(&lock);
-        if(available)printf("SEARCH_UI_QUEUED\n");return available?0:1;
+        if(available)printf("SEARCH_UI_QUEUED\n");
+        return available?0:1;
     }
     if(argc==2&&(!strcmp(argv[1],"typography")||!strcmp(argv[1],"webfont")||!strcmp(argv[1],"layout"))){taskENTER_CRITICAL(&lock);bool available=!pending_key&&!pending_query_set&&!pending_probe&&!pending_image;if(!strcmp(argv[1],"webfont")&&!PS_WebFontReady())available=false;if(available)pending_probe=!strcmp(argv[1],"layout")?3:!strcmp(argv[1],"webfont")?2:1;taskEXIT_CRITICAL(&lock);if(available)printf("SEARCH_UI_QUEUED\n");return available?0:1;}
     if(argc==3&&!strcmp(argv[1],"query")){size_t n=strlen(argv[2]);if(n>96||!ps_valid(argv[2],n))return 1;taskENTER_CRITICAL(&lock);bool available=!pending_key&&!pending_query_set&&!pending_probe&&!pending_image;if(available){memset(pending_query,0,sizeof(pending_query));memcpy(pending_query,argv[2],n);pending_query_set=true;}taskEXIT_CRITICAL(&lock);if(available)printf("SEARCH_UI_QUEUED\n");return available?0:1;}
