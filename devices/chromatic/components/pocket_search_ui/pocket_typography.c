@@ -22,9 +22,16 @@ static bool describe(const lv_font_t *font,lv_font_glyph_dsc_t *d,uint32_t c,uin
 }
 static unsigned ink(const uint8_t *source,unsigned sw,unsigned sh,unsigned bpp,unsigned x,unsigned y,unsigned tw,unsigned th){
     if(x>=tw)return 0;
-    unsigned bit=((y*sh/th)*sw+x*sw/tw)*bpp;
-    unsigned value=(source[bit/8]>>(8-bpp-bit%8))&((1u<<bpp)-1);
-    return bpp==1?value*3:value;
+    unsigned sum=0,count=0;
+    unsigned left=x*sw/tw,right=((x+1)*sw+tw-1)/tw,top=y*sh/th,bottom=((y+1)*sh+th-1)/th;
+    for(unsigned sy=top;sy<bottom;++sy)for(unsigned sx=left;sx<right;++sx){
+        unsigned bit=(sy*sw+sx)*bpp,value=(source[bit/8]>>(8-bpp-bit%8))&((1u<<bpp)-1);
+        sum+=bpp==1?value*3:value;++count;
+    }
+    unsigned alpha=(sum+count/2)/count;
+    // Small-screen optical compensation: a sampled fine stroke cannot vanish
+    // just because its average rounds to zero at 10 or 12 pixels.
+    return sum&&!alpha?1:alpha;
 }
 static int web_slot(uint32_t c){
     if(!PS_WebFontReady())return -1;

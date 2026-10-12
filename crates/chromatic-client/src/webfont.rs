@@ -48,6 +48,7 @@ struct Font<'a> {
     glyphs: usize,
     metrics: usize,
     asc: i32,
+    em: i32,
     span: i32,
 }
 impl<'a> Font<'a> {
@@ -58,6 +59,10 @@ impl<'a> Font<'a> {
         let head = table(b, b"head")?;
         let maxp = table(b, b"maxp")?;
         let hhea = table(b, b"hhea")?;
+        let em = i32::from(u16be(head, 18)?);
+        if !(16..=16384).contains(&em) {
+            return None;
+        }
         let glyphs = u16be(maxp, 4)? as usize;
         let metrics = u16be(hhea, 34)? as usize;
         let format = i16be(head, 50)?;
@@ -109,6 +114,7 @@ impl<'a> Font<'a> {
             glyphs,
             metrics,
             asc,
+            em,
             span,
         };
         if font.loca.len() < (glyphs + 1) * if font.long { 4 } else { 2 }
@@ -249,8 +255,15 @@ impl<'a> Font<'a> {
             return None;
         }
         for p in &mut points[..n] {
-            p.x = p.x * width as i32 * 256 / advance;
-            p.y = (self.asc - p.y) * height as i32 * 256 / self.span;
+            if smooth {
+                // Preserve outline aspect at an em square, with one-pixel side
+                // bearings and a two-pixel descent in the fixed cell.
+                p.x = 256 + p.x * (width as i32 - 2) * 256 / advance;
+                p.y = (height as i32 - 2) * 256 - p.y * (height as i32 - 2) * 256 / self.em;
+            } else {
+                p.x = p.x * width as i32 * 256 / advance;
+                p.y = (self.asc - p.y) * height as i32 * 256 / self.span;
+            }
             if !(-32768..=32768).contains(&p.x) || !(-32768..=32768).contains(&p.y) {
                 return None;
             }
@@ -541,6 +554,7 @@ mod tests {
     fn fixture(curve: bool) -> Vec<u8> {
         let mut head = std::vec![0;54];
         put(&mut head, 50, 0);
+        put(&mut head, 18, 1200);
         let mut maxp = std::vec![0;6];
         put(&mut maxp, 4, 2);
         let mut hhea = std::vec![0;36];

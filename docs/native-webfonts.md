@@ -1,6 +1,6 @@
 # Bounded native Japanese and WOFF2 fonts
 
-The 0.14.12 development candidate adds direct verified-HTTPS WOFF2 download,
+The 0.14.13 development candidate adds direct verified-HTTPS WOFF2 download,
 bounded native decompression, BMP Japanese outline rasterization, four-level
 coverage and horizontal kana cluster composition. The design uses a quiet white
 page, consistent 10/12/14/16-pixel hierarchy and existing paragraph space. Noto
@@ -41,7 +41,9 @@ Japanese font.
 
 The Rust rasterizer executes no hinting or font instructions. Integer quadratic
 curves use eight subdivisions and 2×4 subpixel coverage, quantized to four levels.
-Glyphs are resampled to the supported fixed cells. Kerning, proportional
+Glyphs use the font em square with fixed side/descent space, preserving Japanese
+outline aspect. Area sampling and small-screen optical compensation retain fine
+strokes at the supported fixed cells. Kerning, proportional
 advances, GSUB/GPOS, Arabic/Indic shaping, vertical writing, variation selectors
 and arbitrary Unicode normalization remain unsupported. Horizontal hiragana
 and katakana plus combining dakuten/handakuten are composed before retained
