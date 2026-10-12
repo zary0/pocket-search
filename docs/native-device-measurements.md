@@ -95,3 +95,14 @@ retained document repeatedly, checks four loaded documents, zero socket requests
 unchanged storage generation, memory and UI responsiveness. This workload does
 not cover thirty minutes of repeated TLS/image decoding, physical battery behavior
 or flash interruption. Those cases remain mandatory in the dedicated physical lab.
+
+## Native image formats on 0.14.9
+
+The latest image candidate, source `91022671bb21e60cf627466c1d367e14aae9f2e0`,
+completes a USB-powered 1,810.676-second original-source image run with 160
+JPEG/PNG acquisitions and decodes, cancellation/retry/back, verified native TLS,
+zero unexpected errors/resets and zero persistent-store failures. This supersedes
+the older baseline-only image-format boundary, without changing those older
+measurements. See [format-specific memory/time and qualification](native-image-formats.md)
+and [candidate-bound numeric evidence](evidence/native-images/verification.json).
+Independent battery, physical switches/video and isolated CI E2E remain pending.

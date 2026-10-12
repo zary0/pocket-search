@@ -1,0 +1,146 @@
+{
+  "schema_version": 1,
+  "execution_mode": "native-usb-image-development",
+  "version": "0.14.9",
+  "source_commit": "91022671bb21e60cf627466c1d367e14aae9f2e0",
+  "application_sha256": "2c7f3231565ac221bf365bc51f3a85dc38c82a87d02b9abed47c6987f0fbad7b",
+  "application_bytes": 2015824,
+  "application_only_readback_verified": true,
+  "nvs_and_corpus_preserved_during_install": true,
+  "host_prepared_pixels_used": false,
+  "companion_or_tunnel_required": false,
+  "power": "USB",
+  "controls": "console queued native GUI controls",
+  "physical_usb_video_observed": false,
+  "release_qualified": false,
+  "operator_observation": {
+    "version": "0.14.8",
+    "png_logo_seen": true,
+    "progressive_boat_seen": true,
+    "pixels_unchanged_in_0149": true,
+    "latest_png_seen": false
+  },
+  "qualification": [
+    {
+      "scenario": "cancel-retry-back",
+      "format": "baseline",
+      "passed": true,
+      "retry_source_sha256": "1fc08854196db9098c1814a21592104e2ed6e8d8e75c03efd9b1fe743696b663",
+      "retry_pixels_sha256": "a493c4f0f599052de299cd7ab98c2167970aec4be5e0a1988775429f3ab65dfc",
+      "cancelled_error": 9,
+      "cancelled_image_bytes": 0,
+      "cached_return_console_observation_ms": 774
+    },
+    {
+      "scenario": "cancel-retry-back",
+      "format": "png",
+      "passed": true,
+      "retry_source_sha256": "590608bf256237f22d84bbab2a0a1afc0d4f20db6350bbac2c6841f1f3e13b01",
+      "retry_pixels_sha256": "a3e1770cb1d556ccecd8489809ae9f47c31f05a91854355da20f3aac7ac9f502",
+      "cancelled_error": 9,
+      "cancelled_image_bytes": 0,
+      "cached_return_console_observation_ms": 784
+    },
+    {
+      "scenario": "cancel-retry-back",
+      "format": "progressive",
+      "passed": true,
+      "retry_source_sha256": "b0c8bd080f469edd0fc9e8c417df449f8d24f2046c4eaff31c0b386fd9e30d6e",
+      "retry_pixels_sha256": "12470302f3b02fd717baba8cf47ef3586a92b37e334b4eb6d095e140acc6ad32",
+      "cancelled_error": 9,
+      "cancelled_image_bytes": 0,
+      "cached_return_console_observation_ms": 785
+    },
+    {
+      "scenario": "offline-A-retry-back",
+      "format": "png",
+      "passed": true,
+      "retry_source_sha256": "590608bf256237f22d84bbab2a0a1afc0d4f20db6350bbac2c6841f1f3e13b01",
+      "retry_pixels_sha256": "a3e1770cb1d556ccecd8489809ae9f47c31f05a91854355da20f3aac7ac9f502",
+      "offline_error": 1,
+      "retry_control": "A"
+    }
+  ],
+  "endurance": {
+    "seconds": 1810.676,
+    "successful_images": 160,
+    "unexpected_errors": 0,
+    "unexpected_resets_after_warmup": 0,
+    "storage_failures": 0,
+    "corpus_generation": 13,
+    "minimum_post_back_sampled_free_heap_bytes": 88456,
+    "maximum_post_back_sampled_free_heap_bytes": 90060,
+    "first_post_back_sampled_free_heap_bytes": 90060,
+    "last_post_back_sampled_free_heap_bytes": 89136,
+    "scroll_after_every_image": true
+  },
+  "formats": {
+    "baseline": {
+      "successful_images": 54,
+      "source_sha256": "1fc08854196db9098c1814a21592104e2ed6e8d8e75c03efd9b1fe743696b663",
+      "pixels_sha256": "a493c4f0f599052de299cd7ab98c2167970aec4be5e0a1988775429f3ab65dfc",
+      "width": 64,
+      "height": 80,
+      "source_bytes": 1902,
+      "rgb565_bytes": 10240,
+      "decoder_private_peak_bytes": 14336,
+      "tls_conservative_minimum_free_bytes": 38448,
+      "decode_conservative_minimum_free_bytes": 60500,
+      "decode_us_min": 16579,
+      "decode_us_median": 19157.5,
+      "decode_us_max": 23083,
+      "request_ms_max": 2480,
+      "worker_stack_headroom_bytes": 2844
+    },
+    "png": {
+      "successful_images": 53,
+      "source_sha256": "590608bf256237f22d84bbab2a0a1afc0d4f20db6350bbac2c6841f1f3e13b01",
+      "pixels_sha256": "a3e1770cb1d556ccecd8489809ae9f47c31f05a91854355da20f3aac7ac9f502",
+      "width": 72,
+      "height": 48,
+      "source_bytes": 1848,
+      "rgb565_bytes": 6912,
+      "decoder_private_peak_bytes": 21440,
+      "tls_conservative_minimum_free_bytes": 39040,
+      "decode_conservative_minimum_free_bytes": 53924,
+      "decode_us_min": 15185,
+      "decode_us_median": 17962,
+      "decode_us_max": 21642,
+      "request_ms_max": 2321,
+      "worker_stack_headroom_bytes": 2844
+    },
+    "progressive": {
+      "successful_images": 53,
+      "source_sha256": "b0c8bd080f469edd0fc9e8c417df449f8d24f2046c4eaff31c0b386fd9e30d6e",
+      "pixels_sha256": "12470302f3b02fd717baba8cf47ef3586a92b37e334b4eb6d095e140acc6ad32",
+      "width": 110,
+      "height": 75,
+      "source_bytes": 3650,
+      "rgb565_bytes": 16500,
+      "decoder_private_peak_bytes": 54436,
+      "tls_conservative_minimum_free_bytes": 37812,
+      "decode_conservative_minimum_free_bytes": 19228,
+      "decode_us_min": 56844,
+      "decode_us_median": 61836,
+      "decode_us_max": 66223,
+      "request_ms_max": 2608,
+      "worker_stack_headroom_bytes": 2844
+    }
+  },
+  "memory_method": "Exact decoder-private live allocation peak; TLS/decode sums of ESP-IDF per-region allocator-recorded minima are conservative phase lower bounds, include other tasks, exclude preallocated stack; not exact simultaneous whole-device peaks.",
+  "previous_regression": {
+    "version": "0.14.8",
+    "successful_cycles_before_failure": 8,
+    "failure": "Progressive image rejected by runtime heap headroom guard",
+    "error": 3,
+    "source_pixels_prepared_on_host": false,
+    "text_preserved": true,
+    "qualified": false
+  },
+  "remaining": [
+    "Battery acceptance on latest candidate",
+    "Independent physical controls/video E2E",
+    "Dedicated isolated CI lab",
+    "GIF/SVG/WebP/animation/video"
+  ]
+}

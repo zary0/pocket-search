@@ -82,30 +82,61 @@ until the [physical lab contract](hardware-e2e.md) is satisfied.
 
 ### Latest measured candidate
 
-The installed development application is `0.14.8`, source
-`adefabe855f20da22eedddd52976371480ec9cab`, SHA-256
-`f2774f0c59b83b359e83c3255ad57f24d3beab4ebbb367435563ff147f45391d`,
-2,015,584 bytes. Application-only readback verifies the same bytes; the
+The installed development application is `0.14.9`, source
+`91022671bb21e60cf627466c1d367e14aae9f2e0`, SHA-256
+`2c7f3231565ac221bf365bc51f3a85dc38c82a87d02b9abed47c6987f0fbad7b`,
+2,015,824 bytes. Application-only readback verifies the same bytes; the
 partition table, NVS, saved four-document corpus and FPGA are preserved.
-The current development measurements use USB power and diagnostic GUI commands.
-The complete physical/battery release gate is still closed.
+The [sanitized verification record](evidence/native-images/verification.json)
+binds this candidate to source/pixel hashes, errors, memory and endurance.
 
-These `0.14.8` measurements precede the allocation-order fix; they do not qualify
-`0.14.9`. A repeated run exhausted the 16 KiB headroom guard on a progressive
-image after eight successful cycles; text stayed intact. The new candidate
-defers progressive pixel planes and releases completed coefficient planes
-one at a time, preserving output pixels and both memory caps. Native
-qualification remains pending until a complete run.
+A USB-powered run completes **1,810.676 seconds and 160 native images**:
+54 baseline JPEG, 53 PNG and 53 progressive JPEG. Every image matches its
+original source hash and decoded-pixel hash, returns to the same retained text,
+and is followed by down/up scrolling. There are zero unexpected errors/resets
+and zero storage failures; four documents remain at generation 13. Post-back
+sampled heap spans 88,456–90,060 bytes (first 90,060, last 89,136); this describes
+that run and does not prove absence of every possible leak.
 
-The original 72 x 48 W3C PNG is fetched directly from
-`https://www.w3.org/assets/logos/w3c-2025-transitional/w3c-72x48.png`
-(1,848 bytes), rather than its redirecting legacy URL. Native ROM inflate/filter
-processing takes 17,821 microseconds and emits 6,912 RGB565 bytes. Source SHA-256
-`590608bf256237f22d84bbab2a0a1afc0d4f20db6350bbac2c6841f1f3e13b01` and
-pixel SHA-256
-`a3e1770cb1d556ccecd8489809ae9f47c31f05a91854355da20f3aac7ac9f502`
-match the original source and a separately calculated Pillow RGB565 reference.
-Decoder-private peak is 21,440 bytes; allocator-recorded phase free-heap lower
-bounds are 43,132 bytes for TLS and 57,496 bytes for decoding. MCU framebuffer
-readback shows the source logo in the labelled image viewer; this is not USB
-video or independent physical-panel observation.
+All three formats also pass loading cancellation, immediate cached-text return,
+retry and back. A deliberately disconnected PNG returns error 1; reconnecting
+and pressing A succeeds through native HTTPS/decode. Cancelled images return
+error 9 with zero published image bytes. Cached-back console observations are
+774–785 ms including diagnostic round trips; these are not physical-panel latency.
+
+| Original source | Wire / RGB565 bytes | Private decode peak | Median decode | TLS / decode phase minimum free heap |
+| --- | --- | --- | --- | --- |
+| Raggett portrait, baseline JPEG, 64 x 80 output | 1,902 / 10,240 | 14,336 B | 19.158 ms | 38,448 / 60,500 B |
+| W3C PNG logo, 72 x 48 | 1,848 / 6,912 | 21,440 B | 17.962 ms | 39,040 / 53,924 B |
+| Raggett boat, progressive JPEG, 110 x 75 | 3,650 / 16,500 | 54,436 B | 61.836 ms | 37,812 / 19,228 B |
+
+The phase minima use the conservative allocator method described above. They
+include concurrent runtime tasks, and cannot be relabelled as exact TLS-private
+peaks. Decode-private peak excludes immutable wire bytes and preallocated stack.
+The minimum observed worker stack headroom is 2,844 bytes. HTTPS request maxima
+are 2.321–2.608 seconds for these source files; this is not a universal site limit.
+
+Original files are fetched directly from:
+
+- `https://www.w3.org/People/Raggett/dsr-46c.jpg`
+- `https://www.w3.org/assets/logos/w3c-2025-transitional/w3c-72x48.png`
+- `https://www.w3.org/People/Raggett/rib.jpg`
+
+The PNG output matches a separately calculated Pillow RGB565 reference.
+Progressive pixels match the pinned host component-plane decoder reference;
+that reference is never delivered to the console. Source photos and runtime
+configuration are not bundled in the numeric evidence. The operator confirmed
+both logo and boat on the `0.14.8` LCD; their `0.14.9` decoded bytes are unchanged.
+
+The first `0.14.8` repeated-image trial fails after eight successful images:
+progressive decode exhausts the 16 KiB runtime-headroom guard, while text remains
+readable. `0.14.9` defers each pixel plane until its coefficients can be released,
+reducing this source's private peak from 58,978 to 54,436 bytes without changing
+pixels or weakening either cap. The unsuccessful trial is retained separately
+and never counted as a successful endurance run. Unknown or incompletely finished
+progressive planes are rejected before any output sampling.
+
+This qualifies scoped USB native image development. Battery power, independently
+actuated physical buttons, physical USB video, arbitrary/malformed native-origin
+acceptance and the dedicated isolated release lab remain separate requirements.
+`CHROMATIC_E2E_READY` stays false; no release qualification is claimed.

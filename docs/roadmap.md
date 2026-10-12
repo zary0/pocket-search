@@ -70,10 +70,13 @@ See [retained-content implementation and limits](native-retained-content.md).
 - [x] Automatically load the first visible supported image into its retained box,
   reuse one semantic-slot cache across scroll windows and expansion/back, and
   preserve scrolling/text on image failure or cancellation. A expands or retries.
-- [ ] Qualify actual source pixels, cancellation/retry/back, TLS/decode peak memory
-  and long-duration image use on the latest candidate. A host-prepared image never
-  substitutes for native acquisition/decoding.
-- [ ] Add independently bounded native PNG and progressive-JPEG support. GIF,
+- [x] Qualify scoped native source pixels, cancellation/retry/back and separate
+  TLS/decode allocation windows on installed `0.14.9`: 1,810.676 seconds, 160
+  direct original-source JPEG/PNG images, zero unexpected errors/resets or storage
+  failures. No host-prepared image substitutes for native acquisition/decoding.
+  This uses USB power/diagnostic controls; independent physical/battery release
+  acceptance stays in P0. See [limits and evidence](native-image-formats.md).
+- [x] Add independently bounded native PNG and progressive-JPEG support. GIF,
   SVG, WebP, animation and video remain later format work.
 - [x] Retain headings, paragraphs, lists, links and image slots; reflow to 160 px;
   preserve supported size/weight/color/box styles and vertical line scrolling.
