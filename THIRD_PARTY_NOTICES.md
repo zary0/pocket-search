@@ -244,12 +244,17 @@ The native baseline JPEG adapter calls the existing ESP32 ROM TinyJPEG API decla
 
 ## Vendored native progressive-JPEG decoder
 
-`devices/chromatic/components/pocket_search_ui/vendor/stb_image.h` is unmodified
+`devices/chromatic/components/pocket_search_ui/vendor/stb_image.h` is based on
 stb_image v2.30 from [nothings/stb](https://github.com/nothings/stb) commit
 `013ac3beddff3dbffafd5177e7972067cd2b5083`, copyright 2017 Sean Barrett.
 This distribution selects MIT; the complete upstream grant remains in the source
 and in [the retained MIT text](devices/chromatic/components/pocket_search_ui/vendor/LICENSE-MIT.txt).
-The adjacent `stb-image.json` pins source identity and SHA-256, checked by CI.
+The adjacent `stb-image.json` pins upstream/source/patch identities, checked by CI.
+The unmodified upstream header is retained losslessly in
+`third_party/sources/stb_image-013ac3b.h.gz`. The documented `stb-image.patch`
+defers progressive pixel-plane allocation, releases each coefficient plane
+when converted, and propagates allocation/malformed-marker failures. Those
+project changes are GPL-3.0-only; upstream copyright and MIT grants remain intact.
 Only the JPEG implementation is compiled. Original GPL project glue bounds all
 private allocation and uses decoded component planes directly. PNG uses the
 ESP32 ROM miniz inflater and original project chunk/filter/palette code; no stb

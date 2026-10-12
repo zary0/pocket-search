@@ -32,6 +32,32 @@ static void invalid_png(void){
     n=small_png(b,0,4,false);memmove(b+45,b+33,n-33);chunk(b+33,"acTL",NULL,0);reject(b,n+12,PS_IMAGE_UNSUPPORTED);
     n=small_png(b,0,4,false);memmove(b+45,b+33,n-33);chunk(b+33,"WHAT",NULL,0);reject(b,n+12,PS_IMAGE_UNSUPPORTED);
 }
+static void typed_png(unsigned width,unsigned depth,unsigned type,const uint8_t *row,size_t bytes,const uint8_t *palette,size_t palette_bytes,const uint8_t *alpha,size_t alpha_bytes,const unsigned *golden){
+    uint8_t b[512],header[13]={0},compressed[128];uLongf n=sizeof(compressed);assert(compress(compressed,&n,row,bytes)==Z_OK);
+    be32(header,width);be32(header+4,1);header[8]=(uint8_t)depth;header[9]=(uint8_t)type;
+    memcpy(b,"\x89PNG\r\n\x1a\n",8);size_t at=8;at+=chunk(b+at,"IHDR",header,13);
+    if(palette_bytes)at+=chunk(b+at,"PLTE",palette,palette_bytes);
+    if(alpha_bytes)at+=chunk(b+at,"tRNS",alpha,alpha_bytes);
+    at+=chunk(b+at,"IDAT",compressed,n);at+=chunk(b+at,"IEND",NULL,0);
+    PS_NativeImage image;calls=cancel_at=0;time_us=time_step=0;assert(!PS_ExtendedImage(b,at,&image,cancelled,NULL,NULL));
+    assert(image.height==1&&image.width==(width>160?160:width)&&PS_ImageTestRemaining()==0);
+    for(unsigned x=0;x<image.width;++x)assert(color(&image,x,0)==golden[x%width]);
+    free(image.pixels);
+}
+static void png_variants(void){
+    const uint8_t gray1[]={0,0x40},gray2[]={0,0x1b},gray4[]={0,0x18,0xf0},gray8[]={0,64,128,192},ga[]={0,0,128,128,255,0,0};
+    const uint8_t alpha2[]={0,2},alpha128[]={0,128},rgb[]={0,255,0,0,0,255,0,0,0,255},green[]={0,0,0,255,0,0};
+    const uint8_t palette[]={255,0,0,0,0,255},pa[]={255,0};
+    const unsigned g1[]={0,0xffff,0},g2[]={0,0x52aa,0xffff,0xffff},g4[]={0x1082,0x8c51,0xffff},g8[]={0x4208,0xffff,0xc618},gga[]={0x7bef,0x8410,0xffff},grgb[]={0xf800,0xffff,0x001f},gp[]={0xf800,0xffff,0xf800};
+    typed_png(3,1,0,gray1,sizeof(gray1),NULL,0,NULL,0,g1);
+    typed_png(4,2,0,gray2,sizeof(gray2),NULL,0,alpha2,sizeof(alpha2),g2);
+    typed_png(3,4,0,gray4,sizeof(gray4),NULL,0,NULL,0,g4);
+    typed_png(3,8,0,gray8,sizeof(gray8),NULL,0,alpha128,sizeof(alpha128),g8);
+    typed_png(3,8,4,ga,sizeof(ga),NULL,0,NULL,0,gga);
+    typed_png(3,8,2,rgb,sizeof(rgb),NULL,0,green,sizeof(green),grgb);
+    typed_png(3,1,3,gray1,sizeof(gray1),palette,sizeof(palette),pa,sizeof(pa),gp);
+    uint8_t packed[33]={0};unsigned black[256]={0};typed_png(256,1,0,packed,sizeof(packed),NULL,0,NULL,0,black);
+}
 static uint8_t *load(const char *name,size_t *n){FILE *f=fopen(name,"rb");assert(f);assert(!fseek(f,0,SEEK_END));long length=ftell(f);assert(length>0&&length<24577);*n=(size_t)length;rewind(f);uint8_t *b=malloc(*n);assert(b&&fread(b,1,*n,f)==*n);fclose(f);return b;}
 static void check(const char *name,unsigned format){
     size_t n;uint8_t *b=load(name,&n);PS_NativeImage image;
@@ -54,4 +80,4 @@ static void check(const char *name,unsigned format){
     uint32_t seed=7;for(unsigned i=0;i<400;++i){seed=seed*1664525u+1013904223u;size_t at=seed%n;uint8_t old=b[at];b[at]^=(uint8_t)(1u<<(i%8));calls=0;error=PS_ExtendedImage(b,n,&image,cancelled,NULL,NULL);assert(PS_ImageTestRemaining()==0&&image.decoder_peak_bytes<=65536);if(!error){assert(image.pixels);free(image.pixels);}else assert(!image.pixels);b[at]=old;}
     free(b);
 }
-int main(int argc,char **argv){assert(argc>=3);invalid_png();check(argv[1],PS_FORMAT_PNG);check(argv[2],PS_FORMAT_PROGRESSIVE);for(int i=3;i<argc;++i)check(argv[i],strstr(argv[i],".png")?PS_FORMAT_PNG:PS_FORMAT_PROGRESSIVE);return 0;}
+int main(int argc,char **argv){assert(argc>=3);invalid_png();png_variants();check(argv[1],PS_FORMAT_PNG);check(argv[2],PS_FORMAT_PROGRESSIVE);for(int i=3;i<argc;++i)check(argv[i],strstr(argv[i],".png")?PS_FORMAT_PNG:PS_FORMAT_PROGRESSIVE);return 0;}

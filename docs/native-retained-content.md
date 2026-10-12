@@ -1,6 +1,6 @@
 # Retained sources, updates and native images
 
-The `0.14.8` increment keeps collection, storage, search, layout and bounded JPEG/PNG
+The `0.14.9` increment keeps collection, storage, search, layout and bounded JPEG/PNG
 processing on the ESP32. No companion service, tunnel, host image preparation or
 USB page proxy participates. It is an experimental increment; physical release
 qualification, current battery acceptance and a dedicated CI lab remain required.

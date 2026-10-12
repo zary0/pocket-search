@@ -7,7 +7,8 @@
     "decoder_cycles_per_packet": 160000,
     "verified_https_ms": 15000,
     "unexpected_resets": 0,
-    "persistent_store_failures": 0
+    "persistent_store_failures": 0,
+    "native_image_decoder_peak_bytes": 65536
   },
   "minimum": {
     "free_heap_bytes_after_warmup": 16384,
@@ -15,6 +16,9 @@
     "endurance_seconds": 1800,
     "battery_runtime_seconds": 120,
     "native_image_source_bytes": 1,
-    "native_decoded_image_bytes": 2
+    "native_decoded_image_bytes": 2,
+    "native_baseline_images_verified": 1,
+    "native_png_images_verified": 1,
+    "native_progressive_images_verified": 1
   }
 }

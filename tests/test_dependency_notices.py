@@ -1,5 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-only
 """Every locked registry dependency needs versioned source and intact notices."""
+import difflib
+import gzip
 import hashlib
 import json
 from pathlib import Path
@@ -25,7 +27,12 @@ class DependencyNotices(unittest.TestCase):
         self.assertEqual(metadata['commit'],'013ac3beddff3dbffafd5177e7972067cd2b5083')
         source=(base/'stb_image.h').read_bytes()
         self.assertEqual(hashlib.sha256(source).hexdigest(),metadata['sha256'])
-        self.assertFalse(metadata['local_modifications'])
+        self.assertTrue(metadata['local_modifications'])
+        upstream=gzip.decompress((ROOT/metadata['upstream_archive']).read_bytes())
+        self.assertEqual(hashlib.sha256(upstream).hexdigest(),metadata['upstream_sha256'])
+        patch=''.join(difflib.unified_diff(upstream.decode().splitlines(keepends=True),source.decode().splitlines(keepends=True),fromfile='a/stb_image.h',tofile='b/stb_image.h')).encode()
+        self.assertEqual(patch,(base/'stb-image.patch').read_bytes())
+        self.assertEqual(hashlib.sha256(patch).hexdigest(),metadata['patch_sha256'])
         text=(base/'LICENSE-MIT.txt').read_text()
         self.assertIn('Copyright (c) 2017 Sean Barrett',text)
         self.assertIn(text.rstrip(),source.decode())

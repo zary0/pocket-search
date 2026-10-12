@@ -101,7 +101,9 @@ static int progressive(Budget *b,PS_NativeImage *out){
     if(!stbi__decode_jpeg_image(jpeg)){error=PS_IMAGE_MALFORMED;goto done;}
     if(stopped(b)){error=PS_IMAGE_CANCELLED;goto done;}
     if(!jpeg->progressive||input.img_x!=w||input.img_y!=h||(input.img_n!=1&&input.img_n!=3)){error=PS_IMAGE_MALFORMED;goto done;}
-    // IDCT has finished: release all coefficient arrays before allocating output.
+    for(int c=0;c<input.img_n;++c)if(!jpeg->img_comp[c].raw_data||!jpeg->img_comp[c].data||jpeg->img_comp[c].raw_coeff||jpeg->img_comp[c].coeff){error=PS_IMAGE_MALFORMED;goto done;}
+    // IDCT releases each coefficient plane before allocating the next pixel plane.
+    // Cleanup also accepts partially finished planes on cancellation/allocation failure.
     // Read the decoded component planes directly; no full-size interleaved RGB copy.
     for(int c=0;c<input.img_n;++c){bounded_free(jpeg->img_comp[c].raw_coeff);jpeg->img_comp[c].raw_coeff=NULL;jpeg->img_comp[c].coeff=NULL;}
     error=output_allocate(b,w,h,out);if(error)goto done;
@@ -170,7 +172,7 @@ static int png(Budget *b,PS_NativeImage *out){
     for(unsigned y=0;y<out->height;++y){
         if(stopped(b)){error=PS_IMAGE_CANCELLED;goto done;}const uint8_t *row=raw+(size_t)(y*info.height/out->height)*stride+1;
         for(unsigned x=0;x<out->width;++x){
-            unsigned sx=x*info.width/out->width,r=0,g=0,blue=0,a=255;const uint8_t *p=row+sx*info.channels;
+            unsigned sx=x*info.width/out->width,r=0,g=0,blue=0,a=255;const uint8_t *p=row+((info.color==0||info.color==3)?0:sx*info.channels);
             if(info.color==0||info.color==3){unsigned shift=8-info.depth-(sx*info.depth%8),v=(row[sx*info.depth/8]>>shift)&((1u<<info.depth)-1);if(info.color==3){const uint8_t *q=info.palette+v*3;r=q[0];g=q[1];blue=q[2];if(v<info.transparent_bytes)a=info.transparency[v];}else{r=g=blue=v*255/((1u<<info.depth)-1);if(info.transparency&&v==info.transparency[1])a=0;}}
             else if(info.color==4){r=g=blue=p[0];a=p[1];}
             else {r=p[0];g=p[1];blue=p[2];if(info.color==6)a=p[3];else if(info.transparency&&r==info.transparency[1]&&g==info.transparency[3]&&blue==info.transparency[5])a=0;}

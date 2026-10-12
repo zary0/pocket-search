@@ -2,7 +2,11 @@
   "repository": "https://github.com/nothings/stb",
   "commit": "013ac3beddff3dbffafd5177e7972067cd2b5083",
   "path": "stb_image.h",
-  "sha256": "594c2fe35d49488b4382dbfaec8f98366defca819d916ac95becf3e75f4200b3",
+  "sha256": "86dd17286179ef5720a9b4181345622d7d7bb527644e0d935f97a7fe691c2a1b",
   "license": "MIT OR Unlicense",
-  "local_modifications": false
+  "local_modifications": true,
+  "upstream_sha256": "594c2fe35d49488b4382dbfaec8f98366defca819d916ac95becf3e75f4200b3",
+  "upstream_archive": "third_party/sources/stb_image-013ac3b.h.gz",
+  "modifications": "Progressive component pixel planes are allocated and converted one at a time; each completed coefficient plane is immediately freed; failures propagate. Project changes are GPL-3.0-only. Malformed markers never return partial progressive success.",
+  "patch_sha256": "16614e19a05606ee163cd0113e20f1d38f3d8ad711829bcd051756ecc26af754"
 }

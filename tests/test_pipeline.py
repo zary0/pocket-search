@@ -191,7 +191,9 @@ class ReleaseGateTests(unittest.TestCase):
                 p.evidence(self.folder, self.frames, self.policy)
         for key, value in [("endurance_seconds", 1799), ("battery_runtime_seconds", 119),
                            ("unexpected_resets", 1), ("persistent_store_failures", 1),
-                           ("native_image_source_bytes", 0), ("native_decoded_image_bytes", 0)]:
+                           ("native_image_source_bytes", 0), ("native_decoded_image_bytes", 0), ("native_baseline_images_verified", 0),
+                           ("native_png_images_verified", 0), ("native_progressive_images_verified", 0),
+                           ("native_image_decoder_peak_bytes", 65537)]:
             report = copy.deepcopy(original)
             report["metrics"][key] = value
             p.write(self.frames / "report.json", report)

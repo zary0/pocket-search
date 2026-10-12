@@ -3077,7 +3077,8 @@ static void stbi__jpeg_dequantize(short *data, stbi__uint16 *dequant)
       data[i] *= dequant[i];
 }
 
-static void stbi__jpeg_finish(stbi__jpeg *z)
+// Pocket Search progressive allocation changes: GPL-3.0-only (stb-image.patch).
+static int stbi__jpeg_finish(stbi__jpeg *z)
 {
    if (z->progressive) {
       // dequantize and idct the data
@@ -3085,6 +3086,10 @@ static void stbi__jpeg_finish(stbi__jpeg *z)
       for (n=0; n < z->s->img_n; ++n) {
          int w = (z->img_comp[n].x+7) >> 3;
          int h = (z->img_comp[n].y+7) >> 3;
+         // Defer each pixel plane until its coefficients can be released.
+         z->img_comp[n].raw_data = stbi__malloc_mad2(z->img_comp[n].w2, z->img_comp[n].h2, 15);
+         if (!z->img_comp[n].raw_data) return stbi__err("outofmem", "Out of memory");
+         z->img_comp[n].data = (stbi_uc*) (((size_t) z->img_comp[n].raw_data + 15) & ~15);
          for (j=0; j < h; ++j) {
             for (i=0; i < w; ++i) {
                short *data = z->img_comp[n].coeff + 64 * (i + j * z->img_comp[n].coeff_w);
@@ -3092,8 +3097,12 @@ static void stbi__jpeg_finish(stbi__jpeg *z)
                z->idct_block_kernel(z->img_comp[n].data+z->img_comp[n].w2*j*8+i*8, z->img_comp[n].w2, data);
             }
          }
+         STBI_FREE(z->img_comp[n].raw_coeff);
+         z->img_comp[n].raw_coeff = NULL;
+         z->img_comp[n].coeff = NULL;
       }
    }
+   return 1;
 }
 
 static int stbi__process_marker(stbi__jpeg *z, int m)
@@ -3334,11 +3343,14 @@ static int stbi__process_frame_header(stbi__jpeg *z, int scan)
       z->img_comp[i].coeff = 0;
       z->img_comp[i].raw_coeff = 0;
       z->img_comp[i].linebuf = NULL;
-      z->img_comp[i].raw_data = stbi__malloc_mad2(z->img_comp[i].w2, z->img_comp[i].h2, 15);
-      if (z->img_comp[i].raw_data == NULL)
-         return stbi__free_jpeg_components(z, i+1, stbi__err("outofmem", "Out of memory"));
-      // align blocks for idct using mmx/sse
-      z->img_comp[i].data = (stbi_uc*) (((size_t) z->img_comp[i].raw_data + 15) & ~15);
+      z->img_comp[i].raw_data = NULL;
+      if (!z->progressive) {
+         z->img_comp[i].raw_data = stbi__malloc_mad2(z->img_comp[i].w2, z->img_comp[i].h2, 15);
+         if (z->img_comp[i].raw_data == NULL)
+            return stbi__free_jpeg_components(z, i+1, stbi__err("outofmem", "Out of memory"));
+         // align blocks for idct using mmx/sse
+         z->img_comp[i].data = (stbi_uc*) (((size_t) z->img_comp[i].raw_data + 15) & ~15);
+      }
       if (z->progressive) {
          // w2, h2 are multiples of 8 (see above)
          z->img_comp[i].coeff_w = z->img_comp[i].w2 / 8;
@@ -3437,12 +3449,12 @@ static int stbi__decode_jpeg_image(stbi__jpeg *j)
          if (NL != j->s->img_y) return stbi__err("bad DNL height", "Corrupt JPEG");
          m = stbi__get_marker(j);
       } else {
-         if (!stbi__process_marker(j, m)) return 1;
+         if (!stbi__process_marker(j, m)) return 0;
          m = stbi__get_marker(j);
       }
    }
-   if (j->progressive)
-      stbi__jpeg_finish(j);
+   if (j->progressive && !stbi__jpeg_finish(j))
+      return 0;
    return 1;
 }
 
