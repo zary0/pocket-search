@@ -33,6 +33,7 @@ uint32_t ps_local_profiles(void);
 static char robots_url[128];
 static unsigned profile;
 static portMUX_TYPE lock=portMUX_INITIALIZER_UNLOCKED;
+static bool reading;
 static _Alignas(8) uint8_t local_state[LOCAL_STATE_BYTES];
 static uint8_t robots[ROBOTS_LIMIT+1];
 static size_t robots_length;
@@ -143,7 +144,7 @@ static bool image_url_allowed(const char *url){
 static int resource(const char *url,bool font,bool image,uint8_t **out,size_t *out_length,PS_Reply *r,int64_t start){
     *out=NULL;*out_length=0;
     if(!image&&!strncmp(url,"https://www.w3.org/",19)&&!image_url_allowed(url))return WRONG_TYPE;
-    if(image?!image_url_allowed(url):!PS_ResourceURL(url,font))return WRONG_TYPE;
+    if(image?!image_url_allowed(url):!PS_ResourceURL(url,font))return image?ROBOTS_DENIED:WRONG_TYPE;
     Events events={.reply=r,.identity=true};int error=0;size_t total=0;uint8_t *body=NULL;
     size_t limit=image?PS_NATIVE_IMAGE_WIRE:font?24576:3072;
     esp_http_client_config_t config={.url=url,.timeout_ms=8000,.crt_bundle_attach=esp_crt_bundle_attach,.skip_cert_common_name_check=false,.disable_auto_redirect=true,.buffer_size=512,.buffer_size_tx=512,.event_handler=event,.user_data=&events};
@@ -191,6 +192,7 @@ static bool load_css(const char *url,PS_Reply *r,int64_t start,bool *ready,int *
     *ready=load_face(r,start,cause);return rules>0||*ready;
 }
 int32_t ps_local_image_url(uint8_t*,size_t,uint32_t,uint32_t,uint8_t*,size_t);
+int32_t ps_local_image_slot(uint8_t*,size_t,uint32_t,uint32_t);
 static bool image_cancelled(void *context){(void)context;return cancelled();}
 static void image_memory(void *context){memory(context);}
 static void worker(void *arg){
@@ -299,7 +301,7 @@ cached:
         r.clock_synced=true;if(!robots_state){r.error=fetch(robots_url,true,&r,start);if(r.error)goto done;}uint8_t *body=NULL;size_t length=0;r.error=resource(url,false,true,&body,&length,&r,start);
         if(!r.error){PS_NativeImage image={0};int64_t decode_start=esp_timer_get_time();int error=PS_NativeJPEG(body,length,&image,image_cancelled,image_memory,&r);r.compute_us=(unsigned)(esp_timer_get_time()-decode_start);
             if(!error){r.image_pixels=image.pixels;r.image_width=image.width;r.image_height=image.height;}
-            else r.error=error==PS_IMAGE_CANCELLED?CANCELLED:error==PS_IMAGE_MEMORY?NO_MEMORY:INVALID_IMAGE;
+            else r.error=error==PS_IMAGE_CANCELLED?CANCELLED:error==PS_IMAGE_MEMORY?NO_MEMORY:error==PS_IMAGE_LIMIT?TOO_LARGE:error==PS_IMAGE_UNSUPPORTED?PS_NET_IMAGE_UNSUPPORTED:INVALID_IMAGE;
         }free(body);goto done;
     }
     r.tls_verified=true;r.clock_synced=true;r.sample=false;
@@ -308,6 +310,7 @@ cached:
     int n=ps_local_packet(local_state,sizeof(local_state),job.request.kind==5?1:job.request.kind,job.request.document,job.request.page,(const uint8_t*)job.request.query,strlen(job.request.query),r.bytes);
     r.compute_us=(unsigned)(esp_timer_get_time()-search_start);
     if(n<=0){r.error=INCOMPLETE;goto done;}r.length=(size_t)n;
+    if(job.request.kind==2){int slot=ps_local_image_slot(local_state,sizeof(local_state),job.request.document,job.request.page);if(slot>0&&slot<=24)r.image_slot=(uint8_t)slot;}
 done:
     if(cancelled()){if(r.image_pixels){free(r.image_pixels);r.image_pixels=NULL;}r.error=CANCELLED;}
     memory(&r);r.finished=true;r.elapsed_ms=(unsigned)((esp_timer_get_time()-start)/1000);
@@ -316,9 +319,22 @@ done:
     publish(&r);vTaskDelete(NULL);
 }
 bool PS_NetConfigured(void){return true;}
+bool PS_NetBusy(void){taskENTER_CRITICAL(&lock);bool busy=job.running||job.ready||job.configuring;taskEXIT_CRITICAL(&lock);return busy;}
+bool PS_NetReadViewport(uint32_t document,uint16_t page,uint8_t bytes[512],size_t *length,uint8_t *slot){
+    if(!bytes||!length||!slot)return false;
+    // Image jobs only read LocalSearch. Hold a read reservation across both
+    // encodings so console refresh/profile/start cannot publish a new corpus.
+    taskENTER_CRITICAL(&lock);bool allowed=!job.configuring&&!reading&&(!job.running||job.request.kind==3);if(allowed)reading=true;taskEXIT_CRITICAL(&lock);
+    if(!allowed)return false;
+    int n=ps_local_packet(local_state,sizeof(local_state),2,document,page,(const uint8_t*)"",0,bytes);
+    int key=n>0?ps_local_image_slot(local_state,sizeof(local_state),document,page):0;
+    taskENTER_CRITICAL(&lock);reading=false;taskEXIT_CRITICAL(&lock);
+    if(n<=0||n>512||key<0||key>24)return false;
+    *length=(size_t)n;*slot=(uint8_t)key;return true;
+}
 bool PS_NetStart(const PS_Request *request){
     if(!request||!memchr(request->query,0,sizeof(request->query))||request->kind<1||(request->kind>6&&request->kind!=255))return false;
-    taskENTER_CRITICAL(&lock);bool allowed=!job.running&&!job.ready&&!job.configuring;if(allowed){job.running=true;job.cancelled=false;job.request=*request;}taskEXIT_CRITICAL(&lock);
+    taskENTER_CRITICAL(&lock);bool allowed=!reading&&!job.running&&!job.ready&&!job.configuring;if(allowed){job.running=true;job.cancelled=false;job.request=*request;}taskEXIT_CRITICAL(&lock);
     if(!allowed)return false;
     if(xTaskCreatePinnedToCore(worker,"local_search",10240,NULL,2,NULL,0)==pdPASS)return true;
     taskENTER_CRITICAL(&lock);job.running=false;memset(job.request.query,0,sizeof(job.request.query));taskEXIT_CRITICAL(&lock);return false;
@@ -326,7 +342,7 @@ bool PS_NetStart(const PS_Request *request){
 bool PS_NetPoll(PS_Reply *reply){taskENTER_CRITICAL(&lock);bool ready=job.ready;if(ready){*reply=job.reply;memset(job.reply.bytes,0,sizeof(job.reply.bytes));job.reply.image_pixels=NULL;job.ready=false;}taskEXIT_CRITICAL(&lock);return ready;}
 void PS_NetCancel(unsigned sequence){taskENTER_CRITICAL(&lock);if(job.running&&job.request.sequence==sequence)job.cancelled=true;taskEXIT_CRITICAL(&lock);}
 bool PS_NetRefresh(void){
-    taskENTER_CRITICAL(&lock);bool allowed=!job.running&&!job.ready&&!job.configuring;if(allowed)job.configuring=true;taskEXIT_CRITICAL(&lock);
+    taskENTER_CRITICAL(&lock);bool allowed=!reading&&!job.running&&!job.ready&&!job.configuring;if(allowed)job.configuring=true;taskEXIT_CRITICAL(&lock);
     if(!allowed)return false;
     int error=ps_local_set_profile(local_state,sizeof(local_state),profile);
     if(!error&&!PS_StoreSave(local_state,sizeof(local_state)))++store_failures;
@@ -337,7 +353,7 @@ unsigned PS_NetProfile(void){taskENTER_CRITICAL(&lock);unsigned value=profile;ta
 bool PS_NetProfileName(unsigned value,char *out,size_t capacity){return ps_local_profile_text(value,0,(uint8_t*)out,capacity)>0;}
 bool PS_NetSelectProfile(unsigned value){
     if(value>=PS_NetProfileCount())return false;
-    taskENTER_CRITICAL(&lock);bool allowed=!job.running&&!job.ready&&!job.configuring;if(allowed)job.configuring=true;taskEXIT_CRITICAL(&lock);
+    taskENTER_CRITICAL(&lock);bool allowed=!reading&&!job.running&&!job.ready&&!job.configuring;if(allowed)job.configuring=true;taskEXIT_CRITICAL(&lock);
     if(!allowed)return false;
     nvs_handle_t handle;esp_err_t error=nvs_open("pocket_native",NVS_READWRITE,&handle);
     if(error==ESP_OK){error=nvs_set_u8(handle,"profile",(uint8_t)value);if(error==ESP_OK)error=nvs_commit(handle);nvs_close(handle);}

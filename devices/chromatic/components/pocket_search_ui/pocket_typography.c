@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Fixed-cell typography: built-in OFL font or a locally rasterized ASCII atlas.
 #include "pocket_typography.h"
+#include "pocket_inline_image.h"
 #include <string.h>
 #include <stdint.h>
 #include <stdatomic.h>
@@ -76,12 +77,13 @@ static void rect(lv_draw_ctx_t *ctx,lv_coord_t x,lv_coord_t y,unsigned w,unsigne
     lv_draw_rect_dsc_t d;lv_draw_rect_dsc_init(&d);d.bg_color=color;d.bg_opa=LV_OPA_COVER;d.border_width=0;d.radius=0;
     lv_area_t a={x,y,x+(lv_coord_t)w-1,y+(lv_coord_t)h-1};lv_draw_rect(ctx,&d,&a);
 }
-void PS_FlowDraw(lv_event_t *event,const uint8_t *packet,const PS_FlowView *view){
+void PS_FlowDraw(lv_event_t *event,const uint8_t *packet,const PS_FlowView *view,const lv_img_dsc_t *image){
     if(lv_event_get_code(event)!=LV_EVENT_DRAW_MAIN)return;
     lv_obj_t *object=lv_event_get_target(event);lv_area_t area;lv_obj_get_coords(object,&area);
     lv_draw_ctx_t *ctx=lv_event_get_draw_ctx(event);const uint8_t *palette=packet+view->palette.offset;
     rect(ctx,area.x1,area.y1,160,92,rgb565((uint16_t)palette[2]|((uint16_t)palette[3]<<8)));
     lv_draw_label_dsc_t dsc;lv_draw_label_dsc_init(&dsc);
+    bool first_image=true;
     for(unsigned row=0;row<view->row_count;++row){
         const PS_FlowRow *r=&view->rows[row];lv_coord_t bx=area.x1+r->box_x,by=area.y1+r->y;
         if(r->flags&1)rect(ctx,bx,by,r->box_width,r->height,rgb565(r->background));
@@ -89,6 +91,22 @@ void PS_FlowDraw(lv_event_t *event,const uint8_t *packet,const PS_FlowView *view
             lv_color_t color=rgb565(r->border);rect(ctx,bx,by,r->stroke,r->height,color);rect(ctx,bx+r->box_width-r->stroke,by,r->stroke,r->height,color);
             if(r->edges&1)rect(ctx,bx,by,r->box_width,r->stroke,color);
             if(r->edges&2)rect(ctx,bx,by+r->height-r->stroke,r->box_width,r->stroke,color);
+        }
+        if((r->flags&4)&&first_image){
+            first_image=false;
+            if(image){
+                unsigned bottom=(r->edges&2)?r->stroke:0;
+                PS_InlineFit fit=PS_InlineFitBox(image->header.w,image->header.h,r->width,r->height-r->text_y-bottom);
+                if(fit.width&&fit.height){
+                    lv_coord_t x=area.x1+r->x+(r->width-fit.width)/2,y=by+r->text_y+(r->height-r->text_y-bottom-fit.height)/2;
+                    lv_draw_img_dsc_t d;lv_draw_img_dsc_init(&d);d.zoom=fit.zoom;d.pivot=(lv_point_t){0,0};d.antialias=0;
+                    lv_area_t a={x,y,x+(lv_coord_t)image->header.w-1,y+(lv_coord_t)image->header.h-1};
+                    lv_area_t box={area.x1+r->x,by+r->text_y,area.x1+r->x+r->width-1,by+r->height-bottom-1},clip;
+                    const lv_area_t *previous=ctx->clip_area;
+                    if(_lv_area_intersect(&clip,previous,&box)){ctx->clip_area=&clip;lv_draw_img(ctx,&d,&a,image);ctx->clip_area=previous;}
+                    continue;
+                }
+            }
         }
         unsigned x=r->x,glyph=0,at=0;const uint8_t *text=packet+r->text.offset,*codes=packet+r->codes.offset;
         while(at<r->text.length){

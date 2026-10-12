@@ -90,6 +90,8 @@ jobs:
           /tmp/test-frame-capture
           cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined tests/test_jpeg_policy.c -o /tmp/test-jpeg-policy
           /tmp/test-jpeg-policy
+          cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined tests/test_inline_image.c -o /tmp/test-inline-image
+          /tmp/test-inline-image
           node --test tests/test_search_input.mjs tests/test_pcs1.mjs tests/test_images.mjs tests/test_feedback.mjs
       - name: Check persistent flash record corruption and torn commits
         run: |

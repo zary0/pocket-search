@@ -1160,7 +1160,7 @@ impl LocalSearch {
         )
     }
     /// Resolve the first image slot visible in a reading viewport.
-    pub fn image_url(&self, id: usize, offset: usize, out: &mut [u8]) -> usize {
+    pub fn image_slot(&self, id: usize, offset: usize) -> u8 {
         if id == 0 || id > self.count() {
             return 0;
         }
@@ -1172,10 +1172,16 @@ impl LocalSearch {
             tree: &doc.tree,
             marker: 0,
         };
-        let Some(image) = crate::flow::visible_image(content, offset) else {
+        crate::flow::visible_image(content, offset).map_or(0, |i| (i + 1) as u8)
+    }
+    /// Resolve a visible slot using the same stable semantic identity as its preview.
+    pub fn image_url(&self, id: usize, offset: usize, out: &mut [u8]) -> usize {
+        let slot = self.image_slot(id, offset);
+        if slot == 0 {
             return 0;
-        };
-        crate::css::resolve(doc.url.as_str(), doc.tree.resource(image), out)
+        }
+        let doc = &self.documents[id - 1];
+        crate::css::resolve(doc.url.as_str(), doc.tree.resource(slot as usize - 1), out)
     }
     /// Semantic 160px viewport; source images retain their slot/alt/source only.
     pub fn flow_packet_reference(&self, id: usize, offset: usize, out: &mut [u8]) -> usize {
@@ -1583,6 +1589,7 @@ mod profile_tests {
         let n = state.flow_packet(1, 0, &mut packet);
         let positions = crate::flow::Packet::decode(&packet[..n]).unwrap().positions;
         let mut visible = 0;
+        let mut identity = 0;
         for position in 0..positions {
             let n = state.flow_packet(1, position as usize, &mut packet);
             let view = crate::flow::Packet::decode(&packet[..n]).unwrap();
@@ -1590,7 +1597,16 @@ mod profile_tests {
             let mut url = [0; 256];
             let n = state.image_url(1, position as usize, &mut url);
             assert_eq!(n > 0, slot);
+            let key = state.image_slot(1, position as usize);
+            assert_eq!(key > 0, slot);
             if slot {
+                if identity == 0 {
+                    identity = key;
+                }
+                assert_eq!(
+                    key, identity,
+                    "scroll offsets must share the semantic image identity"
+                );
                 assert_eq!(&url[..n], b"https://www.w3.org/Press/Stock/original.jpg");
                 visible += 1;
             }
@@ -1598,8 +1614,48 @@ mod profile_tests {
         assert!(visible > 0);
         assert_eq!(state.image_url(0, 0, &mut [0; 256]), 0);
         assert_eq!(state.image_url(1, 65535, &mut [0; 256]), 0);
+        assert_eq!(state.image_slot(0, 0), 0);
+        assert_eq!(state.image_slot(1, 65535), 0);
     }
 
+    #[test]
+    fn later_images_have_distinct_preview_keys_and_matching_sources() {
+        let mut state = LocalSearch::new();
+        assert!(state.set_profile(1));
+        state.next_url(&mut [0; 128]);
+        let text = "A paragraph between the original source images. ".repeat(12);
+        let html = std::format!(
+            "<title>Two images</title><img src='one.jpg' alt='First' height='40'><p>{text}</p><img src='two.jpg' alt='Second' height='40'><p>End.</p>"
+        );
+        state.feed(html.as_bytes());
+        assert!(state.finish(true));
+        let mut bytes = [0; 512];
+        let n = state.flow_packet(1, 0, &mut bytes);
+        let count = crate::flow::Packet::decode(&bytes[..n]).unwrap().positions;
+        let mut first = 0;
+        let mut second = 0;
+        for offset in 0..count {
+            let slot = state.image_slot(1, offset as usize);
+            if slot == 0 {
+                continue;
+            }
+            let mut url = [0; 256];
+            let n = state.image_url(1, offset as usize, &mut url);
+            if url[..n].ends_with(b"one.jpg") {
+                if first == 0 {
+                    first = slot;
+                }
+                assert_eq!(first, slot);
+            } else {
+                assert!(url[..n].ends_with(b"two.jpg"));
+                if second == 0 {
+                    second = slot;
+                }
+                assert_eq!(second, slot);
+            }
+        }
+        assert!(first > 0 && second > 0 && first != second);
+    }
     #[test]
     fn profile_selection_is_explicit_invalid_choices_preserve_content() {
         let mut state = LocalSearch::new();

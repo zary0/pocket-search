@@ -1,6 +1,6 @@
 # Retained sources, updates and native images
 
-The `0.14.6` increment keeps collection, storage, search, layout and baseline JPEG
+The `0.14.7` increment keeps collection, storage, search, layout and baseline JPEG
 processing on the ESP32. No companion service, tunnel, host image preparation or
 USB page proxy participates. It is an experimental increment; physical release
 qualification, current battery acceptance and a dedicated CI lab remain required.
@@ -27,9 +27,12 @@ network acceptance; a public-looking name alone does not establish safe DNS.
 - Home **Up** checks existing documents for updates. Home **Right** clears the
   logical collection and the next query starts a new crawl.
 - Results: Up/Down selects, A reads, Select opens source information.
-- Reader: Up/Down scrolls one line, Left/Right seven lines, A opens a visible
-  supported image before a visible retained link, Select opens source information,
-  and B returns. Image loading B cancels; image B returns to the cached text.
+- Reader: Up/Down scrolls one line and Left/Right seven lines. The first visible
+  image slot automatically fetches a supported image and paints an aspect-fit
+  preview inside its retained box. A expands a ready preview before opening a
+  retained link. Select opens source information and B returns. Navigation cancels
+  an unfinished preview; it does not wait for the image. Expanded-image B returns
+  to the text with the same preview still cached.
 - Source information: Up/Down pages the complete admitted URL, profile, HTTP
   acquisition status, UTC fetch/check time, received and retained byte counts,
   and any text limit. B restores the prior result/reader position.
@@ -96,8 +99,14 @@ cooperative deadline. Source pixels are not processed on the Mac.
 Supported: bounded, single-scan, eight-bit **baseline JPEG**, one or three
 components, dimensions no larger than 1024 x 1024. Progressive JPEG, PNG, GIF,
 SVG, WebP, ICC color management, animation and video remain unsupported. Image
-failure keeps the text readable and shows a retry/back notice. Images open in a
-separate viewer; the text retains the image slot and alt text. This is not inline
+failure keeps the text and alt text readable, with a compact reason in the footer.
+A opens details or retries. Successful images appear inside the first visible
+semantic slot; A also opens the larger separate viewer. The original ROM-decoded
+RGB565 buffer is reused for both sizes. Only one slot is cached in RAM; scroll
+windows sharing its document/node identity do not fetch it again. Leaving the
+article frees the cache. Images are not persisted to flash. Failed or cancelled
+slots do not automatically retry on each scroll; A explicitly retries, and a Wi-Fi
+reconnection can retry an offline failure. This is a bounded preview, not arbitrary
 browser image compositing. W3C's Tim Berners-Lee photograph was acquired directly
 but is progressive and correctly rejected. The W3C People profile supplies a small
 baseline source for the native acceptance case.

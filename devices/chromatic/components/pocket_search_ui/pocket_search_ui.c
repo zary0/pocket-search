@@ -3,6 +3,7 @@
 #include "pocket_search_ui.h"
 #include "pocket_search_input.h"
 #include "pocket_search_net.h"
+#include "pocket_inline_image.h"
 #include "pocket_typography.h"
 #include "chromatic_wifi.h"
 #include "menu_mgr.h"
@@ -26,6 +27,8 @@ static struct {
     PS_RichView rich_view;PS_FlowView flow_view;bool rich,flow,probe,image_error;
     uint32_t probe_document;uint16_t probe_position;
     uint8_t *image_pixels;uint16_t image_width,image_height,image_rows;
+    PS_InlineImage inline_image;uint8_t reader_image_slot;bool inline_loading,deferred;
+    PS_Request deferred_request;
     struct {uint32_t document;uint16_t page;} back[4];unsigned back_count;
     uint32_t info_document;uint16_t info_position;bool info_results;
 } u = {.dirty=true,.sample=true};
@@ -40,6 +43,7 @@ static portMUX_TYPE lock = portMUX_INITIALIZER_UNLOCKED;
 static int pending_key;
 static unsigned observed_mode, observed_bytes, observed_image_bytes, observed_back;
 static bool observed_rich,observed_probe;static unsigned observed_large,observed_small,observed_bold,observed_gaps;
+static unsigned observed_inline_stage,observed_inline_slot;static bool observed_inline_visible;
 static PS_View observed_view;static bool observed_verified;
 static bool pending_query_set;static char pending_query[97];
 static unsigned pending_probe;
@@ -64,7 +68,7 @@ static lv_obj_t *label(lv_obj_t *parent,int x,int y,int w) {
     lv_label_set_long_mode(o,LV_LABEL_LONG_CLIP); return o;
 }
 static void visible(lv_obj_t *o, bool show) { if(show) lv_obj_clear_flag(o,LV_OBJ_FLAG_HIDDEN); else lv_obj_add_flag(o,LV_OBJ_FLAG_HIDDEN); }
-static void draw_rich(lv_event_t *event){if(u.flow)PS_FlowDraw(event,u.packet,&u.flow_view);else PS_TypographyDraw(event,u.packet,&u.rich_view);}
+static void draw_rich(lv_event_t *event){if(u.flow)PS_FlowDraw(event,u.packet,&u.flow_view,u.inline_image.stage==PS_INLINE_READY&&PS_InlineMatches(&u.inline_image,u.view.document_id,u.reader_image_slot)?&image_descriptor:NULL);else PS_TypographyDraw(event,u.packet,&u.rich_view);}
 static void create(lv_obj_t *screen) {
     root=lv_obj_create(screen); lv_obj_remove_style_all(root); lv_obj_set_pos(root,0,0); lv_obj_set_size(root,160,144);
     lv_obj_set_style_bg_color(root,lv_color_hex(0xffffff),0); lv_obj_set_style_bg_opa(root,LV_OPA_COVER,0); lv_obj_clear_flag(root,LV_OBJ_FLAG_SCROLLABLE);
@@ -94,8 +98,9 @@ static void release_image(void){
     if(picture){visible(picture,false);lv_img_set_src(picture,NULL);}
     lv_img_cache_invalidate_src(&image_descriptor);free(u.image_pixels);u.image_pixels=NULL;u.image_width=u.image_height=u.image_rows=0;
     memset(&image_descriptor,0,sizeof(image_descriptor));
+    u.inline_image=(PS_InlineImage){0};u.inline_loading=false;
 }
-static void cancel(void){PS_NetCancel(u.sequence);++u.sequence;release_image();}
+static void cancel(void){PS_NetCancel(u.sequence);++u.sequence;u.deferred=false;release_image();}
 static void mode(Mode value) { if(value!=NOTICE)u.image_error=false;u.mode=value;if(value!=READER)u.probe=false;u.selection=0; u.notice=NULL; u.dirty=true; }
 static void keyboard(Role role) {
     mode(KEYBOARD); u.role=role; u.script=role==QUERY?0:1; u.group=0; u.letter=0; u.choosing=false;
@@ -104,10 +109,20 @@ static void keyboard(Role role) {
 static void message(const char *value,Role destination) { mode(NOTICE); u.notice=value; u.notice_role=destination; }
 static void request(uint8_t kind,uint32_t document,uint16_t page){
     u.probe=false;
-    PS_NetCancel(u.sequence);release_image();
+    PS_NetCancel(u.sequence);u.inline_loading=false;PS_InlineInterrupt(&u.inline_image);
+    if(kind!=2||document!=u.view.document_id)release_image();
     PS_Request r={.sequence=++u.sequence,.kind=kind,.document=document,.page=page};if(kind==1||kind==5)memcpy(r.query,u.query,sizeof(r.query));memcpy(r.generation,u.generation,sizeof(r.generation));
     u.requested_kind=kind;u.requested_id=document;u.requested_page=page;u.network_error=0;u.verified=false;
-    if(!PS_NetStart(&r)){message("Previous request\nfinishing. Try again.",QUERY);u.image_error=kind==3;return;}
+    if(kind==2&&PS_NetBusy()){
+        size_t length;uint8_t slot;PS_FlowView flow;
+        if(PS_NetReadViewport(document,page,u.packet,&length,&slot)&&ps_flow_decode(u.packet,length,&flow)==0){
+            u.deferred=false;u.flow_view=flow;u.reader_image_slot=slot;u.flow=true;u.rich=false;u.verified=true;
+            u.view=(PS_View){.document_id=flow.document_id,.page_index=flow.position,.page_count=flow.positions,.kind=flow.link_target?4:2,.title=flow.title,.link_target=flow.link_target};mode(READER);return;
+        }
+    }
+    if(kind==3)PS_InlineBegin(&u.inline_image,document,u.reader_image_slot);
+    u.deferred=PS_NetBusy();u.deferred_request=r;
+    if(!u.deferred&&!PS_NetStart(&r)){message("Not enough memory.\nB:Back",QUERY);u.image_error=kind==3;return;}
     mode(kind==3?IMAGE_LOADING:LOADING);
 }
 static void submit_query(void) {
@@ -125,6 +140,40 @@ static void modify_kana(void) {
     }
 }
 static bool visible_image(void){if(!u.flow)return false;for(unsigned i=0;i<u.flow_view.row_count;++i)if(u.flow_view.rows[i].flags&4)return true;return false;}
+static const char *image_notice(int error){
+    switch(error){
+    case 1:return "Image needs Wi-Fi.\nText is available.\nA:Retry B:Text";
+    case 2:return "Clock not ready.\nTry the image again.\nA:Retry B:Text";
+    case 3:return "Image memory limit.\nA:Retry B:Text";
+    case 6:return "Image too large.\nLimit: 24 KiB.\nA:Retry B:Text";
+    case 8:case PS_NET_IMAGE_UNSUPPORTED:return "Format unsupported.\nBaseline JPEG only.\nB:Return to text";
+    case 9:return "Image cancelled.\nA:Retry B:Text";
+    case 10:return "Image data invalid.\nA:Retry B:Text";
+    case 12:return "Image source blocked\nby scope or robots.\nB:Return to text";
+    default:return "Image transfer failed.\nA:Retry B:Text";
+    }
+}
+static const char *image_footer(void){
+    if(!PS_InlineMatches(&u.inline_image,u.view.document_id,u.reader_image_slot))return "Image:Waiting Up/Down";
+    if(u.inline_image.stage==PS_INLINE_LOADING)return "Image:Loading Up/Down";
+    if(u.inline_image.stage==PS_INLINE_READY)return "A:Expand Up/Down B";
+    switch(u.inline_image.error){
+    case 1:return "Image:Offline A:Retry";
+    case 2:return "Image:Clock A:Retry";
+    case 8:case PS_NET_IMAGE_UNSUPPORTED:return "Image:Unsupported A:Info";
+    case 6:return "Image:Too large A:Info";
+    case 12:return "Image:Blocked A:Info";
+    case 9:return "Image:Cancelled A:Retry";
+    default:return "Image:Failed A:Retry";
+    }
+}
+static void inline_load(void){
+    if(u.mode!=READER||!u.flow||u.probe||u.deferred||PS_NetBusy()||!PS_InlineNeedsLoad(&u.inline_image,u.view.document_id,u.reader_image_slot))return;
+    release_image();PS_InlineBegin(&u.inline_image,u.view.document_id,u.reader_image_slot);
+    PS_Request r={.sequence=++u.sequence,.kind=3,.document=u.view.document_id,.page=u.view.page_index};
+    u.inline_loading=PS_NetStart(&r);if(!u.inline_loading)PS_InlineFinish(&u.inline_image,3);
+    u.dirty=true;
+}
 static void render(void) {
     char text[128]; bool home=u.mode==HOME, typing=u.mode==KEYBOARD;
     visible(brand,home); visible(submit,home); visible(status,home); visible(field,home||typing); visible(heading,!home); visible(body,!home&&!typing);
@@ -160,7 +209,7 @@ static void render(void) {
         lv_label_set_text(status,text);lv_obj_set_pos(heading,8,18);
         memcpy(text,u.packet+u.view.title.offset,u.view.title.length);text[u.view.title.length]=0;lv_label_set_text(heading,text);lv_obj_set_style_text_color(heading,lv_color_hex(0x1a73e8),0);
         if(u.mode==IMAGE_READER){
-            visible(picture,true);lv_obj_set_pos(picture,(160-u.image_width)/2,34+(80-u.image_height)/2);
+            lv_img_set_src(picture,&image_descriptor);visible(picture,true);lv_obj_set_pos(picture,(160-u.image_width)/2,34+(80-u.image_height)/2);
             if(u.view.line_count){memcpy(text,u.packet+u.view.lines[0].offset,u.view.lines[0].length);text[u.view.lines[0].length]=0;visible(rows[0],true);lv_obj_set_pos(rows[0],8,116);lv_label_set_text(rows[0],text);}
         }else if(u.rich||u.flow){lv_obj_set_pos(rich_body,u.flow?0:8,34);lv_obj_set_size(rich_body,u.flow?160:144,92);visible(rich_body,true);lv_obj_invalidate(rich_body);}
         else for(unsigned i=0;i<u.view.line_count;++i){
@@ -168,7 +217,7 @@ static void render(void) {
             visible(rows[i],true);lv_obj_set_pos(rows[i],8,34+i*13);lv_label_set_text(rows[i],text);
             lv_obj_set_style_text_color(rows[i],lv_color_hex(u.view.kind==5||u.view.kind==4?0x1a73e8:0x202124),0);
         }
-        lv_label_set_text_static(footer,u.probe?"Original test. B:Back":u.mode==INFO?"Up/Down:Info B:Back":u.mode==RESULTS?"Up/Down A:Read B:Back":u.mode==IMAGE_READER?"B:Return to text":visible_image()?"A:Image Up/Down B":u.view.kind==4&&u.view.link_target?"A:Open Up/Down B":u.flow&&u.flow_view.limited?"Color limit. Up/Down B":"Up/Down:Scroll B:Back");
+        lv_label_set_text_static(footer,u.probe?"Original test. B:Back":u.mode==INFO?"Up/Down:Info B:Back":u.mode==RESULTS?"Up/Down A:Read B:Back":u.mode==IMAGE_READER?"B:Return to text":visible_image()?image_footer():u.view.kind==4&&u.view.link_target?"A:Open Up/Down B":u.flow&&u.flow_view.limited?"Color limit. Up/Down B":"Up/Down:Scroll B:Back");
     }
     else if(u.mode==SOURCES){
         lv_label_set_text_static(heading,"Search sources");lv_label_set_text_static(body,"");
@@ -197,13 +246,14 @@ static void render(void) {
     if(u.mode!=RESULTS&&u.mode!=READER&&u.mode!=IMAGE_READER&&u.mode!=INFO){lv_obj_set_pos(heading,8,4);lv_obj_set_style_text_color(heading,lv_color_hex(0x202124),0);}
     unsigned large=0,small=0,bold=0,gaps=0;bool styled=u.mode==READER&&(u.rich||u.flow);
     if(styled){const unsigned sizes[]={12,16,14,10};small=16;unsigned row_count=u.flow?u.flow_view.row_count:u.rich_view.row_count;for(unsigned i=0;i<row_count;++i){unsigned glyphs=u.flow?u.flow_view.rows[i].codes.length:u.rich_view.rows[i].glyphs;if(!glyphs)++gaps;for(unsigned j=0;j<glyphs;++j){unsigned s=u.flow?(u.packet[u.flow_view.rows[i].codes.offset+j]&15):(u.packet[u.rich_view.rows[i].styles.offset+j/2]>>((j%2)*4))&15,n=sizes[s&3];if(n>large)large=n;if(n<small)small=n;if(s&4)++bold;}}}
-    taskENTER_CRITICAL(&lock); observed_mode=(unsigned)u.mode; observed_bytes=(unsigned)strlen(u.query);observed_view=u.view;observed_verified=u.verified;observed_image_bytes=(unsigned)u.image_width*u.image_height*2;observed_back=u.back_count;observed_rich=styled;observed_probe=u.probe;observed_large=large;observed_small=small;observed_bold=bold;observed_gaps=gaps; taskEXIT_CRITICAL(&lock);
+    taskENTER_CRITICAL(&lock); observed_mode=(unsigned)u.mode; observed_bytes=(unsigned)strlen(u.query);observed_view=u.view;observed_verified=u.verified;observed_image_bytes=(unsigned)u.image_width*u.image_height*2;observed_back=u.back_count;observed_rich=styled;observed_probe=u.probe;observed_large=large;observed_small=small;observed_bold=bold;observed_gaps=gaps;observed_inline_stage=u.inline_image.stage;observed_inline_slot=u.reader_image_slot;observed_inline_visible=u.mode==READER&&u.inline_image.stage==PS_INLINE_READY&&PS_InlineMatches(&u.inline_image,u.view.document_id,u.reader_image_slot); taskEXIT_CRITICAL(&lock);
 }
 OSD_Result_t PocketUI_Draw(void *arg) {
     Tab_DrawCtx_t *ctx=arg; if(!ctx || !ctx->pScreen) return kOSD_Result_Err_NullDataPtr;
     if(!root) create(ctx->pScreen);
     CW_State old=u.wifi.state; unsigned count_before=u.wifi.count; bool scanning=u.wifi.scanning;
     CW_GetStatus(&u.wifi); if(old!=u.wifi.state||count_before!=u.wifi.count||scanning!=u.wifi.scanning) u.dirty=true;
+    if(old!=CW_CONNECTED&&u.wifi.state==CW_CONNECTED&&u.inline_image.stage==PS_INLINE_FAILED&&u.inline_image.error==1)u.inline_image.stage=PS_INLINE_EMPTY;
     if(u.dirty) { render(); }
     lv_obj_move_foreground(root); return kOSD_Result_Ok;
 }
@@ -222,7 +272,7 @@ OSD_Result_t PocketUI_Button(Button_t b,ButtonState_t state,void *arg) {
     }
     if(u.mode==LOADING||u.mode==IMAGE_LOADING||u.mode==RESULTS||u.mode==READER||u.mode==IMAGE_READER||u.mode==INFO){
         bool loading=u.mode==LOADING||u.mode==IMAGE_LOADING;
-        if(b==kButton_B&&(u.mode==IMAGE_LOADING||u.mode==IMAGE_READER)){cancel();u.verified=true;mode(READER);return kOSD_Result_Ok;}
+        if(b==kButton_B&&(u.mode==IMAGE_LOADING||u.mode==IMAGE_READER)){PS_NetCancel(u.sequence);++u.sequence;u.deferred=false;PS_InlineInterrupt(&u.inline_image);u.verified=true;mode(READER);return kOSD_Result_Ok;}
         if(b==kButton_Select&&(u.mode==RESULTS||u.mode==READER)&&u.view.document_id){u.info_document=u.view.document_id;u.info_position=u.view.page_index;u.info_results=u.mode==RESULTS;request(4,u.view.document_id,0);return kOSD_Result_Ok;}
         if(u.mode==INFO){if(b==kButton_B)request(u.info_results?1:2,u.info_results?0:u.info_document,u.info_position);else if(b==kButton_Up&&u.view.page_index)request(4,u.info_document,u.view.page_index-1);else if(b==kButton_Down&&u.view.page_index+1<u.view.page_count)request(4,u.info_document,u.view.page_index+1);return kOSD_Result_Ok;}
         if(b==kButton_Select||(b==kButton_B&&(loading||u.mode==RESULTS))){cancel();u.back_count=0;mode(HOME);return kOSD_Result_Ok;}
@@ -234,7 +284,11 @@ OSD_Result_t PocketUI_Button(Button_t b,ButtonState_t state,void *arg) {
             if(b==kButton_A&&u.view.document_id){u.back_count=0;request(2,u.view.document_id,0);}
             else if(b==kButton_Up&&u.view.page_index)request(1,0,u.view.page_index-1);
             else if(b==kButton_Down&&u.view.page_index+1<u.view.page_count)request(1,0,u.view.page_index+1);
-        }else if(b==kButton_A&&u.mode==READER&&visible_image()){request(3,u.view.document_id,u.view.page_index);
+        }else if(b==kButton_A&&u.mode==READER&&visible_image()){
+            if(PS_InlineMatches(&u.inline_image,u.view.document_id,u.reader_image_slot)&&u.inline_image.stage==PS_INLINE_READY)mode(IMAGE_READER);
+            else if(u.inline_loading){u.inline_loading=false;mode(IMAGE_LOADING);u.requested_kind=3;u.requested_id=u.view.document_id;u.requested_page=u.view.page_index;}
+            else if(PS_InlineMatches(&u.inline_image,u.view.document_id,u.reader_image_slot)&&(u.inline_image.error==8||u.inline_image.error==PS_NET_IMAGE_UNSUPPORTED||u.inline_image.error==6||u.inline_image.error==12)){message(image_notice(u.inline_image.error),QUERY);u.image_error=true;}
+            else request(3,u.view.document_id,u.view.page_index);
         }else if(b==kButton_A&&u.view.kind==4&&u.view.link_target){
             if(u.back_count==4){message("Link depth limit.\nB: Search home",QUERY);return kOSD_Result_Ok;}
             u.back[u.back_count].document=u.view.document_id;u.back[u.back_count++].page=u.view.page_index;request(2,u.view.link_target,0);
@@ -274,7 +328,7 @@ OSD_Result_t PocketUI_Button(Button_t b,ButtonState_t state,void *arg) {
             else if(u.role==SSID && u.draft[0]) { memcpy(u.ssid,u.draft,33); keyboard(PASSWORD); }
             else if(u.role==PASSWORD) mode(WIFI_CONFIRM);
         }
-    } else if(u.mode==NOTICE&&u.image_error){if(b==kButton_A)request(3,u.requested_id,u.requested_page);else if(b==kButton_B){cancel();u.verified=true;mode(READER);}}
+    } else if(u.mode==NOTICE&&u.image_error){if(b==kButton_A)request(3,u.view.document_id,u.view.page_index);else if(b==kButton_B){PS_NetCancel(u.sequence);++u.sequence;u.deferred=false;u.verified=true;mode(READER);}}
     else if(u.mode==NOTICE) { if(b==kButton_A) keyboard(u.notice_role); else if(b==kButton_B||b==kButton_Select) mode(u.notice_role==QUERY?HOME:WIFI_LIST); }
     else if(u.mode==WIFI_LIST) {
         int n=(int)u.wifi.count+2; if(delta) u.selection=(u.selection+delta+n)%n;
@@ -300,8 +354,8 @@ static int command(int argc,char **argv) {
     if(argc==3&&!strcmp(argv[1],"query")){size_t n=strlen(argv[2]);if(n>96||!ps_valid(argv[2],n))return 1;taskENTER_CRITICAL(&lock);bool available=!pending_key&&!pending_query_set&&!pending_probe;if(available){memset(pending_query,0,sizeof(pending_query));memcpy(pending_query,argv[2],n);pending_query_set=true;}taskEXIT_CRITICAL(&lock);if(available)printf("SEARCH_UI_QUEUED\n");return available?0:1;}
     if(argc!=2) return 1;
     if(!strcmp(argv[1],"status")) {
-        taskENTER_CRITICAL(&lock);unsigned m=observed_mode,n=observed_bytes;PS_View v=observed_view;bool verified=observed_verified,styled=observed_rich,probe=observed_probe;unsigned image_bytes=observed_image_bytes,back=observed_back,large=observed_large,small=observed_small,bold=observed_bold,gaps=observed_gaps;taskEXIT_CRITICAL(&lock);
-        printf("SEARCH_UI {\"mode\":%u,\"query_bytes\":%u,\"tls_verified\":%s,\"rust_decoder\":true,\"document_id\":%lu,\"page_index\":%u,\"page_count\":%u,\"kind\":%u,\"image_bytes\":%u,\"back_depth\":%u,\"styled\":%s,\"typography_probe\":%s,\"largest_font_px\":%u,\"smallest_font_px\":%u,\"bold_glyphs\":%u,\"paragraph_gaps\":%u}\n",m,n,verified?"true":"false",(unsigned long)v.document_id,v.page_index,v.page_count,v.kind,image_bytes,back,styled?"true":"false",probe?"true":"false",large,small,bold,gaps);return 0;
+        taskENTER_CRITICAL(&lock);unsigned m=observed_mode,n=observed_bytes;PS_View v=observed_view;bool verified=observed_verified,styled=observed_rich,probe=observed_probe,inline_visible=observed_inline_visible;unsigned inline_stage=observed_inline_stage,inline_slot=observed_inline_slot,image_bytes=observed_image_bytes,back=observed_back,large=observed_large,small=observed_small,bold=observed_bold,gaps=observed_gaps;taskEXIT_CRITICAL(&lock);
+        printf("SEARCH_UI {\"mode\":%u,\"query_bytes\":%u,\"tls_verified\":%s,\"rust_decoder\":true,\"document_id\":%lu,\"page_index\":%u,\"page_count\":%u,\"kind\":%u,\"image_bytes\":%u,\"back_depth\":%u,\"styled\":%s,\"typography_probe\":%s,\"largest_font_px\":%u,\"smallest_font_px\":%u,\"bold_glyphs\":%u,\"paragraph_gaps\":%u,\"inline_image_stage\":%u,\"inline_image_slot\":%u,\"inline_image_visible\":%s}\n",m,n,verified?"true":"false",(unsigned long)v.document_id,v.page_index,v.page_count,v.kind,image_bytes,back,styled?"true":"false",probe?"true":"false",large,small,bold,gaps,inline_stage,inline_slot,inline_visible?"true":"false");return 0;
     }
     for(unsigned i=0;i<sizeof(key_names)/sizeof(*key_names);++i) if(!strcmp(argv[1],key_names[i])) {
         taskENTER_CRITICAL(&lock); bool available=!pending_key&&!pending_query_set&&!pending_probe; if(available) pending_key=(int)i+1; taskEXIT_CRITICAL(&lock);
@@ -314,12 +368,20 @@ void PocketUI_RegisterCommands(void) { const esp_console_cmd_t cmd={.command="se
 void PocketUI_Poll(void) {
     PS_Reply reply={0};
     bool received=PS_NetPoll(&reply);
+    if(received&&reply.sequence==u.sequence&&u.mode==READER&&u.inline_loading){
+        bool valid=!reply.error&&reply.tls_verified&&reply.clock_synced&&reply.finished&&reply.image_pixels&&reply.image_width&&reply.image_width<=160&&reply.image_height&&reply.image_height<=80;
+        u.inline_loading=false;
+        if(valid){u.image_pixels=reply.image_pixels;reply.image_pixels=NULL;u.image_width=reply.image_width;u.image_height=reply.image_height;
+            image_descriptor.header.cf=LV_IMG_CF_TRUE_COLOR;image_descriptor.header.w=u.image_width;image_descriptor.header.h=u.image_height;image_descriptor.data_size=(uint32_t)u.image_width*u.image_height*2;image_descriptor.data=u.image_pixels;PS_InlineFinish(&u.inline_image,0);
+        }else PS_InlineFinish(&u.inline_image,reply.error?reply.error:10);
+        u.dirty=true;
+    }
     if(received&&reply.sequence==u.sequence&&(u.mode==LOADING||u.mode==IMAGE_LOADING)){
         bool valid=!reply.error&&reply.tls_verified&&reply.clock_synced;
         if(u.mode==IMAGE_LOADING&&reply.image_pixels){
             valid=valid&&reply.finished&&reply.image_width&&reply.image_width<=160&&reply.image_height&&reply.image_height<=80;
             if(valid){u.image_pixels=reply.image_pixels;reply.image_pixels=NULL;u.image_width=reply.image_width;u.image_height=reply.image_height;
-                image_descriptor.header.cf=LV_IMG_CF_TRUE_COLOR;image_descriptor.header.w=u.image_width;image_descriptor.header.h=u.image_height;image_descriptor.data_size=(uint32_t)u.image_width*u.image_height*2;image_descriptor.data=u.image_pixels;lv_img_set_src(picture,&image_descriptor);u.verified=true;mode(IMAGE_READER);}
+                image_descriptor.header.cf=LV_IMG_CF_TRUE_COLOR;image_descriptor.header.w=u.image_width;image_descriptor.header.h=u.image_height;image_descriptor.data_size=(uint32_t)u.image_width*u.image_height*2;image_descriptor.data=u.image_pixels;lv_img_set_src(picture,&image_descriptor);PS_InlineFinish(&u.inline_image,0);u.verified=true;mode(IMAGE_READER);}
         }else if(u.mode==IMAGE_LOADING){
             PS_ImageView image;
             valid=valid&&ps_image_decode(reply.bytes,reply.length,&image)==0;
@@ -333,7 +395,7 @@ void PocketUI_Poll(void) {
         }else if(u.requested_kind==2&&reply.length>=4&&!memcmp(reply.bytes,"PFW1",4)){
             PS_FlowView flow;valid=valid&&reply.finished&&reply.length<=sizeof(u.packet)&&ps_flow_decode(reply.bytes,reply.length,&flow)==0;
             if(valid&&(flow.position!=u.requested_page||flow.document_id!=u.requested_id))valid=false;
-            if(valid){memcpy(u.packet,reply.bytes,reply.length);u.flow_view=flow;u.flow=true;u.rich=false;u.verified=true;u.view=(PS_View){.document_id=flow.document_id,.page_index=flow.position,.page_count=flow.positions,.kind=flow.link_target?4:2,.title=flow.title,.link_target=flow.link_target};mode(READER);}
+            if(valid){memcpy(u.packet,reply.bytes,reply.length);u.flow_view=flow;u.reader_image_slot=reply.image_slot;u.flow=true;u.rich=false;u.verified=true;u.view=(PS_View){.document_id=flow.document_id,.page_index=flow.position,.page_count=flow.positions,.kind=flow.link_target?4:2,.title=flow.title,.link_target=flow.link_target};mode(READER);}
         }else if(u.requested_kind==2&&reply.length>=4&&!memcmp(reply.bytes,"PSR1",4)){
             PS_RichView rich;valid=valid&&reply.finished&&reply.length<=sizeof(u.packet)&&ps_rich_decode(reply.bytes,reply.length,&rich)==0;
             if(valid&&(rich.position!=u.requested_page||rich.document_id!=u.requested_id))valid=false;
@@ -343,14 +405,18 @@ void PocketUI_Poll(void) {
             if(valid&&(view.page_index!=u.requested_page||((u.requested_kind==1||u.requested_kind==5)?(view.kind!=1||view.page_count>256):(view.kind<2||view.kind>5||view.document_id!=u.requested_id))))valid=false;
             if(valid){memcpy(u.generation,reply.generation,sizeof(u.generation));u.sample=reply.sample;memcpy(u.packet,reply.bytes,reply.length);u.view=view;u.rich=false;u.flow=false;u.verified=true;if(view.kind==1){u.result_index=view.page_index;mode(RESULTS);}else if(view.kind==3)request(3,view.document_id,view.page_index);else mode(u.requested_kind==4?INFO:READER);}
         }
-        if(!valid){bool image_request=u.requested_kind==3;release_image();u.network_error=reply.error;u.verified=false;message(image_request?"Image unavailable.\nSupported: small JPEG.\nA:Retry B:Text":reply.error==PS_NET_STALE_COLLECTION?"Collection changed.\nA: Search again":reply.error==1?"Wi-Fi disconnected.\nSelect: Wi-Fi setup":reply.error==2?"Clock sync failed.\nTry again.":reply.error==12?"robots.txt blocks\nthis collection.":reply.error==13?"No usable pages.\nRight on home:\nRetry collection.":reply.error?"Connection failed.\nTry again.":"Invalid response.\nTry again.",QUERY);u.image_error=image_request;}
+        if(!valid){bool image_request=u.requested_kind==3;release_image();if(image_request){PS_InlineBegin(&u.inline_image,u.view.document_id,u.reader_image_slot);PS_InlineFinish(&u.inline_image,reply.error?reply.error:10);}u.network_error=reply.error;u.verified=false;message(image_request?image_notice(reply.error):reply.error==PS_NET_STALE_COLLECTION?"Collection changed.\nA: Search again":reply.error==1?"Wi-Fi disconnected.\nSelect: Wi-Fi setup":reply.error==2?"Clock sync failed.\nTry again.":reply.error==12?"robots.txt blocks\nthis collection.":reply.error==13?"No usable pages.\nRight on home:\nRetry collection.":reply.error?"Connection failed.\nTry again.":"Invalid response.\nTry again.",QUERY);u.image_error=image_request;}
     }
     if(received)free(reply.image_pixels);
+    if(u.deferred&&!PS_NetBusy()){
+        u.deferred=false;
+        if(!PS_NetStart(&u.deferred_request)){PS_InlineFinish(&u.inline_image,3);message(u.requested_kind==3?image_notice(3):"Not enough memory.\nB:Back",QUERY);u.image_error=u.requested_kind==3;}
+    }
     char query[97];taskENTER_CRITICAL(&lock); int key=pending_key; pending_key=0;bool set_query=pending_query_set;unsigned probe=pending_probe;pending_probe=0;if(set_query){memcpy(query,pending_query,sizeof(query));memset(pending_query,0,sizeof(pending_query));pending_query_set=false;}taskEXIT_CRITICAL(&lock);
     if(probe&&u.mode==READER&&u.verified&&!u.probe){u.probe_document=u.view.document_id;u.probe_position=u.view.page_index;
         if(probe==3){PS_FlowView flow;int n=ps_flow_probe(reply.bytes,0);if(n>0&&ps_flow_decode(reply.bytes,(size_t)n,&flow)==0){memcpy(u.packet,reply.bytes,(size_t)n);u.flow_view=flow;u.flow=true;u.rich=false;u.probe=true;u.view=(PS_View){.document_id=flow.document_id,.page_count=flow.positions,.kind=2,.title=flow.title};u.dirty=true;}return;}
         int n=probe==2?ps_webfont_probe(reply.bytes):ps_rich_probe(reply.bytes);PS_RichView rich;if(n>0&&ps_rich_decode(reply.bytes,(size_t)n,&rich)==0){memcpy(u.packet,reply.bytes,(size_t)n);u.rich_view=rich;u.rich=true;u.flow=false;u.probe=true;u.view=(PS_View){.document_id=rich.document_id,.page_count=rich.positions,.kind=2,.title=rich.title};u.dirty=true;}return;}
-    if(set_query){cancel();u.back_count=0;mode(HOME);memcpy(u.query,query,sizeof(u.query));MenuMgr_SelectTab(kTabID_Search);return;}if(!key)return;
+    if(set_query){cancel();u.back_count=0;mode(HOME);memcpy(u.query,query,sizeof(u.query));MenuMgr_SelectTab(kTabID_Search);return;}if(!key){inline_load();return;}
     if(key==1) { cancel();u.back_count=0;mode(HOME); MenuMgr_SelectTab(kTabID_Search); }
     else (void)PocketUI_Button(buttons[key-1],kButtonState_Pressed,NULL);
 }

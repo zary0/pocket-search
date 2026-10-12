@@ -417,7 +417,8 @@ pub unsafe extern "C" fn ps_local_profile_text(
     text.len() as i32
 }
 /// # Safety
-/// Exclusive initialized state; out owns capacity writable non-overlapping bytes.
+/// Initialized state with no concurrent mutation; out owns capacity writable
+/// bytes disjoint from state and every concurrent immutable reader's output.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ps_local_image_url(
     state: *mut u8,
@@ -439,6 +440,22 @@ pub unsafe extern "C" fn ps_local_image_url(
     } else {
         0
     }
+}
+/// Stable one-based semantic identity of the first visible image, or zero.
+/// # Safety
+/// Initialized state as for ps_local_init; no concurrent mutation. Concurrent
+/// immutable packet/image readers may share it, with disjoint output buffers.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_local_image_slot(
+    state: *mut u8,
+    size: usize,
+    id: u32,
+    position: u32,
+) -> i32 {
+    if !state_valid(state, size) {
+        return -1;
+    }
+    unsafe { &*state.cast::<LocalSearch>() }.image_slot(id as usize, position as usize) as i32
 }
 /// # Safety
 /// Initialized exclusive state as for ps_local_init; out owns length writable,
@@ -503,8 +520,10 @@ pub unsafe extern "C" fn ps_local_metadata(
     }
 }
 /// # Safety
-/// Initialized exclusive state; out owns 512 writable bytes, query owns length
+/// Initialized state; out owns 512 writable bytes, query owns length
 /// readable UTF-8 bytes. All regions are disjoint. Kind 1 searches; kind 2 reads.
+/// Concurrent immutable packet/image readers may share state; no mutation may
+/// overlap this call and each caller needs its own output buffer.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ps_local_packet(
     state: *mut u8,
@@ -933,6 +952,10 @@ mod tests {
             }
             assert_eq!(ps_local_finish(ptr, size, 1), 1);
             assert_eq!(ps_local_count(ptr, size), 1);
+            assert_eq!(ps_local_image_slot(ptr, size, 1, 0), 0);
+            assert_eq!(ps_local_image_slot(ptr, size, 0, 0), 0);
+            assert_eq!(ps_local_image_slot(ptr.add(1), size - 1, 1, 0), -1);
+            assert_eq!(ps_local_image_slot(core::ptr::null_mut(), size, 1, 0), -1);
             let len = ps_local_packet(ptr, size, 1, 0, 0, b"AI".as_ptr(), 2, packet.as_mut_ptr());
             let view = Packet::decode(&packet[..len as usize]).unwrap();
             assert_eq!(view.document_id, 1);

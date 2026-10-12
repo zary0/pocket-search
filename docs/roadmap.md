@@ -66,7 +66,10 @@ See [retained-content implementation and limits](native-retained-content.md).
 
 - [x] Resolve the visible image source; directly acquire a bounded verified HTTPS
   baseline JPEG on the selected public authority; decode with the ESP32 ROM path,
-  resize to RGB565, show a separate viewer and release temporary buffers on exit.
+  resize to RGB565 and release temporary buffers on leaving the article.
+- [x] Automatically load the first visible supported image into its retained box,
+  reuse one semantic-slot cache across scroll windows and expansion/back, and
+  preserve scrolling/text on image failure or cancellation. A expands or retries.
 - [ ] Qualify actual source pixels, cancellation/retry/back, TLS/decode peak memory
   and long-duration image use on the latest candidate. A host-prepared image never
   substitutes for native acquisition/decoding.
