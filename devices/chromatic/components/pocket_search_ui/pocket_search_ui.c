@@ -234,7 +234,7 @@ static void render(void) {
         visible(rows[1],true);lv_obj_set_pos(rows[1],8,112);lv_obj_set_style_text_font(rows[1],PS_TypographyFont(3),0);
         lv_label_set_text(rows[1],text);lv_obj_set_style_text_color(rows[1],lv_color_hex(0x70757a),0);
         lv_obj_set_pos(footer,8,130);lv_obj_set_style_text_font(footer,PS_TypographyFont(3),0);
-        lv_label_set_text_static(footer,"Up/Down A:Read B:Back");
+        lv_label_set_text_static(footer,"");
     }
     else if(u.mode==RESULTS||u.mode==READER||u.mode==IMAGE_READER||u.mode==INFO){
         visible(body,false);visible(status,true);lv_obj_set_pos(status,8,3);lv_obj_set_width(status,144);lv_obj_set_style_text_align(status,LV_TEXT_ALIGN_LEFT,0);
@@ -253,7 +253,7 @@ static void render(void) {
             visible(rows[i],true);lv_obj_set_pos(rows[i],8,34+i*13);lv_label_set_text(rows[i],text);
             lv_obj_set_style_text_color(rows[i],lv_color_hex(u.view.kind==5||u.view.kind==4?0x1a73e8:0x202124),0);
         }
-        lv_label_set_text_static(footer,u.probe?"Original test. B:Back":u.mode==INFO?"Up/Down:Info B:Back":u.mode==RESULTS?"Up/Down A:Read B:Back":u.mode==IMAGE_READER?"B:Return to text":visible_image()?image_footer():u.view.kind==4&&u.view.link_target?"A:Open Up/Down B":u.flow&&u.flow_view.limited?"Color limit. Up/Down B":"Up/Down:Scroll B:Back");
+        lv_label_set_text_static(footer,u.probe?"Original test. B:Back":u.mode==INFO?"Up/Down:Info B:Back":u.mode==RESULTS?"":u.mode==IMAGE_READER?"B:Return to text":visible_image()?image_footer():u.view.kind==4&&u.view.link_target?"A:Open Up/Down B":u.flow&&u.flow_view.limited?"Color limit. Up/Down B":"Up/Down:Scroll B:Back");
     }
     else if(u.mode==SOURCES){
         lv_label_set_text_static(heading,"Search sources");lv_label_set_text_static(body,"");

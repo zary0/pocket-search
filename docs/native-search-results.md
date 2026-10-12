@@ -8,7 +8,11 @@ excerpt the main content. It shows one selected result at a time on the
 - A blue, bold title, wrapping to at most two 20-cell lines.
 - Three excerpt lines for a two-line title, or four for a one-line title.
 - A small gray authority label instead of a multi-line complete URL.
-- Up/Down to select, A to read, B to return, Start to edit the query.
+
+From `0.14.14`, result screens omit the persistent button legend, leaving the
+title, excerpt and authority as the visible content. Up/Down selects, A reads,
+B returns and Start edits the query. The optional browser preview follows this
+presentation too; legacy result packets also omit the legend.
 
 Select still opens complete admitted URL and acquisition details. Shortening the
 visible source does not change the document identity, source policy or open

@@ -21,6 +21,23 @@ The probe used USB for power, its diagnostic command, and reading the result. Wi
 
 Device-to-computer LAN reachability was not established. Earlier companion experiments used an authorized temporary HTTPS tunnel. The current autonomous mode directly collects, indexes and searches pages on the MCU and requires neither that tunnel nor a companion service; see [on-device search](../../docs/on-device-search.md).
 
+## DevDay storage verification
+
+As checked on 2026-10-12, the inspected unit's 4 MiB MCU flash is verified, but a
+populated microSD connector on the DevDay edition is not verified. The
+[official DevDay quickstart](https://support.modretro.com/en_us/chromatic-devday-edition-quickstart-guid-By1iOlcMg)
+documents the included writable cartridge and developer activation, without an
+SD-card storage specification. Those cartridge features do not establish MCU
+access to removable storage.
+
+The pinned [public MCU sources](https://github.com/ModRetro/oss-chromatic-console-mcu/tree/63ed3b62b16768ad2415c9e3b865b438ca40fcc6)
+and this application expose no SD-card mount or card-identification command.
+USB discovery confirms the console's connection, not connector population.
+Visual inspection of the specific DevDay board or manufacturer confirmation is
+still required; absence of a driver does not prove absence of a connector.
+Pocket Search currently uses its owned internal-flash banks for retained content,
+and does not claim SD support or any removable-storage capacity.
+
 ## What is portable today
 
 `crates/chromatic-client` provides dependency-free `no_std` text/image validation, button action mapping, and the on-device crawl frontier, streaming HTML text, fixed-capacity inverted index and local pagination. Rust owns no allocator, framebuffer, network stack, font renderer or OS bindings. The adapter reserves 16 KiB for opaque local state plus its separate robots buffer; networking and display retain separate costs.
