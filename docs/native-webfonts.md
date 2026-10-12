@@ -1,6 +1,6 @@
 # Bounded native Japanese and WOFF2 fonts
 
-The 0.14.11 development candidate adds direct verified-HTTPS WOFF2 download,
+The 0.14.12 development candidate adds direct verified-HTTPS WOFF2 download,
 bounded native decompression, BMP Japanese outline rasterization, four-level
 coverage and horizontal kana cluster composition. The design uses a quiet white
 page, consistent 10/12/14/16-pixel hierarchy and existing paragraph space. Noto

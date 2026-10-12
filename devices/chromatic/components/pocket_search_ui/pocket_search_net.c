@@ -46,7 +46,9 @@ static _Atomic unsigned store_failures;
 static char installed_font_url[256];
 static _Atomic unsigned css_cache_hits,css_fetches,font_fetches,font_glyphs,font_bytes,css_rules,resource_fallbacks;
 static const char probe_css[]="https://fonts.googleapis.com/css?family=VT323&text=WEB%20FONT%20TEST%20Pocket%20Search%20ABC%20xyz%20012345%20Small%20caption%20Downloaded%20TTF";
-static const char probe_jp_css[]="https://fonts.googleapis.com/css2?family=Noto+Sans+JP%3Awght%40400&text=%E6%97%A5%E6%9C%AC%E8%AA%9E%E6%A4%9C%E7%B4%A2%E7%B5%90%E6%9E%9C%E3%81%8C%E3%81%B1";
+static const char probe_jp_css[]="https://fonts.googleapis.com/css2?family=Noto+Sans+JP%3Awght%40400&text=%E6%97%A5%E6%9C%AC%E8%AA%9E%E6%A4%9C%E7%B4%A2%E7%B5%90%E6%9E%9C";
+static const char probe_jp_budget_css[]="https://fonts.googleapis.com/css2?family=Noto+Sans+JP%3Awght%40400&text=%E6%97%A5%E6%9C%AC%E8%AA%9E%E6%A4%9C%E7%B4%A2%E7%B5%90%E6%9E%9C%E3%81%8C%E3%81%B1";
+static bool font_budget_probe;
 static bool font_probe_japanese;
 static unsigned font_cancel_check,font_checks;
 static struct {bool running,ready,cancelled,configuring;PS_Request request;PS_Reply reply;} job;
@@ -184,9 +186,14 @@ static bool load_face(PS_Reply *r,int64_t start,int *cause){
     // Existing readers retain the same immutable atlas, even during refresh.
     if(PS_WebFontReady()){bool same=!strcmp(url,installed_font_url);if(!same&&cause)*cause=WRONG_TYPE;return same;}
     uint8_t *body=NULL;size_t length=0;
-    int error=resource(url,true,false,&body,&length,r,start);if(error){if(cause)*cause=error;++resource_fallbacks;return false;}
+    bool tls_monitor=heap_caps_monitor_local_minimum_free_size_start()==ESP_OK;r->tls_heap_window=tls_monitor;
+    int error=resource(url,true,false,&body,&length,r,start);
+    if(tls_monitor){r->tls_allocator_minimum=(unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT);heap_caps_monitor_local_minimum_free_size_stop();}
+    if(error){if(cause)*cause=error;++resource_fallbacks;return false;}
+    bool decode_monitor=heap_caps_monitor_local_minimum_free_size_start()==ESP_OK;r->decode_heap_window=decode_monitor;r->decode_heap_before=(unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT);
     font_checks=0;PS_FontBudget budget={.cancel=font_cancel,.clock_ms=font_clock,.free_heap=font_heap,.context=r};
-    int64_t begin=esp_timer_get_time();int n=PS_WebFontLoad(body,length,&budget);
+    int64_t begin=esp_timer_get_time();int n=PS_WebFontLoad(body,length,&budget);r->compute_us=(unsigned)(esp_timer_get_time()-begin);r->decoder_peak_bytes=budget.peak_bytes;r->decoder_allocations=budget.allocations;
+    if(decode_monitor){r->decode_allocator_minimum=(unsigned)heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT);heap_caps_monitor_local_minimum_free_size_stop();}
     char digest[65]={0},atlas_digest[65]={0};uint8_t hash[32];mbedtls_sha256(body,length,hash,0);for(unsigned i=0;i<32;++i)sprintf(digest+i*2,"%02x",hash[i]);
     if(n>0){mbedtls_sha256(PS_WebFontAtlas(),PS_WebFontAtlasBytes(),hash,0);for(unsigned i=0;i<32;++i)sprintf(atlas_digest+i*2,"%02x",hash[i]);}
     printf("SEARCH_FONT {\"error\":%d,\"wire_bytes\":%u,\"private_peak_bytes\":%u,\"allocations\":%u,\"decode_raster_us\":%lld,\"atlas_bytes\":%u,\"glyphs\":%d,\"source_sha256\":\"%s\",\"atlas_sha256\":\"%s\",\"checks\":%u}\n",n<0?-n:n?0:10,(unsigned)length,budget.peak_bytes,budget.allocations,(long long)(esp_timer_get_time()-begin),(unsigned)PS_WebFontAtlasBytes(),n>0?n:0,digest,atlas_digest,font_checks);
@@ -217,7 +224,7 @@ static void worker(void *arg){
     // ESP-IDF records each heap's low watermark at allocation time. Their sum
     // is a conservative phase minimum, unlike the periodic sample above.
     bool phase_monitor=false;
-    if(job.request.kind==3||job.request.kind==7||job.request.kind==255){r.tls_heap_window=heap_caps_monitor_local_minimum_free_size_start()==ESP_OK;phase_monitor=r.tls_heap_window;}
+    if(job.request.kind==3||job.request.kind==7){r.tls_heap_window=heap_caps_monitor_local_minimum_free_size_start()==ESP_OK;phase_monitor=r.tls_heap_window;}
     conditional_etag[0]=conditional_modified[0]=0;
     r.heap_before=(unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT);r.minimum_free_heap_bytes=r.heap_before;r.largest_free_block_bytes=(unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
     // Cached search/reader work never requires a socket, Wi-Fi, clock sync or
@@ -230,7 +237,7 @@ static void worker(void *arg){
         r.clock_synced=true;
         if(job.request.kind==255){
             bool ready=false;
-            int cause=0;if(!load_css(font_probe_japanese?probe_jp_css:probe_css,&r,start,&ready,&cause)||!ready)r.error=cause?cause:WRONG_TYPE;
+            int cause=0;if(!load_css(font_probe_japanese?(font_budget_probe?probe_jp_budget_css:probe_jp_css):probe_css,&r,start,&ready,&cause)||!ready)r.error=cause?cause:WRONG_TYPE;
             goto done;
         }
         if(!robots_state){
@@ -315,7 +322,7 @@ cached:
         printf("SEARCH_COMPARE {\"execution_mode\":\"physical-native-cpu\",\"repeats\":%u,\"identical_packets\":%s,\"reference_total_us\":%llu,\"cached_total_us\":%llu,\"decoder_total_cycles\":%llu,\"decoder_allocations\":0,\"cpu_hz_before\":%lu,\"cpu_hz_after\":%lu,\"core\":%u,\"packet_bytes\":%u,\"source_bytes_over_usb\":0}\n",count,equal?"true":"false",(unsigned long long)reference_us,(unsigned long long)cached_us,(unsigned long long)decode_cycles,(unsigned long)cpu_before,(unsigned long)cpu_after,(unsigned)xPortGetCoreID(),(unsigned)r.length);
         r.error=equal&&count==30&&cpu_before==cpu_after?0:INCOMPLETE;goto done;
     }
-    if(job.request.kind==3||job.request.kind==7||job.request.kind==255){
+    if(job.request.kind==3||job.request.kind==7){
         char url[256];
         if(job.request.kind==7){
             // Diagnostic-only original public source files. No caller URL, proxy
@@ -399,8 +406,8 @@ bool PS_NetSelectProfile(unsigned value){
 static int status(int argc,char **argv){
     if(argc==3&&!strcmp(argv[1],"profile")){char *end;unsigned long value=strtoul(argv[2],&end,10);return *argv[2]&&!*end&&value<PS_NetProfileCount()&&PS_NetSelectProfile((unsigned)value)?0:1;}
     if(argc==3&&!strcmp(argv[1],"compare")){char *end;unsigned long id=strtoul(argv[2],&end,10);PS_Request request={.kind=6,.document=(uint32_t)id};return *argv[2]&&!*end&&id>0&&id<=4&&PS_NetStart(&request)?0:1;}
-    if(argc==2&&(!strcmp(argv[1],"fonts")||!strcmp(argv[1],"jfonts"))){if(PS_NetBusy())return 1;font_cancel_check=0;font_probe_japanese=!strcmp(argv[1],"jfonts");PS_Request request={.kind=255};return PS_NetStart(&request)?0:1;}
-    if(argc==3&&!strcmp(argv[1],"jfonts-cancel")){char *end;unsigned long checks=strtoul(argv[2],&end,10);if(!*argv[2]||*end||!checks||checks>100000||PS_NetBusy())return 1;font_probe_japanese=true;font_cancel_check=(unsigned)checks;PS_Request request={.kind=255};return PS_NetStart(&request)?0:1;}
+    if(argc==2&&(!strcmp(argv[1],"fonts")||!strcmp(argv[1],"jfonts")||!strcmp(argv[1],"jfonts-budget"))){if(PS_NetBusy())return 1;font_cancel_check=0;font_budget_probe=!strcmp(argv[1],"jfonts-budget");font_probe_japanese=strcmp(argv[1],"fonts")!=0;PS_Request request={.kind=255};return PS_NetStart(&request)?0:1;}
+    if(argc==3&&!strcmp(argv[1],"jfonts-cancel")){char *end;unsigned long checks=strtoul(argv[2],&end,10);if(!*argv[2]||*end||!checks||checks>100000||PS_NetBusy())return 1;font_probe_japanese=true;font_budget_probe=false;font_cancel_check=(unsigned)checks;PS_Request request={.kind=255};return PS_NetStart(&request)?0:1;}
     if(argc==2&&!strcmp(argv[1],"font-cancel")){taskENTER_CRITICAL(&lock);bool allowed=job.running&&job.request.kind==255&&job.request.sequence==0;if(allowed)job.cancelled=true;taskEXIT_CRITICAL(&lock);return allowed?0:1;}
     if(argc==2&&!strcmp(argv[1],"refresh"))return PS_NetRefresh()?0:1;
     if(argc!=2||strcmp(argv[1],"status"))return 1;

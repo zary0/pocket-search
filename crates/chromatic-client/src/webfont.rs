@@ -710,3 +710,29 @@ mod tests {
         assert_eq!(rasterize(&oversized, &mut atlas), 0);
     }
 }
+
+#[cfg(test)]
+mod native_acceptance_reference {
+    use super::*;
+    extern crate std;
+    #[test]
+    fn small_japanese_native_reference() {
+        let bytes = include_bytes!("../../../tests/fixtures/webfonts/noto-jp-native-reference.ttf");
+        let mut atlas = UnicodeAtlas::EMPTY;
+        let n = rasterize_unicode(bytes, &mut atlas, || false).unwrap();
+        for c in "日本語検索結果".chars() {
+            assert!(atlas.codes[..n].contains(&(c as u32)));
+        }
+        if let Ok(path) = std::env::var("POCKET_NATIVE_FONT_REFERENCE") {
+            let mut bytes = std::vec::Vec::new();
+            bytes.extend(atlas.count.to_le_bytes());
+            for c in atlas.codes {
+                bytes.extend(c.to_le_bytes());
+            }
+            for pixels in atlas.pixels {
+                bytes.extend(pixels);
+            }
+            std::fs::write(path, bytes).unwrap();
+        }
+    }
+}

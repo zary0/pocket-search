@@ -10,10 +10,20 @@
   "fetched_date": "2026-10-12",
   "fixture_purpose": "host decoder reference, never a substituted native download",
   "files": {
+    "noto-jp-native-subset.woff2": "abac0328a4e07dacd5fab84c2a8395445b15abc87e2ce0c00b6d6c8704ef36a3",
+    "noto-jp-native-reference.ttf": "4b999854997540cc053bf9c63e0660562a41cb0d18a359bc7d374c9c2d613234",
     "noto-jp-reference.ttf": "db1df5960e8426cfdd7b802eebd964903334272bfdc94b193eff129a2c6200f2",
     "OFL.txt": "1c05c68c34f9708415aada51f17e1b0092d2cea709bf4a94cd38114f9e73d7d9",
     "noto-jp-subset.woff2": "c080e991ff9704eb9de843cded83d5734427c46347400fd8e99c7cee27e1b970",
     "noto-jp-budget-rejection.woff2": "ca236e6cb444a6ecfa4d532cf755b77fdee15bb18c3cb29afd2713e96da477ba"
   },
-  "reference": "Google FontTools WOFF2 reconstruction; compare independent SFNT table/glyph data, not native glyph pixels"
+  "reference": "Google FontTools WOFF2 reconstruction; compare independent SFNT table/glyph data, not native glyph pixels",
+  "native_acceptance": {
+    "css_url": "https://fonts.googleapis.com/css2?family=Noto+Sans+JP%3Awght%40400&text=%E6%97%A5%E6%9C%AC%E8%AA%9E%E6%A4%9C%E7%B4%A2%E7%B5%90%E6%9E%9C",
+    "font_url": "https://fonts.gstatic.com/l/font?kit=-F6jfjtqLzI2JPCgQBnw7HFyzSD-AsregP8VFBEj757Y0rw_qMGldFjx4EHRjLqOwIrqYZyUZSbZn1fMIA&skey=72472b0eb8793570&v=v57",
+    "text": "日本語検索結果",
+    "headers": {
+      "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+  }
 }
