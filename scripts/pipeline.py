@@ -22,6 +22,8 @@ SEMVER = r"(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)"
 CASES = {
     "native_wifi_verified_https", "query_result_open", "utf8_pagination",
     "empty_results_network_errors", "cpu_memory_budget",
+    "cancellation_retry", "persistent_cold_start", "native_image_processing",
+    "battery_standalone", "endurance_30_minutes",
 }
 
 
@@ -266,10 +268,22 @@ def promote(root, folder, evidence_dir, output):
 
 def readiness(root):
     require(os.environ.get("CHROMATIC_E2E_READY") == "true", "Physical runner/adapter not enabled; release remains blocked")
-    require((root / "devices/chromatic/firmware/CMakeLists.txt").is_file(), "Pocket Search MCU firmware project is not implemented")
+    for path in ("devices/chromatic/firmware/overlay/CMakeLists.txt", "devices/chromatic/firmware/inputs.json", "devices/chromatic/firmware/sdkconfig.defaults", "scripts/build_chromatic_firmware.py"):
+        require((root / path).is_file(), "Complete native firmware build input is missing: " + path)
     for key in ("CHROMATIC_LAB_DRIVER", "CHROMATIC_LAB_DRIVER_SHA256", "CHROMATIC_TEST_ORIGIN"):
         require(os.environ.get(key), "Missing lab configuration: " + key)
-    require(os.environ["CHROMATIC_TEST_ORIGIN"].startswith("https://"), "Lab origin must use verified HTTPS")
+    if __package__:
+        from .native_fixture import source_profile
+    else:
+        from native_fixture import source_profile
+    origin = os.environ["CHROMATIC_TEST_ORIGIN"]
+    try:
+        source_profile(origin)
+    except ValueError as error:
+        raise Invalid("Lab origin must pass native public HTTPS admission") from error
+    sources = json.loads((root / "devices/chromatic/sources.json").read_text())
+    require(any(profile["base"].startswith(origin + "/") for profile in sources["profiles"]),
+            "Lab origin must be admitted by a reviewed candidate source profile")
 
 
 def main():

@@ -9,6 +9,7 @@ pub mod css;
 pub mod flow;
 pub mod local;
 pub mod rich;
+pub mod shaping;
 pub mod webfont;
 
 pub const DISPLAY_WIDTH: usize = 160;

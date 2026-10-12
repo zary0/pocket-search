@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "mcu": {
+    "repository": "https://github.com/ModRetro/oss-chromatic-console-mcu.git",
+    "commit": "63ed3b62b16768ad2415c9e3b865b438ca40fcc6"
+  },
+  "idf": {
+    "repository": "https://github.com/espressif/esp-idf.git",
+    "commit": "e0991facf5ecb362af6aac1fae972139eb38d2e4",
+    "version": "5.3.0"
+  },
+  "lvgl": {
+    "repository": "https://github.com/lvgl/lvgl.git",
+    "commit": "4495f428630cc1741bd8bfd977f080e8460e8e8d",
+    "version": "8.4.0"
+  },
+  "font": {
+    "name": "Pocket JP",
+    "source_name": "Noto Sans JP",
+    "license": "OFL-1.1",
+    "source_sha256": "c2f3b4d463500a2ddcd3849cded1fceeb9fd6d1c32e6cbecd568453ba50fc68f",
+    "glyph_px": 12,
+    "weight": 500,
+    "format": "compiled 1-bit bitmap; no runtime font dependency"
+  },
+  "flash": {
+    "bytes": 4194304,
+    "application_offset": 65536,
+    "application_bytes": 2097152,
+    "partition_table_offset": 32768,
+    "nvs_offset": 36864,
+    "nvs_bytes": 24576,
+    "corpus_offset": 2162688,
+    "corpus_bytes": 131072
+  },
+  "rust": {
+    "rustc": "rustc 1.97.0-nightly (8ea53bcd7 2026-07-08) (1.97.0.0)",
+    "target": "xtensa-esp32-none-elf",
+    "profile": "chromatic-size",
+    "release": "v1.97.0.0",
+    "archives": {
+      "x86_64-unknown-linux-gnu": "a99bfee69221e9ff6d86388f6811ee688cd405e6a0400a3cd1784e8d463e9d99",
+      "aarch64-unknown-linux-gnu": "dc6efa8906849608497c2ffb3d6a9466588835a79b5e8886c229de133640945c",
+      "aarch64-apple-darwin": "430fcbf54967e99d16debe48926a1df558ab8b67af3c060a658d25ce752bd790"
+    },
+    "source_sha256": "568d688b9f8f332ec4d04657544fad23e99ce11e9e6cf5835979e68a28c68b73"
+  }
+}

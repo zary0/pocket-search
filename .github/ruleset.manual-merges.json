@@ -1,0 +1,29 @@
+{
+  "name": "Maintainer-only PR merges",
+  "target": "branch",
+  "enforcement": "active",
+  "conditions": {
+    "ref_name": {
+      "include": [
+        "refs/heads/main",
+        "refs/heads/develop"
+      ],
+      "exclude": []
+    }
+  },
+  "rules": [
+    {
+      "type": "update",
+      "parameters": {
+        "update_allows_fetch_and_merge": false
+      }
+    }
+  ],
+  "bypass_actors": [
+    {
+      "actor_id": 94175002,
+      "actor_type": "User",
+      "bypass_mode": "pull_request"
+    }
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "version": "0.14.10",
+  "source_commit": "c6d7adecd50a58d4bc8934eea4fe2f0d146cefd4",
+  "application_sha256": "14ff36b0a2a21f2613d65bcd07ed11ee6c2f3dc9c54990fa3fac172cced95a3a",
+  "application_bytes": 2020800,
+  "application_only_readback_verified": true,
+  "nvs_and_corpus_preserved_during_install": true,
+  "execution_mode": "on-device",
+  "service_required": false,
+  "power": "USB",
+  "control_method": "console queued native GUI controls",
+  "frame_source": "native MCU framebuffer readback, not physical USB video",
+  "operator_lcd_confirmed": true,
+  "physical_buttons_independently_actuated": false,
+  "release_qualified": false,
+  "query": "AI",
+  "retained_documents": 4,
+  "matching_results": 2,
+  "corpus_generation": 13,
+  "storage_failures": 0,
+  "local_state_used_bytes": 21936,
+  "local_state_budget_bytes": 22272,
+  "search_network_bytes": 0,
+  "result_compute_us": [
+    6562,
+    6952,
+    7066,
+    7003,
+    6305
+  ],
+  "result_elapsed_ms": [
+    7,
+    8,
+    8,
+    7,
+    7
+  ],
+  "packet_decoder_allocations": 0,
+  "checks": {
+    "one_line_title_excerpt_source": true,
+    "two_line_title_excerpt_source": true,
+    "down_up_selection": true,
+    "A_opens_selected_document": true,
+    "B_restores_selected_result": true,
+    "Select_opens_source_details": true,
+    "B_restores_result_from_details": true,
+    "retained_corpus_restored_after_install": true
+  },
+  "image_assets_sha256": {
+    "before.png": "eac3cf6da43d31596c6e383cc2a5638c6adbd8d15216136149e2922c1f8ce55a",
+    "result-one-line-title.png": "8880e793325d52f4cfec53ab9334cab2be4a7c8ef27270bed009eb0e0bb3d2d7",
+    "result-two-line-title.png": "9401a8d358603977e73dbde47b3facd4936798498db1ad290165f6190feede33"
+  },
+  "previous_frame_version": "0.14.9",
+  "remaining": [
+    "Battery and independent physical-control/video release acceptance",
+    "Dedicated isolated hardware CI lab"
+  ]
+}

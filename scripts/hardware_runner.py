@@ -28,7 +28,7 @@ def main():
         # Private build logs stay local; only selected sanitized evidence is uploaded.
         for command, extra, timeout in [
             ("build", ["--source", str(ROOT), "--commit", manifest["commit"], "--version", manifest["version"], "--output", str(build)], 1200),
-            ("e2e", ["--candidate", str(args.candidate.resolve()), "--origin", os.environ["CHROMATIC_TEST_ORIGIN"], "--output", str(args.evidence.resolve())], 600),
+            ("e2e", ["--candidate", str(args.candidate.resolve()), "--origin", os.environ["CHROMATIC_TEST_ORIGIN"], "--output", str(args.evidence.resolve())], 3600),
         ]:
             with (build / (command + ".private.log")).open("wb") as log:
                 result = subprocess.run([str(driver), command, *extra], stdout=log, stderr=subprocess.STDOUT, timeout=timeout)

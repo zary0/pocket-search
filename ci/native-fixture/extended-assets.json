@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "provenance": "Original deterministic color/filter/alpha fixtures authored for Pocket Search; no third-party photographs",
+  "license": "GPL-3.0-only",
+  "source": "ci/native-fixture/generate_extended.py",
+  "assets": {
+    "bars.png": {
+      "bytes": 649,
+      "sha256": "1d7efe6eaad3f6058efb0a3a1bb2a3cda332cf62b81456b7b1c33225fb56c8d6"
+    },
+    "palette.png": {
+      "bytes": 104,
+      "sha256": "c12a95af514138fad34572ed5c8202dfeb141c694e5321be0fd01cc2387eb5e7"
+    },
+    "bars-progressive.jpg": {
+      "bytes": 1053,
+      "sha256": "19ab95f64a8bdb323d9f631e18935a5d254f60780a525371428d37068913ee49"
+    }
+  }
+}

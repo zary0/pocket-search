@@ -210,7 +210,7 @@ Additional source attribution is preserved in `servo_arc`'s source notice, `siph
 
 The QSPI transaction settings and framebuffer addressing in `devices/chromatic/components/pocket_band_display` follow the ModRetro Chromatic MCU transport at [commit 63ed3b62b16768ad2415c9e3b865b438ca40fcc6](https://github.com/ModRetro/oss-chromatic-console-mcu/tree/63ed3b62b16768ad2415c9e3b865b438ca40fcc6), whose [license](https://github.com/ModRetro/oss-chromatic-console-mcu/blob/63ed3b62b16768ad2415c9e3b865b438ca40fcc6/LICENSE) is GNU GPL v3. Pocket Search's bounded band driver replaces the full-frame buffering and transaction handling; its source and modifications are GPL-3.0-only. Preserve applicable upstream notices when importing further code.
 
-No official firmware binary, FPGA image, commercial game, device backup, or third-party font is included. ModRetro and Chromatic identify the target device; the project is independent of ModRetro.
+No official firmware binary, FPGA image, commercial game or device backup is included. The native MCU build overlay includes a compiled Pocket JP font bitmap under OFL-1.1, as described below. ModRetro and Chromatic identify the target device; the project is independent of ModRetro.
 
 ## External build and runtime prerequisites
 
@@ -218,7 +218,7 @@ The optional native click integration follows the PCM wiring and project/version
 
 Icarus Verilog is an external simulation tool. The pinned upstream design specifies Gowin FPGA Designer 1.9.12.03; the complete design was built here with Gowin FPGA Designer 1.9.12.04. An appropriate vendor license is required. Neither the tools nor vendor license credentials are bundled. See [native click build and validation boundaries](docs/native-click.md).
 
-ESP-IDF 5.3, FreeRTOS, LVGL 8.4.0, the Xtensa C toolchain, esp-rs Rust/LLVM toolchain (installed with espup 0.17.1), Rust core/compiler-builtins used by build-std, and a suitable licensed font are external prerequisites of the experimental MCU integration. Their source/binaries are not bundled in the current packages. A future native application distribution must inventory the exact linked components and assets, include their required notices, and provide corresponding source/build instructions before release. Do not treat this list as a completed firmware distribution review.
+ESP-IDF 5.3, FreeRTOS, LVGL 8.4.0, the Xtensa C toolchain, esp-rs Rust/LLVM toolchain (installed with espup 0.17.1), Rust core/compiler-builtins used by build-std, are external prerequisites of the experimental MCU integration. Their source/binaries are not bundled in the current packages. A future native application distribution must inventory the exact linked components and assets, include their required notices, and provide corresponding source/build instructions before release. Do not treat this list as a completed firmware distribution review.
 
 Third-party GitHub Actions execute in CI and are not part of the release application. Their upstream source and pinned revisions are recorded in `.github/workflows`; dependency updates keep those pins reviewable.
 
@@ -228,4 +228,62 @@ Supplemental attribution files preserve the Tectonic source-header copyright use
 
 ## Runtime web-font diagnostic
 
-The bounded CSS parser and static TrueType subset rasterizer are original project code under GPL-3.0-only; no font parsing library or font binary is vendored or linked. The optional native diagnostic directly requests a VT323 subset from Google Fonts. VT323 is copyright 2011 The VT323 Project Authors and remains [SIL Open Font License 1.1](https://github.com/google/fonts/blob/main/ofl/vt323/OFL.txt), not GPL. Its runtime-generated glyph atlas is volatile and is not bundled in the firmware or repository. The repository's mathematical font fixtures are original outlines. Any future distribution of downloaded font files or derived font data must retain the applicable copyright and OFL text; do not relabel those assets as project GPL code.
+The bounded CSS parser and static TrueType subset rasterizer are original project code under GPL-3.0-only; the earlier ASCII increment had no third-party font parser. The current native WOFF2 decoder and OFL test fixtures are listed below. The optional native diagnostic directly requests a VT323 subset from Google Fonts. VT323 is copyright 2011 The VT323 Project Authors and remains [SIL Open Font License 1.1](https://github.com/google/fonts/blob/main/ofl/vt323/OFL.txt), not GPL. Its runtime-generated glyph atlas is volatile and is not bundled in the firmware or repository. The repository's mathematical font fixtures are original outlines. Any future distribution of downloaded font files or derived font data must retain the applicable copyright and OFL text; do not relabel those assets as project GPL code.
+
+## Reproducible native MCU overlay
+
+`devices/chromatic/firmware/overlay` retains the MCU integration based on ModRetro commit `63ed3b62b16768ad2415c9e3b865b438ca40fcc6` under its GPL v3 license. Repository modifications are GPL-3.0-only; upstream grants remain intact. The builder obtains complete pinned public MCU, ESP-IDF and LVGL sources, including their licenses. It copies tracked source only. No complete vendor firmware, private configuration, NVS or backup is imported.
+
+The compiled `components/fonts/pocket_jp.c` bitmap is a modified Noto Sans JP font named **Pocket JP**, copyright 2014-2021 Adobe, Reserved Font Name 'Source'. It remains **OFL-1.1**, with the original notice in `components/fonts/POCKET-FONT-LICENSE.txt`. The generator renders 12-pixel glyphs at weight 500 to a 1-bit bitmap. The original font input SHA-256 is in `devices/chromatic/firmware/inputs.json`; derived bitmap bytes are included as compilable source. These font assets are not GPL code. Runtime downloads of other web fonts retain their separate licenses.
+
+See [complete native MCU build](docs/native-firmware-build.md) for compiler/dependency pins, supported hosts and application-only build/deployment boundaries. A native build pass does not replace physical E2E or complete distribution qualification.
+
+## ESP32 ROM JPEG path
+
+The native baseline JPEG adapter calls the existing ESP32 ROM TinyJPEG API declared in pinned ESP-IDF `esp32/rom/tjpgd.h`. That header attributes TinyJPEG to ChaN, 2012. The ROM decoder is resident device code; no JPEG decoder implementation or third-party source photograph is vendored by Pocket Search. The repository-authored admission policy, resizing callback and adapter are GPL-3.0-only. Preserve the pinned upstream ESP-IDF header notices and platform licensing with distributed corresponding source. This use does not establish general decoder conformance or a security audit.
+
+## Vendored native progressive-JPEG decoder
+
+`devices/chromatic/components/pocket_search_ui/vendor/stb_image.h` is based on
+stb_image v2.30 from [nothings/stb](https://github.com/nothings/stb) commit
+`013ac3beddff3dbffafd5177e7972067cd2b5083`, copyright 2017 Sean Barrett.
+This distribution selects MIT; the complete upstream grant remains in the source
+and in [the retained MIT text](devices/chromatic/components/pocket_search_ui/vendor/LICENSE-MIT.txt).
+The adjacent `stb-image.json` pins upstream/source/patch identities, checked by CI.
+The unmodified upstream header is retained losslessly in
+`third_party/sources/stb_image-013ac3b.h.gz`. The documented `stb-image.patch`
+defers progressive pixel-plane allocation, releases each coefficient plane
+when converted, and propagates allocation/malformed-marker failures. Those
+project changes are GPL-3.0-only; upstream copyright and MIT grants remain intact.
+Only the JPEG implementation is compiled. Original GPL project glue bounds all
+private allocation and uses decoded component planes directly. PNG uses the
+ESP32 ROM miniz inflater and original project chunk/filter/palette code; no stb
+PNG decoder or full-image interleaved RGB allocation is used.
+
+### Native WOFF2 and Brotli decoders
+
+The native component vendors decoder/common source subsets from Google's
+[WOFF2](https://github.com/google/woff2/tree/fb9c3379f2605b10f3e8f1d9636664ab5576775c)
+and [Brotli](https://github.com/google/brotli/tree/392b261debb0f478811ddacb98b118da36b06158),
+both under the MIT license. Their original copyright/license texts remain in
+`devices/chromatic/components/pocket_search_ui/third_party/{woff2,brotli}/LICENSE`.
+The pinned commits and local WOFF2 allocator, cancellation, intermediate-size and
+Xtensa integer-ABI modifications are recorded in `third_party/sources.json`.
+The original bounded allocation wrapper and Unicode rasterizer are GPL-3.0-only.
+No font hinting, script VM or native code contained in a font is executed.
+
+### Japanese web-font test fixtures
+
+`tests/fixtures/webfonts` contains received Noto Sans JP subsets and an
+independently reconstructed TrueType reference for decoder tests, under
+**OFL-1.1**, copyright 2014-2021 Adobe, Reserved Font Name 'Source'. The complete
+notice is retained in that directory's `OFL.txt`; URLs, dates and content hashes
+are in `provenance.json`. These are font assets, not GPL code. Test references
+never replace acquisition/decoding on the physical console. The native Japanese
+diagnostic downloads its face directly from Google Fonts; its glyph atlas is
+volatile. Apple system fonts are not included, fetched or redistributed.
+
+Pocket JP's internal storage is now losslessly compressed: all 16,077 original
+codepoints and bitmap bytes remain identical. Its modified name and OFL notice
+remain unchanged. The stored format, reference hashes and fixed loop bounds are
+recorded in `pocket_jp_storage.json` and tested against the complete glyph set.

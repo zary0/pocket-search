@@ -4,7 +4,7 @@ Pocket Search is intended for public open-source development under **GPL-3.0-onl
 
 ## Development priorities
 
-Chromatic is the primary target: 160 × 144 pixels, physical buttons, bounded memory, and a responsive MCU UI. Keep the device core dependency-free and allocation-free. Crawling, the corpus, ranking, and image preparation belong to the companion service.
+Chromatic is the primary target: 160 × 144 pixels, physical buttons, bounded memory, and a responsive MCU UI. Keep the device core dependency-free and allocation-free. Collection, indexing, ranking and reading run on the device. Keep the historical companion service optional. Native image processing must respect measured memory, byte, dimension and time budgets.
 
 Prefer measured changes with a clear behavior or resource benefit. Do not trade UTF-8 validation, packet bounds, certificate validation, result correctness, or source attribution for a faster number. Avoid CPU intrinsics or unsafe device code without an actual target measurement and a portable reference path.
 
@@ -36,7 +36,7 @@ For performance work, compare the same corpus, queries, compiler, optimization p
 
 ## Pull requests
 
-The initial maintainer is **[@zary0](https://github.com/zary0)**, who decides scope, accepts changes, and coordinates releases. Review ownership is recorded in [CODEOWNERS](https://github.com/zary0/pocket-search/blob/develop/.github/CODEOWNERS); CI, release-gate, license, and security changes require owner review under the intended GitHub protection policy. Automated review does not replace a required human approval. See [GitHub governance](docs/github-governance.md) for what is currently enforced and how to activate the remaining controls.
+The initial maintainer is **[@zary0](https://github.com/zary0)**, who decides scope, accepts changes, and coordinates releases. Review ownership is recorded in [CODEOWNERS](https://github.com/zary0/pocket-search/blob/develop/.github/CODEOWNERS); The sole maintainer manually assesses CI, release-gate, license and security changes. PRs and passing CI are mandatory, but approving reviews and mandatory CODEOWNER approval are set to zero while there is no independent reviewer. CODEOWNERS still records responsibility. Automated review does not replace the maintainer's judgment, and agents do not merge PRs. See [GitHub governance](docs/github-governance.md) for what is currently enforced and how to activate the remaining controls.
 
 We accept reproducible bug fixes, bounded Chromatic search/reader improvements, documentation, meaningful tests, and measured performance changes consistent with the [roadmap](docs/roadmap.md). Discuss large architecture changes or new dependencies in a feature issue first. Update [third-party notices](THIRD_PARTY_NOTICES.md) and license texts when importing code or changing dependencies; keep GitHub Actions pinned to reviewed upstream commit SHAs.
 

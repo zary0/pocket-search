@@ -12,7 +12,15 @@ class CollectionChanged extends Error {}
 const $=id=>document.getElementById(id),ctx=$('screen').getContext('2d');
 const state={query:'',mode:'home',script:0,group:0,letter:0,choosing:false,results:[],selected:0,offset:0,total:0,packet:null,seq:0,controller:null,busy:false,error:'',document:0,back:[],image:null};
 function box(x,y,w,h,r,color,stroke){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fillStyle=color;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke();}}
-function text(value,x,y,color='#202124',size=12){ctx.font=`${size}px Arial, "Hiragino Sans", sans-serif`;ctx.fillStyle=color;ctx.fillText(value,x,y+size);}
+function text(value,x,y,color='#202124',size=12,weight='normal'){ctx.font=`${weight} ${size}px Arial, "Hiragino Sans", sans-serif`;ctx.fillStyle=color;ctx.fillText(value,x,y+size);}
+function resultLines(value,limit,size=12,weight='normal'){
+  ctx.font=`${weight} ${size}px Arial, "Hiragino Sans", sans-serif`;
+  const lines=[];let rest=value.replace(/\s+/g,' ').trim();
+  while(rest&&lines.length<limit){let line='',end=0,space=0;for(const c of rest){if(ctx.measureText(line+c).width>144)break;line+=c;end+=c.length;if(c===' ')space=end;}
+    if(end<rest.length&&space>0){end=space;line=rest.slice(0,end);}lines.push(line.trim());rest=rest.slice(end).trim();}
+  if(rest&&lines.length){let line=lines.at(-1);while(line&&ctx.measureText(line+'...').width>144)line=[...line].slice(0,-1).join('');lines[lines.length-1]=line+'...';}
+  return lines;
+}
 function cancel(){state.seq++;state.controller?.abort();state.controller=null;state.busy=false;}
 function home(){cancel();state.mode='home';state.packet=null;state.results=[];state.back=[];state.image=null;state.error='';$('notice').textContent=collectionNotice();$('notice').classList.remove('error');render();}
 function render(){
@@ -27,11 +35,20 @@ function render(){
     values.forEach((value,i)=>{const x=8+i%3*49,y=59+Math.floor(i/3)*17,selected=i===(state.choosing?state.letter:state.group);if(selected)box(x-1,y,46,16,3,'#1a73e8');text(!state.choosing&&state.script===0&&i<10?value[0]+'行':value,x+1,y+1,selected?'#fff':'#202124',10);});
     text('Select:ABC Start:OK',8,129,'#70757a',10);
   }else if(state.busy){text('Pocket Search',8,4);text('Loading...',8,38);text('B:Cancel',8,129,'#70757a',10);}
+  else if(state.mode==='results'&&state.packet?.id&&state.results[state.selected]){
+    const p=state.packet,hit=state.results[state.selected];box(6,3,108,24,13,'#fff','#dadce0');
+    ctx.save();ctx.beginPath();ctx.rect(14,5,92,20);ctx.clip();text(tail(state.query),14,7,'#5f6368',11);ctx.restore();
+    text(`${p.page+1}/${p.count}`,118,8,'#70757a',10);
+    const title=resultLines(hit.title,2,12,'bold');title.forEach((line,i)=>text(line,8,34+i*14,'#1a0dab',12,'bold'));
+    const description=resultLines(hit.snippet,title.length>1?3:4,11);description.forEach((line,i)=>text(line,8,(title.length>1?66:52)+i*13,'#3c4043',11));
+    let source='';try{source=new URL(hit.url).hostname.replace(/^www\./,'');}catch{source=hit.url;}
+    text(resultLines(source,1,10)[0]||'',8,112,'#70757a',10);
+  }
   else if(state.packet&&['results','reader'].includes(state.mode)){
     const p=state.packet;text(`${p.page+1}/${p.count}`,8,3,'#70757a',10);text(p.title,8,18,'#1a73e8',11);
     if(state.mode==='reader'&&state.image){const image=state.image,off=document.createElement('canvas');off.width=image.width;off.height=image.height;off.getContext('2d').putImageData(new ImageData(image.rgba,image.width,image.height),0,0);ctx.drawImage(off,(160-image.width)/2,34+(80-image.height)/2);text(p.lines[0]||'',8,116,'#202124',10);}
     else p.lines.forEach((line,i)=>text(line,8,35+i*13,p.kind===4||p.kind===5?'#1a73e8':'#202124',11));
-    text(state.mode==='reader'?(p.kind===4&&p.target?'A:Open Left/Right B':'Left/Right B:Back'):'Up/Down A:Read B:Back',8,129,'#70757a',9);
+    if(state.mode==='reader')text(p.kind===4&&p.target?'A:Open Left/Right B':'Left/Right B:Back',8,129,'#70757a',9);
   }else{text('Pocket Search',8,4);text(state.error?'Connection error':'Enter a query',8,38);text('B:Search home',8,129,'#70757a',10);}
   $('screen').setAttribute('aria-label',`本体プレビュー。${state.mode}。${state.packet?.title||tail(state.query)}。${state.packet?.lines.join(' ')||''}`);
   $('clear').hidden=!$('query').value;document.body.classList.toggle('has-results',['results','reader','loading'].includes(state.mode));

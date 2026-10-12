@@ -35,6 +35,11 @@ The header is 20 bytes. Multibyte integers are little-endian.
 
 Flags must agree with index and count. All non-result IDs must be nonzero. Result ID zero is an empty-result screen with no open action.
 
+The autonomous `0.14.10` adapter gives successful local result text a bounded
+presentation convention (title continuation, compact authority, query excerpt).
+PCS1 bytes and validation are unchanged; optional companion result packets keep
+their previous text order. See [native result presentation](native-search-results.md).
+
 Payload: kind 4 starts with a four-byte little-endian registered target ID (0 = unavailable, 1–256 = registered document), included in the payload length. Other kinds have no target prefix. Then UTF-8 title, then each body line as `one-byte length + UTF-8 bytes`. No terminators or padding. The supplied slice must equal the payload length plus 20, and parsing must consume it exactly.
 
 ## Host behavior

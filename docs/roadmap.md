@@ -1,130 +1,134 @@
 # Product-first Chromatic roadmap
 
-The primary outcome is **Chromatic directly collects a small public-web corpus, builds an index, searches it and reads it without a Mac, companion service or temporary tunnel**. Search scope may be small. Infrastructure and previous companion demonstrations do not complete this outcome.
+The outcome is a small public-web collector, search engine and reader that runs
+on Chromatic without a Mac, companion search service or temporary tunnel.
+Completion requires the actual installed candidate and physical acceptance;
+a checked implementation item does not qualify a firmware release.
 
-## Priority and execution order
+## P0 — Reproducible firmware and trustworthy physical operation
 
-| Priority | User outcome | Completion boundary |
-| --- | --- | --- |
-| P0 | Standalone collection, search and text reading | Native direct HTTPS, local index/ranking/pagination, physical controls, battery and cold-start/error acceptance |
-| P1 | Useful sources and retained local content | Configurable public profiles, provenance, policy expansion and measured persistent storage |
-| P2 | Autonomous source images | Native acquisition/decoding/resizing within measured TLS/display limits |
-| P3 | Faster and clearer device use | Measured CPU/heap/stack/display improvements against the working standalone flow |
+- [x] Allocation-free Rust streaming extraction, fixed frontier, inverted index,
+  exact matching, locally generated results and bounded semantic reading windows.
+- [x] Native Wi-Fi, SNTP, verified HTTPS, robots checks and bounded sequential
+  requests. No host page proxy or external search API in autonomous mode.
+- [x] Complete MCU application source overlay, fonts, display/button integration,
+  public pinned dependencies, checksum-verified tool installer and clean build.
+  Two fresh macOS `0.14.6` outputs match; isolated Linux native CI passes. See
+  [build procedure and distribution boundary](native-firmware-build.md).
+- [x] Correct cancellation retry: a cancelled robots request does not cache a
+  denial. Unpublished cancelled pages remain resumable. Transfer/format errors
+  retain readable content and free temporary image allocations.
+- [ ] Verify **the latest candidate** on battery: cold start, saved corpus without
+  Wi-Fi, reconnection, fresh collection, input, scrolling and image/back behavior.
+  The earlier operator-confirmed battery experiment does not qualify new changes.
+- [ ] Finish latest physical controls/video, no-result, disconnected, timeout,
+  cancellation, malformed/oversized source and long-duration acceptance.
+  MCU render-buffer readback and synthetic button injection are development
+  evidence, not physical USB video or independent button/panel observation.
+- [ ] Provision a dedicated isolated runner, trusted installed lab driver,
+  public HTTPS deployment of the implemented [native source fixture](native-fixture.md),
+  a reviewed candidate profile and actual capture/control access.
+  Keep `CHROMATIC_E2E_READY=false` until verified. Never execute contributor PR
+  code on the maintainer's daily-use machine.
+- [ ] Bind candidate/source/readback and all required physical E2E evidence,
+  with no failed/skipped scenarios, before main promotion or any `vX.Y.Z` release.
 
-## P0 — Autonomous mode takes priority
+The [physical lab contract](hardware-e2e.md) remains a hard release boundary.
+Hosted CI checks actual complete MCU compilation and behavior, not a fabricated
+hardware pass. Public source availability does not qualify firmware, register a personal
+machine as a runner or authorize automatic PR merging.
 
-- [x] Implement a dependency-free Rust crawl frontier, streaming text parser and fixed-capacity inverted index, with safe exact matching and a bounded fallback when the term table fills.
-- [x] Replace companion requests with direct native verified HTTPS collection; keep source scope, byte/time/frontier/request bounds explicit.
-- [x] Generate results and text pages locally without sockets or external formatting after collection. Exclude sample content from the autonomous index.
-- [x] Build the Xtensa Rust archive and an app-only native image within the existing 2 MiB partition.
-- [x] Verify standalone direct collection/search with the Mac services/tunnels stopped, all 18 retained pages of one reader document, and installation/settings integrity. The operator confirmed battery-only restart, four `AI` results and A to read; see [scoped evidence](on-device-search.md).
-- [x] Preserve supported heading/body/annotation sizes, inline bold and paragraph breaks in bounded native reading windows; verify the actual MCU rendering and scrolling. The following increment covers a bounded CSS/font subset and does not qualify a physical release. See [typography scope](typography.md).
-- [x] Add a bounded external-CSS typography cascade and an on-device static TrueType ASCII rasterizer. Full CSS, WOFF2, variable fonts, shaping and proportional layout remain future work; see [scope and acceptance](native-css-webfonts.md).
-- [x] Retain a bounded heading/paragraph/list/link/image-slot tree, apply basic color/background/pixel box CSS and reflow to 160 px with vertical reading controls. Native image pixels and full browser layout remain out of scope for this increment; see [semantic flow scope](native-flow-layout.md).
-- [ ] Expand source profiles and CSS resource acceptance with measured native adversarial inputs before broadening stylesheet/font formats.
-- [ ] Complete physical input, battery-only, empty/error/cancellation and endurance acceptance, and make the complete firmware build reproducible for release.
+## P1 — Useful sources and durable local content
 
-No standalone image support is claimed by the earlier host-prepared source-image experiment. Bookmarks, history and Codex approval remain outside scope. Retained text has a visible fixed-capacity limit; a persistent, complete-page storage path is P1 work. The checked standalone evidence does not complete the broader release-qualification checkbox.
+- [x] Maintainer-reviewed source configuration and a generated dependency-free
+  registry; select Stanford AI, W3C Web or W3C People on the device.
+- [x] Full admitted URL, profile, acquisition/check UTC time, status, received/
+  retained bytes and text-limit information, with paged source details.
+- [x] Validated explicit snapshot format, two commit-last flash banks, ownership
+  and CRC checks, previous-bank fallback, index rebuild and retained crawl cursor.
+  Foreign storage is never automatically erased. Queries/history are not stored.
+- [x] Persist completed pages, requeue cancelled unpublished pages, load/search
+  a completed corpus offline, and resume an incomplete frontier.
+- [x] Explicit conditional update using ETag/Last-Modified. Keep a 304's original
+  text/provenance; replace only complete 200 content; preserve old data on failure.
+- [ ] Qualify latest restart/resume/conditional-update behavior physically and
+  test actual power interruption during flash writes; host truncation/torn-header
+  tests do not prove physical brownout recovery.
+- [ ] Expand reviewed sites and resource/DNS/robots policy with native adversarial
+  acceptance. Arbitrary URLs, a durable cross-domain frontier and Internet-wide
+  indexing are outside this bounded four-document increment.
+- [ ] Add measured complete-page storage and deliberate stable-format migrations.
+  The current 2,560-byte body limit remains visible and is not complete HTML storage.
 
-## Earlier work and remaining acceptance
+See [retained-content implementation and limits](native-retained-content.md).
 
-The following records describe the preceding companion architecture and reusable enablers. They do not override autonomous P0.
+## P2 — Native source pixels and staged browser fidelity
 
-## P0 — First usable native search and reader
+- [x] Native result titles, bounded query-context excerpts and compact source
+  labels with result selection and complete provenance still available. See
+  [result presentation](native-search-results.md).
+- [x] Resolve the visible image source; directly acquire a bounded verified HTTPS
+  baseline JPEG on the selected public authority; decode with the ESP32 ROM path,
+  resize to RGB565 and release temporary buffers on leaving the article.
+- [x] Automatically load the first visible supported image into its retained box,
+  reuse one semantic-slot cache across scroll windows and expansion/back, and
+  preserve scrolling/text on image failure or cancellation. A expands or retries.
+- [x] Qualify scoped native source pixels, cancellation/retry/back and separate
+  TLS/decode allocation windows on installed `0.14.9`: 1,810.676 seconds, 160
+  direct original-source JPEG/PNG images, zero unexpected errors/resets or storage
+  failures. No host-prepared image substitutes for native acquisition/decoding.
+  This uses USB power/diagnostic controls; independent physical/battery release
+  acceptance stays in P0. See [limits and evidence](native-image-formats.md).
+- [x] Add independently bounded native PNG and progressive-JPEG support. GIF,
+  SVG, WebP, animation and video remain later format work.
+- [x] Retain headings, paragraphs, lists, links and image slots; reflow to 160 px;
+  preserve supported size/weight/color/box styles and vertical line scrolling.
+- [x] Basic external CSS plus four bounded embedded simple rules, with cross-page
+  isolation and streaming/chunk-boundary tests. Persist supported computed styles.
+- [ ] Extend selector/document-order behavior and measured layout incrementally;
+  flex, grid, table layout and complete HTML5/CSS conformance are not implemented.
+- [x] Bounded native static WOFF2/TrueType and downloaded Japanese subset faces,
+  four-level grayscale, preserved outline aspect and horizontal kana clusters.
+  OFL/MIT notices, source/atlas reference hashes, 39,083-byte decoder peak and
+  native transport/decode/raster cancel/retry acceptance on 0.14.13. Built-in
+  Pocket JP retains all 16,077 original glyphs. See [font scope and evidence](native-webfonts.md).
+- [ ] Extend multiple/larger downloaded faces, composite/variable/CFF/color
+  fonts, cmap coverage and general GSUB/GPOS/complex-script shaping within
+  independently qualified memory, licensing and cancellation limits.
 
-### Historical companion API — retained development tooling
+## P3 — Physical feedback and measured efficiency
 
-- [x] Expose the existing Rust index and PCS1 encoder through `GET /v1/chromatic/search?q=...&result=0` and `GET /v1/chromatic/page?id=...&page=0`.
-- [x] Load one immutable, original English/Japanese fixture collection; keep document IDs stable for the experiment and mark fixture content visibly.
-- [x] Enforce the 96-byte decoded UTF-8 query limit and 512-byte packet limit; reject invalid IDs/pages, return honest empty results, and bound request time/concurrency with explicit response lengths.
-- [ ] Add deterministic failure cases and test hooks for timeouts, malformed/oversized packets, and request correlation. Keep query/body logging disabled.
-- [x] Make a certificate-validated HTTPS origin reachable from the actual device network. Verify this before relying on a local service: earlier tests did not establish device-to-computer LAN reachability.
-- [x] Offer explicit saved-origin setup and restore it after an MCU restart. Verify native search/read/back without reconfiguring the origin; keep the companion/tunnel availability and battery-only acceptance boundaries explicit. See [restart recovery evidence](search-service.md).
+- [x] FPGA menu-button click RTL and official-source integration, leaf simulation
+  and licensed Gowin build with no reported timing violations.
+- [ ] Verify complete clock-domain behavior, original FPGA recovery, deployment,
+  speaker/headphone/USB audio and mute/volume behavior on the physical console.
+  The custom FPGA image is not installed; no physical click is claimed.
+- [x] Cache immutable layout-position counts at publish/load and invalidate/rebuild
+  after replacement; remove repeated whole-page counting from navigation.
+- [x] Implement explicit same-document reference/cached packet comparisons and
+  a thirty-second current-native-UI render/heap/stack window without a test scene.
+- [x] Record scoped latest CPU, heap/largest block, stack, TLS/image and GUI windows;
+  compare same-document packet bytes and unchanged-reader transfers. See
+  [native measurements and exact scope](native-device-measurements.md). Physical
+  power, full TLS peak traces and broader size/speed profile comparison remain pending.
+- [x] Complete a scoped latest USB-powered thirty-minute offline reader run, with
+  3,760 queued controls, stable sampled heap, zero socket requests/storage failures
+  and all 120 positions traversed. It does not qualify battery, physical controls
+  or repeated network/image endurance.
+- [ ] Extend endurance testing and optimize measured bottlenecks without weakening
+  certificate, content, storage and release validation. Assess task consolidation
+  or bare-metal changes against equivalent working networking/recovery behavior.
 
-**Completion:** known queries produce query-dependent PCS1 results and complete reader pages through the service, with compatible decoding and deterministic errors. This API check alone is not a physical-device pass.
+## Separate future work and historical evidence
 
-### 2. Reproducible native application and adapter
+Japanese input ergonomics, user-supplied book import and relevance improvements
+can follow the working bounded reader. Bookmarks, browsing history, launch-time
+reading restoration and the Codex approval app remain outside product scope.
 
-- [x] Build `chromatic-client` for the actual ESP32 Xtensa toolchain and link it through a defined C ABI or native Rust integration. A host `no_std` check does not meet this requirement.
-- [ ] Build the Pocket Search application from repository-controlled source and documented, licensed dependencies, including the display/button/font adapter and build configuration. An operator-local experimental image is not the application deliverable.
-- [x] Reuse ESP-IDF/FreeRTOS, native Wi-Fi, SNTP, certificate/hostname validation, and the measured display components. Start with the 48-row graphics-optimized prototype and verify it with the reader workload; retain the 16-row alternative for measured memory constraints.
-- [x] Correct the retained LVGL tick-unit issue and verify application timer/input behavior separately from the recorded display comparison.
-- [x] Keep one request in flight; cap the receive buffer before writing, decode only a complete packet, and retain its borrowed data until drawing/action dispatch finishes.
-- [x] Produce an application-only image within 2 MiB, with exact source/version/image identity and the established recovery, settings-preservation, and installation verification procedure.
-
-**Completion:** the exact image runs the Rust decoder on the intended MCU and renders a verified packet through the real font/display adapter. This integration check does not yet complete the search flow.
-
-### 3. Physical input and text interaction
-
-- [x] Implement a bounded on-device keyboard with editing, deletion, and submit. State the initial supported character set explicitly; retain UTF-8 limits as input support expands.
-- [x] Connect buttons to query entry, result up/down, A to open, reader left/right, B to return, Start for query entry, and Select to go home.
-- [ ] Show loading, no results, timeout, disconnected, and invalid-response states without blocking controls or inventing content.
-- [ ] Display title, bounded body rows, and navigation hints without overlap. Inspect English/Japanese fixture text physically, with visible unsupported-glyph fallback.
-- [ ] Preserve the complete stored body across pagination, enforce first/last-page boundaries, and keep only temporary navigation state for returning to results.
-
-**Completion:** a person can type a query on the handheld, select its actual returned document, read every page, and return to results or query entry using physical controls.
-
-### 4. Physical acceptance and repeatable E2E
-
-- [ ] Exercise the complete flow over device-native Wi-Fi after native clock synchronization, with certificate validation enabled and no host fetch/USB proxy.
-- [ ] Check changed queries, empty results, malformed/oversized replies, timeout/reconnection, repeated navigation, and full mixed-language pagination without a frozen UI or silent text loss.
-- [ ] Measure pinned-core decoder cycles/allocations, stack headroom, packet sizes, HTTPS/UI timing, minimum free heap, and largest free block with the actual application.
-- [ ] Implement and verify the operator-installed lab driver, dedicated physical runner, reachable fixture origin, and physical USB-video capture required by the E2E contract.
-- [ ] Bind the tested image and evidence to the exact candidate/source; pass all five required scenarios without failures or skips before enabling `CHROMATIC_E2E_READY`.
-- [ ] Verify battery-only operation separately; USB-powered diagnostics do not establish it.
-
-**P0 is done only when** the physical query → verified HTTPS result → complete text → back loop works and its required E2E is repeatable for the exact native image. Host tests, a rendering probe, and screenshots alone cannot substitute for this outcome. See [hardware acceptance](hardware-e2e.md), [protocol](chromatic-protocol.md), and [release policy](releases.md).
-
-P0 uses controlled fixtures to prove integration. It must not be presented as searching the real web; that is P1.
-
-## P1 — Real web content and book text
-
-- [x] Add a bounded public-HTTPS crawler/extractor for explicit seeds with public-web or exact-domain scope. Respect robots.txt; bound page count, depth, bytes, parsing time, redirects, and per-host request rate; validate destinations before fetching.
-- [x] Collect bounded public pages with source URL, collection time, SHA-256 records, extracted text/links and protected PNG/JPEG preparation. Live host acquisition is verified on Example Domain, IANA and W3C, including two prepared source images; physical real-page acceptance remains pending. Do not execute fetched scripts or substitute invented content for unsupported sites.
-- [x] Add within-run deduplication, immutable snapshot persistence and generation checks so collected reader IDs fail on a mismatched collection.
-- [ ] Add a durable cross-domain frontier, cross-run deduplication, partitioned corpus/index storage, automatic resumption and incremental updates; current snapshots are capped at 256 pages and never hot-reloaded.
-- [ ] Add a bounded source/details view for complete URLs and collection information that do not fit a result screen.
-- [ ] Import user-provided or redistributable plain-text books into the companion, with bounded file/page sizes and source metadata. Reuse the reader; device requests refer to registered document IDs rather than arbitrary filesystem paths.
-- [ ] Make Japanese query entry usable and verify input, wrapping, glyph fallback, and complete reading against actual Japanese content.
-- [x] Search actual indexed public pages on the handheld over certificate-verified HTTPS; reach results beyond the first ten and open reading scenes. Scoped synthetic-input/render-buffer evidence is recorded separately from operator LCD observations and release E2E.
-- [ ] Open imported book text on the handheld; complete physical-control, provenance, first/last body page, zero-result and mixed-language acceptance.
-
-**Completion:** physical searches return actual collected content, and the same handheld reader opens real web text and imported book text with inspectable source information. Collection scope stays explicit; this is independent search, not Google's results or a web-scale index.
-
-## P2 — Source images
-
-- [x] Fetch registered images referenced by collected documents, applying the crawler's origin/redirect/size protections, and resize them on the companion.
-- [x] Define and implement PCI1 RGB565 stripes, CRC/order/document/page validation, cooperative cancellation and incomplete-transfer rejection for an image up to 128 × 80 pixels.
-- [x] Display registered image stripes through LVGL and the bounded band driver using one temporary <=20 KiB image cache; release it when leaving the image.
-- [ ] Display an actual source image and return to text with B; measure TLS-active peak memory, responsiveness, and interrupted-transfer recovery.
-
-**Completion:** an image from the selected source displays correctly on the physical console within the measured memory budget, and failure/back navigation works.
-
-Registered local PNG/JPEG resizing and two original source images have native Wi-Fi/render-buffer verification; see [DOM/image evidence](dom-images.md). Live network collection and image preparation are now verified on the host; physical source-image/interruption acceptance and TLS allocator peak tracing remain pending.
-
-## P3 — Quality and measured improvements
-
-- [x] Implement optional FPGA physical menu-button clicks and validate the waveform/mixer in RTL simulation with pinned official-source integration. See [native click scope](native-click.md).
-- [x] Build that FPGA design with the licensed Gowin toolchain and record resources and zero reported timing violations. See the [vendor-build evidence](evidence/native-click/vendor-build.json).
-- [ ] Review complete clock-domain behavior, verify recovery, and physically qualify speaker/headphone/USB feedback. The custom image has not been installed or heard on the console.
-
-- [ ] Refine Japanese input, keyboard ergonomics, long-text layout, links, reading controls, and search relevance using the working product.
-- [ ] Add native character-commit click feedback after a verified FPGA audio command/path is available; preserve the wheel/mute and game/USB audio. Browser input feedback is implemented separately; see [UI scope](search-ui.md#input-click-feedback).
-- [ ] Optimize actual decoder, HTTPS, and rendering bottlenecks while preserving validation, content correctness, and source information. Compare target size/speed profiles on the real Xtensa build.
-- [ ] Evaluate stack/task consolidation or platform replacement only against equivalent networking, recovery, and physical E2E behavior.
-- [ ] Evaluate externally prepared low-resolution video after text and still-image acceptance.
-
-Bookmarks, browsing history, launch-time reading restoration, and the Codex approval application remain outside the product scope.
-
-## Completed enablers — not product completion
-
-The [search-first UI](search-ui.md) now connects to the bounded API and Xtensa Rust decoder. [Experimental evidence](search-results.md) verifies native Wi-Fi search, reader navigation, and user-confirmed LCD/A/Left/Right/B behavior. Full reproducible firmware, error/mixed-language acceptance and qualified physical E2E remain P0 work. Checked image/build items describe this local experiment, not release completion.
-
-- [x] Chromatic-first MCU/service architecture, English documentation, and GPL-3.0-only contribution/security guidance.
-- [x] Rust search/ranking, bounded text encoding, allocation-free `no_std` decoding, and button action mapping with host validation.
-- [x] Repeatable host timing/allocation measurements and compact bounded search selection.
-- [x] Target compilation of the ESP32 CPU-cycle/heap probe; native Rust decoder execution is now verified in the experimental search image.
-- [x] Physical C/LVGL rendering measurements, 16/48-row display transports, and an opt-in graphics compiler experiment. These do not verify the reader or native Wi-Fi search.
-- [x] `develop` → `main` → annotated `vX.Y.Z` version/package policy and CI/CD orchestration requiring physical evidence before release.
-
-The complete reproducible application and qualified physical search E2E are still pending; the sample API/reader loop and a bounded real-web snapshot collector are implemented. Keep [implementation status](../README.md) accurate as each acceptance boundary is met.
+The optional Rust companion crawler/API/browser and host image preparation are
+retained development tools. Their broader corpus does not expand native scope.
+Historical [standalone search](on-device-search.md), [typography](typography.md),
+[semantic flow](native-flow-layout.md), [companion DOM/images](dom-images.md), and
+[display measurements](performance.md) retain their original revision and evidence
+boundaries. Release policy stays `feature/fix` -> `develop` -> qualified `main` ->
+annotated `vX.Y.Z`, with review and CI required and no automatic merge.

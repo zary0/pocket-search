@@ -1,0 +1,3 @@
+
+# Retain verbatim upstream font license bytes.
+devices/chromatic/firmware/overlay/components/fonts/POCKET-FONT-LICENSE.txt whitespace=-blank-at-eol

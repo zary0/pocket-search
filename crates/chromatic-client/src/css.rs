@@ -27,6 +27,8 @@ impl Rule {
 /// Integer-only fields allow the native opaque state to be zero-initialized.
 pub struct Sheet {
     rules: [Rule; RULES],
+    embedded: [Rule; 4],
+    embedded_count: u8,
     count: u8,
     /// Limitation of the retained stylesheet, not a per-document status.
     pub limited: u8,
@@ -44,6 +46,8 @@ pub struct Sheet {
 impl Sheet {
     pub const EMPTY: Self = Self {
         rules: [Rule::EMPTY; RULES],
+        embedded: [Rule::EMPTY; 4],
+        embedded_count: 0,
         count: 0,
         limited: 0,
         href: [0; URL],
@@ -64,11 +68,13 @@ impl Sheet {
         core::str::from_utf8(&self.font[..self.font_len as usize]).unwrap_or("")
     }
     pub fn begin_page(&mut self) {
+        self.embedded_count = 0;
         self.enabled = 0;
         self.cached = 0;
         self.href_len = 0;
     }
     pub fn enable(&mut self) {
+        self.embedded_count = 0;
         self.enabled = 1;
     }
     pub fn cached(&self) -> bool {
@@ -162,7 +168,7 @@ impl Sheet {
                             }
                         }
                     }
-                    // Only a single url(...), no local(), multiple sources, escapes, or formats other than truetype.
+                    // Only a single url(...), no local(), multiple sources, escapes, or formats other than truetype/woff2.
                     if family.is_empty()
                         || family.len() > 24
                         || !family.is_ascii()
@@ -179,6 +185,8 @@ impl Sheet {
                     if !tail.is_empty()
                         && tail != "format('truetype')"
                         && tail != "format(\"truetype\")"
+                        && tail != "format('woff2')"
+                        && tail != "format(\"woff2\")"
                     {
                         self.limited = 1;
                         continue;
@@ -217,14 +225,56 @@ impl Sheet {
             }
         }
     }
+    /// Complete simple embedded rule; no allocation, imports, faces or nested blocks.
+    pub fn embedded(&mut self, bytes: &[u8]) {
+        let Ok(css) = core::str::from_utf8(bytes) else {
+            self.limited = 1;
+            return;
+        };
+        let Some(open) = css.find('{') else {
+            return;
+        };
+        let Some(close) = css.rfind('}') else {
+            return;
+        };
+        let selector = css[..open].trim();
+        let body = &css[open + 1..close];
+        if selector.starts_with('@')
+            || body.contains(['{', '}'])
+            || css.contains("/*")
+            || css.contains('\\')
+        {
+            self.limited = 1;
+            return;
+        }
+        for sel in selector.split(',') {
+            let sel = sel.trim();
+            if !simple(sel) || self.embedded_count as usize == self.embedded.len() {
+                self.limited = 1;
+                continue;
+            }
+            let mut rule = Rule::EMPTY;
+            rule.selector[..sel.len()].copy_from_slice(sel.as_bytes());
+            rule.len = sel.len() as u8;
+            declarations(body, self.family(), &mut rule);
+            rule.paint.parse(body);
+            if rule.mask != 0 || rule.paint.mask != 0 {
+                self.embedded[self.embedded_count as usize] = rule;
+                self.embedded_count += 1;
+            }
+        }
+    }
     pub fn apply(&self, name: &str, id: &str, classes: &str, inline: &str, mut style: u8) -> u8 {
         let mut values = [0; 3];
         let mut priorities = [0u16; 3];
-        for rule in &self.rules[..if self.enabled != 0 {
+        for rule in self.rules[..if self.enabled != 0 {
             self.count as usize
         } else {
             0
-        }] {
+        }]
+            .iter()
+            .chain(self.embedded[..self.embedded_count as usize].iter())
+        {
             let sel = core::str::from_utf8(&rule.selector[..rule.len as usize]).unwrap_or("");
             let score = specificity(sel, name, id, classes);
             cascade(rule, score, &mut priorities, &mut values);
@@ -257,11 +307,14 @@ impl Sheet {
         mut style: crate::box_css::Style,
     ) -> crate::box_css::Style {
         let mut priorities = [0; crate::box_css::PROPERTIES];
-        for rule in &self.rules[..if self.enabled != 0 {
+        for rule in self.rules[..if self.enabled != 0 {
             self.count as usize
         } else {
             0
-        }] {
+        }]
+            .iter()
+            .chain(self.embedded[..self.embedded_count as usize].iter())
+        {
             let sel = core::str::from_utf8(&rule.selector[..rule.len as usize]).unwrap_or("");
             rule.paint.cascade(
                 specificity(sel, name, id, classes),
@@ -618,12 +671,22 @@ mod tests {
             b"p{font-size:16px".as_slice(),
             b"\xff",
             b"@font-face{font-family:X;src:local(X)}",
-            b"@font-face{font-family:X;src:url(x.woff2) format('woff2')}",
+            b"@font-face{font-family:X;src:url(x.woff2) format('woff')}",
         ] {
             sheet.parse(data, "https://example.org/x.css");
             assert!(sheet.limited != 0);
             assert!(sheet.font_url().is_empty());
         }
+    }
+    #[test]
+    fn woff2_face_is_a_single_bounded_explicit_source() {
+        let mut sheet = Sheet::EMPTY;
+        sheet.parse(b"@font-face{font-family:'Noto Sans JP';src:url(jp.woff2) format('woff2')}p{font-family:'Noto Sans JP'}","https://fonts.gstatic.com/example/site.css");
+        assert!(sheet.font_len > 0);
+        assert_eq!(
+            core::str::from_utf8(&sheet.font[..sheet.font_len as usize]).unwrap(),
+            "https://fonts.gstatic.com/example/jp.woff2"
+        );
     }
     #[test]
     fn only_bounded_https_urls_resolve() {

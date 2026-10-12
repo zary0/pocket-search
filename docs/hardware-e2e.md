@@ -1,18 +1,18 @@
 # Physical Chromatic E2E lab
 
-> The current native experiment uses on-device collection/search. The lab contract below was designed for companion-mode fixtures and is not yet qualified for autonomous mode. Before enabling E2E, adapt the trusted driver and deterministic fixture source to test cold-start direct collection and socket-free local search/reading. A source HTTPS fixture is distinct from a companion search service. Keep the existing native transport, physical capture, exact-image and recovery gates mandatory.
+> This contract targets on-device collection/search, retained flash content and bounded native baseline/progressive JPEG and PNG processing. It is not yet backed by a provisioned lab. The trusted driver and deterministic HTTPS source fixture remain required. A source fixture serves HTML and original image bytes; it does not search, extract, lay out or resize pages for the device.
 
 The lab must test the native Pocket Search MCU application through the actual display, controls, and device Wi-Fi. Host fixtures, packet unit tests, PyBoy, and streamed emulator demos cannot qualify a release.
 
 ## Current readiness
 
-As checked on 2026-10-10, no lab runner is registered, `CHROMATIC_E2E_READY=false`, the complete Pocket Search MCU firmware project and installed lab driver are not implemented, and no reachable test HTTPS origin is configured. The workflows and release-gate validators exist. The experimental search UI/rendering images have external integration and different application/version identities; they cannot satisfy this pipeline.
+As checked on 2026-10-12, no lab runner is registered and `CHROMATIC_E2E_READY=false`. The complete MCU build is implemented and verified by hosted CI. The [deterministic source fixture](native-fixture.md) is implemented and host-tested; its public HTTPS deployment, reviewed candidate profile and the operator-installed physical lab driver remain unavailable. The workflows and release-gate validators exist. Current USB render-buffer and synthetic-input checks cannot satisfy this pipeline.
 
 Automatic develop pushes record **Physical E2E not run** while the repository variable is explicitly `false`. This keeps the development status separate from a failed test or a fabricated pass. An unset/invalid value runs the strict readiness check and fails. Main pushes, manual dispatch on develop/main, and release tags always invoke qualification, whose readiness and physical evidence gates remain mandatory. Enable `true` only after the prerequisites below are verified; then develop pushes also run physical qualification automatically.
 
 ## Dedicated runner
 
-Use an operator-controlled machine with USB access to the intended Chromatic, ESP-IDF and the actual Rust Xtensa toolchain, Python 3.11+, and the firmware deployment/capture dependencies. The pinned Actions use Node.js 24 and require Actions Runner **2.327.1 or newer**. Register it for this repository with the `chromatic` label. Use a dedicated unit and preserve its verified recovery backup and Wi-Fi settings outside the checkout.
+Use an operator-controlled machine with USB access to the intended Chromatic, ESP-IDF and the actual Rust Xtensa toolchain, Python 3.12+, and the firmware deployment/capture dependencies. The pinned Actions use Node.js 24 and require Actions Runner **2.327.1 or newer**. Register it for this repository with the `chromatic` label. Use a dedicated unit and preserve its verified recovery backup and Wi-Fi settings outside the checkout.
 
 Configure the `chromatic-lab` environment for trusted `develop`, `main`, and stable release tags. Do not execute fork PRs or arbitrary contributor refs on the lab machine. Preconfigure physical capture access through the normal ModRetro/OS permission flow; CI cannot silently grant it. Keep the installed driver outside repository-controlled paths.
 
@@ -24,6 +24,8 @@ Repository variables:
 | `CHROMATIC_LAB_DRIVER` | Absolute installed driver executable path, for example `/opt/pocket-search-lab/driver` |
 | `CHROMATIC_LAB_DRIVER_SHA256` | Operator-approved digest of that installed executable |
 | `CHROMATIC_TEST_ORIGIN` | Reachable HTTPS fixture origin with a certificate accepted by the device |
+
+Readiness also requires an exact public HTTPS origin already admitted by a reviewed source profile; a variable cannot grant the device a new authority.
 
 These variables do not contain Wi-Fi passwords, activation keys, tokens, or backups. Runner credentials and private device state stay outside the repository and upload artifacts. Actions execute the driver with an argument list and verify its path and hash rather than evaluating a repository-provided shell command.
 
@@ -42,16 +44,27 @@ The driver must never emit a synthetic success or substitute a different firmwar
 - `query_result_open`: submit a known query through device controls, inspect real returned results, select one, and verify the displayed document/source.
 - `utf8_pagination`: read all pages of a mixed Japanese/English fixture and verify bounds, text completeness, back navigation, and physical glyph behavior.
 - `empty_results_network_errors`: zero-result behavior, timeout/reconnection, and malformed/oversized replies without fabricated content or a frozen UI.
-- `cpu_memory_budget`: pinned-core decoder cycle measurements, zero decoder allocations, and free/largest heap checks after warm-up; measure verified HTTPS separately.
+- `cpu_memory_budget`: pinned-core decoder cycle measurements, zero Rust packet-decoder allocations, and free/largest heap checks after warm-up; measure verified HTTPS separately. The `decoder_allocations` release metric refers to the Rust packet decoder (`SEARCH_COMPARE`), not the separately bounded native image allocations in `SEARCH_NET`.
+- `cancellation_retry`: cancel collection and image loading with physical B, return to readable content, retry successfully, and check that cancellation did not cache a robots denial or publish partial image pixels.
+- `persistent_cold_start`: collect, preserve the corpus during a genuine reboot, search/read with Wi-Fi disabled and no socket requests, resume an interrupted frontier, then exercise an explicit conditional update. Include controlled interruption of an inactive-bank write on the lab unit and recovery from the previous valid bank.
+- `native_image_processing`: use original encoded baseline JPEG, PNG and progressive-JPEG fixtures that were not prepared for the display on a host. Correlate native HTTPS acquisition with native decode/resize, observe source pixels on the display, and check back/error/cancellation buffer release. The source and decoded byte metrics must both be nonzero. Record at least one source/pixel-verified success for each format and the native decoder-private allocation peak. Validate PNG CRC/inflate/filter and progressive scan rejection, cancellation/retry/back, TLS and decode phase heap bounds, without replacing source bytes with host pixels.
+- `battery_standalone`: disconnect USB power, restart on batteries, search/read retained content, reconnect Wi-Fi and acquire an image. Observe at least 120 seconds of this segment independently; this is a smoke check, not a battery-life estimate. A USB-powered serial trace or render-buffer dump cannot prove battery operation. The lab must provide an independent observation/control path while USB is disconnected.
+- `endurance_30_minutes`: exercise reading/navigation and repeated network/image/error/retry transitions for at least 1,800 seconds after warm-up. Record local heap/largest-block minima, watchdog/reset observations, storage failures and final responsiveness. No unexpected reset or persistent-storage failure is permitted.
 
-The service origin must support deterministic test documents, error injection, request correlation, and a native-device request trace so the driver can verify the path. These fixture service features are not implemented yet. Initial thresholds in `ci/hardware-policy.json` are acceptance targets, not measured achievements.
+The source origin must support deterministic test documents, error injection, request correlation, and a native-device request trace so the driver can verify the path. The fixture implements these source behaviors; deployment and exact-candidate/physical-device correlation remain required. Initial thresholds in `ci/hardware-policy.json` are acceptance targets, not measured achievements.
 
 ## Evidence
 
-The report uses schema 1 and `execution_mode: physical-native-wifi`. It must bind `commit`, `version`, `candidate_sha256`, `firmware_sha256`, and `readback_sha256`; state `transport_source: device-wifi`, `host_proxy_used: false`, `clock_source: native-sntp`, `certificate_validation: true`, and `frame_source: physical-usb-video`; list all five passed cases and all policy metrics; and reference at least three distinct physical captures.
+The report uses schema 1 and `execution_mode: physical-native-wifi`. It must bind `commit`, `version`, `candidate_sha256`, `firmware_sha256`, and `readback_sha256`; state `transport_source: device-wifi`, `host_proxy_used: false`, `clock_source: native-sntp`, `certificate_validation: true`, and `frame_source: physical-usb-video`; list all ten passed cases and all policy metrics; and reference at least three distinct physical captures. Older five-case reports no longer satisfy acceptance. Keep the independent battery observation and source request correlation in the controlled lab's private audit record; the sanitized public report does not itself authenticate those observations.
+
+The driver has up to 20 minutes for the exact build and 60 minutes for the physical phase; the hardware job allows 85 minutes for transfer and overhead. These ceilings accommodate the required 30-minute run rather than timing out at the old ten-minute physical-phase limit. They do not relax any missing-evidence gate.
 
 JUnit must contain exactly the required scenarios with zero failures, errors, or skips. PNGs must have valid chunk checksums and the Chromatic's 160:144 geometry at integer scale 1–8. Failed, skipped, incomplete, wrong-revision, emulator, host-proxy, invalid-metric, or tampered-asset evidence is rejected. Capture filenames are plain relative filenames; arbitrary paths and unlisted artifacts are rejected.
 
 Parsing JSON and PNG metadata cannot authenticate their physical origin. Trust comes from the controlled runner and hash-approved driver performing actual installation, read-back, native requests, UI checks, and physical capture. `tests/test_pipeline.py` uses explicit synthetic unit fixtures solely to check gate acceptance/rejection. Those fixtures are never physical results or release evidence.
 
 After validation, the pipeline uploads only the candidate and selected evidence. Publication revalidates everything and promotes the same tested bytes without rebuilding. A missing runner or unfinished driver leaves the release blocked.
+
+## Personal-machine boundary
+
+Do not register a maintainer's daily-use Mac as a public self-hosted runner. It contains GitHub credentials, Gowin licenses and private device backups. Use a dedicated account and ideally a dedicated machine/USB fixture, outside personal credentials and directories, with operator-approved driver identity and normal physical capture permissions. PRs run only in GitHub-hosted compilation/unit jobs. Keep `CHROMATIC_E2E_READY=false` until exact-image installation/readback, physical controls/video, native fixture cases, recovery and battery evidence pass. A documented workflow alone is not a configured or tested lab.

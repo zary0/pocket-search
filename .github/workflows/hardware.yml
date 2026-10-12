@@ -10,7 +10,7 @@ jobs:
   lab-not-configured:
     name: Lab disabled — no physical test performed
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop' && vars.CHROMATIC_E2E_READY == 'false'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Record the development lab status
         run: |

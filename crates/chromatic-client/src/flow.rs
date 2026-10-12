@@ -83,8 +83,8 @@ pub struct Tree {
     pub nodes: [Node; NODES],
     pub count: u8,
     pub limited: u8,
-    resources: [u8; RESOURCES],
-    resource_len: u16,
+    pub(crate) resources: [u8; RESOURCES],
+    pub(crate) resource_len: u16,
     stack: [u8; 16],
     depth: u8,
     ignored: u8,
@@ -672,6 +672,7 @@ impl<'a> Packet<'a> {
         })
     }
 }
+#[derive(Clone, Copy)]
 pub(crate) struct Content<'a> {
     pub title: &'a str,
     pub body: &'a str,
@@ -679,10 +680,88 @@ pub(crate) struct Content<'a> {
     pub tree: &'a Tree,
     pub marker: u8,
 }
+pub(crate) fn visible_image(content: Content<'_>, position: usize) -> Option<usize> {
+    let mut pixels = 0;
+    let mut bytes = 24 + crate::local::short_title(content.title).len() + PAINTS * 5;
+    let lines = Lines {
+        body: content.body,
+        runs: content.runs,
+        tree: content.tree,
+        at: 0,
+        entered: None,
+        previous: None,
+        first: true,
+        marker: content.marker,
+    };
+    for (count, row) in lines.skip(position).enumerate() {
+        if count == ROWS
+            || pixels + row.height as usize > HEIGHT
+            || bytes + row.bytes() > MAX_PACKET_BYTES
+        {
+            break;
+        }
+        if row.flags & 4 != 0 {
+            return content.tree.nodes[..content.tree.count as usize]
+                .iter()
+                .position(|n| {
+                    n.kind == IMAGE && row.at >= n.start as usize && row.at < n.end as usize
+                });
+        }
+        pixels += row.height as usize;
+        bytes += row.bytes();
+    }
+    None
+}
+
+pub(crate) fn positions(content: Content<'_>) -> usize {
+    let base = 24 + crate::local::short_title(content.title).len() + PAINTS * 5;
+    let lines = Lines {
+        body: content.body,
+        runs: content.runs,
+        tree: content.tree,
+        at: 0,
+        entered: None,
+        previous: None,
+        first: true,
+        marker: content.marker | if content.tree.limited != 0 { 4 } else { 0 },
+    };
+    let mut queue = [(0, 0); ROWS];
+    let (mut total, mut used, mut pixels, mut bytes) = (0, 0, 0, base);
+    for row in lines.clone() {
+        let n = row.bytes();
+        while used > 0
+            && (used == ROWS
+                || pixels + row.height as usize > HEIGHT
+                || bytes + n > MAX_PACKET_BYTES)
+        {
+            pixels -= queue[0].0;
+            bytes -= queue[0].1;
+            queue.copy_within(1..used, 0);
+            used -= 1;
+        }
+        queue[used] = (row.height as usize, n);
+        used += 1;
+        total += 1;
+        pixels += row.height as usize;
+        bytes += n;
+    }
+    if used == 0 { 0 } else { total - used + 1 }
+}
 pub(crate) fn encode(
     id: usize,
     content: Content<'_>,
     position: usize,
+    out: &mut [u8],
+    resolve: impl Fn(usize) -> u32,
+) -> usize {
+    let count = positions(content);
+    encode_cached(id, content, position, count, out, resolve)
+}
+pub(crate) fn encode_cached(
+    id: usize,
+    content: Content<'_>,
+    position: usize,
+    positions: usize,
     out: &mut [u8],
     resolve: impl Fn(usize) -> u32,
 ) -> usize {
@@ -708,30 +787,9 @@ pub(crate) fn encode(
         first: true,
         marker: marker | if tree.limited != 0 { 4 } else { 0 },
     };
-    let mut queue = [(0, 0); ROWS];
-    let (mut total, mut used, mut pixels, mut bytes) = (0, 0, 0, base);
-    for row in lines.clone() {
-        let n = row.bytes();
-        while used > 0
-            && (used == ROWS
-                || pixels + row.height as usize > HEIGHT
-                || bytes + n > MAX_PACKET_BYTES)
-        {
-            pixels -= queue[0].0;
-            bytes -= queue[0].1;
-            queue.copy_within(1..used, 0);
-            used -= 1;
-        }
-        queue[used] = (row.height as usize, n);
-        used += 1;
-        total += 1;
-        pixels += row.height as usize;
-        bytes += n;
-    }
-    if used == 0 || position > total - used {
+    if positions == 0 || position >= positions {
         return 0;
     }
-    let positions = total - used + 1;
     out[..base].fill(0);
     out[..4].copy_from_slice(b"PFW1");
     out[4] = 1;
