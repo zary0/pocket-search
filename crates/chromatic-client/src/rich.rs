@@ -343,6 +343,30 @@ pub(crate) fn encode(
     at
 }
 
+/// Original Japanese diagnostic; normalization matches the native collection path.
+pub fn jpfont_probe(out: &mut [u8]) -> usize {
+    let mut normalized = [0; 160];
+    let text = crate::shaping::normalize(
+        "日本語\n検索結果\nか\u{3099}は\u{309a}\n\n日本語検索結果\nがぱ",
+        &mut normalized,
+    )
+    .unwrap_or("");
+    let runs = [
+        Run {
+            start: 0,
+            style: WEBFONT | HEADING,
+        },
+        Run {
+            start: 10,
+            style: WEBFONT,
+        },
+        Run {
+            start: text.find("\n\n").unwrap() as u16 + 2,
+            style: WEBFONT | CAPTION,
+        },
+    ];
+    encode(1, "Noto Sans JP", text, &runs, 0, 0, out)
+}
 /// Original external-font diagnostic, never indexed.
 pub fn webfont_probe(out: &mut [u8]) -> usize {
     let text = "WEB FONT TEST\nPocket Search\nABC xyz 012345\n\nSmall caption\nDownloaded TTF";

@@ -49,6 +49,7 @@ static bool observed_image_diagnostic;static unsigned observed_image_format;
 static PS_View observed_view;static bool observed_verified;
 static bool pending_query_set;static char pending_query[97];
 static unsigned pending_probe;
+int ps_jpfont_probe(uint8_t*);
 static unsigned pending_image;
 static const char *key_names[] = {"home","up","down","left","right","a","b","start","select"};
 static const Button_t buttons[] = {0,kButton_Up,kButton_Down,kButton_Left,kButton_Right,kButton_A,kButton_B,kButton_Start,kButton_Select};
@@ -391,7 +392,7 @@ static int command(int argc,char **argv) {
         if(available)printf("SEARCH_UI_QUEUED\n");
         return available?0:1;
     }
-    if(argc==2&&(!strcmp(argv[1],"typography")||!strcmp(argv[1],"webfont")||!strcmp(argv[1],"layout"))){taskENTER_CRITICAL(&lock);bool available=!pending_key&&!pending_query_set&&!pending_probe&&!pending_image;if(!strcmp(argv[1],"webfont")&&!PS_WebFontReady())available=false;if(available)pending_probe=!strcmp(argv[1],"layout")?3:!strcmp(argv[1],"webfont")?2:1;taskEXIT_CRITICAL(&lock);if(available)printf("SEARCH_UI_QUEUED\n");return available?0:1;}
+    if(argc==2&&(!strcmp(argv[1],"typography")||!strcmp(argv[1],"webfont")||!strcmp(argv[1],"jpfont")||!strcmp(argv[1],"layout"))){taskENTER_CRITICAL(&lock);bool available=!pending_key&&!pending_query_set&&!pending_probe&&!pending_image;if((!strcmp(argv[1],"webfont")||!strcmp(argv[1],"jpfont"))&&!PS_WebFontReady())available=false;if(available)pending_probe=!strcmp(argv[1],"jpfont")?4:!strcmp(argv[1],"layout")?3:!strcmp(argv[1],"webfont")?2:1;taskEXIT_CRITICAL(&lock);if(available)printf("SEARCH_UI_QUEUED\n");return available?0:1;}
     if(argc==3&&!strcmp(argv[1],"query")){size_t n=strlen(argv[2]);if(n>96||!ps_valid(argv[2],n))return 1;taskENTER_CRITICAL(&lock);bool available=!pending_key&&!pending_query_set&&!pending_probe&&!pending_image;if(available){memset(pending_query,0,sizeof(pending_query));memcpy(pending_query,argv[2],n);pending_query_set=true;}taskEXIT_CRITICAL(&lock);if(available)printf("SEARCH_UI_QUEUED\n");return available?0:1;}
     if(argc!=2) return 1;
     if(!strcmp(argv[1],"status")) {
@@ -457,7 +458,7 @@ void PocketUI_Poll(void) {
     if(image&&u.mode==READER&&u.verified){request(7,image-1,0);return;}
     if(probe&&u.mode==READER&&u.verified&&!u.probe){u.probe_document=u.view.document_id;u.probe_position=u.view.page_index;
         if(probe==3){PS_FlowView flow;int n=ps_flow_probe(reply.bytes,0);if(n>0&&ps_flow_decode(reply.bytes,(size_t)n,&flow)==0){memcpy(u.packet,reply.bytes,(size_t)n);u.flow_view=flow;u.flow=true;u.rich=false;u.probe=true;u.view=(PS_View){.document_id=flow.document_id,.page_count=flow.positions,.kind=2,.title=flow.title};u.dirty=true;}return;}
-        int n=probe==2?ps_webfont_probe(reply.bytes):ps_rich_probe(reply.bytes);PS_RichView rich;if(n>0&&ps_rich_decode(reply.bytes,(size_t)n,&rich)==0){memcpy(u.packet,reply.bytes,(size_t)n);u.rich_view=rich;u.rich=true;u.flow=false;u.probe=true;u.view=(PS_View){.document_id=rich.document_id,.page_count=rich.positions,.kind=2,.title=rich.title};u.dirty=true;}return;}
+        int n=probe==4?ps_jpfont_probe(reply.bytes):probe==2?ps_webfont_probe(reply.bytes):ps_rich_probe(reply.bytes);PS_RichView rich;if(n>0&&ps_rich_decode(reply.bytes,(size_t)n,&rich)==0){memcpy(u.packet,reply.bytes,(size_t)n);u.rich_view=rich;u.rich=true;u.flow=false;u.probe=true;u.view=(PS_View){.document_id=rich.document_id,.page_count=rich.positions,.kind=2,.title=rich.title};u.dirty=true;}return;}
     if(set_query){cancel();u.back_count=0;mode(HOME);memcpy(u.query,query,sizeof(u.query));MenuMgr_SelectTab(kTabID_Search);return;}if(!key){inline_load();return;}
     if(key==1) { cancel();u.back_count=0;mode(HOME); MenuMgr_SelectTab(kTabID_Search); }
     else (void)PocketUI_Button(buttons[key-1],kButtonState_Pressed,NULL);

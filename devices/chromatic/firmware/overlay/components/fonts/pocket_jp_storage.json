@@ -1,0 +1,9 @@
+{
+  "format": "bounded Huffman, eight-glyph checkpoints and BMP rank bitset",
+  "glyphs": 16077,
+  "raw_pixel_bytes": 289386,
+  "stored_bytes": 269865,
+  "maximum_bits_per_symbol": 13,
+  "uncompressed_pixels_sha256": "a6ae259918012ee88a5abc7ec75c506df6f9a41a63fd908dbe1a09cb720c5393",
+  "codepoints_sha256": "50e2925d7c9b7e04337942c9be7a6ace5ffbfb4849ab8a9c72978d6eb8f9f249"
+}

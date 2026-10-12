@@ -46,6 +46,9 @@ static _Atomic unsigned store_failures;
 static char installed_font_url[256];
 static _Atomic unsigned css_cache_hits,css_fetches,font_fetches,font_glyphs,font_bytes,css_rules,resource_fallbacks;
 static const char probe_css[]="https://fonts.googleapis.com/css?family=VT323&text=WEB%20FONT%20TEST%20Pocket%20Search%20ABC%20xyz%20012345%20Small%20caption%20Downloaded%20TTF";
+static const char probe_jp_css[]="https://fonts.googleapis.com/css2?family=Noto+Sans+JP%3Awght%40400&text=%E6%97%A5%E6%9C%AC%E8%AA%9E%E6%A4%9C%E7%B4%A2%E7%B5%90%E6%9E%9C%E3%81%8C%E3%81%B1";
+static bool font_probe_japanese;
+static unsigned font_cancel_check,font_checks;
 static struct {bool running,ready,cancelled,configuring;PS_Request request;PS_Reply reply;} job;
 enum {NO_WIFI=1,NO_CLOCK,NO_MEMORY,CONNECT_FAILED,HTTP_FAILED,TOO_LARGE,INCOMPLETE,WRONG_TYPE,CANCELLED,INVALID_IMAGE,STALE_COLLECTION,ROBOTS_DENIED,NO_DOCUMENTS};
 typedef struct {PS_Reply *reply;bool html,plain,css,font,jpeg,png,identity;char etag[96],modified[64];} Events;
@@ -82,7 +85,7 @@ static esp_err_t event(esp_http_client_event_t *e){
     Events *v=e->user_data;
     if(e->event_id==HTTP_EVENT_ON_CONNECTED)v->reply->tls_verified=true;
     if(e->event_id==HTTP_EVENT_ON_HEADER&&e->header_key){
-        if(!strcasecmp(e->header_key,"Content-Type")){v->jpeg=media(e->header_value,"image/jpeg");v->png=media(e->header_value,"image/png");v->html=media(e->header_value,"text/html");v->plain=media(e->header_value,"text/plain");v->css=media(e->header_value,"text/css");v->font=media(e->header_value,"font/ttf")||media(e->header_value,"application/octet-stream")||media(e->header_value,"application/x-font-ttf")||media(e->header_value,"application/font-sfnt");}
+        if(!strcasecmp(e->header_key,"Content-Type")){v->jpeg=media(e->header_value,"image/jpeg");v->png=media(e->header_value,"image/png");v->html=media(e->header_value,"text/html");v->plain=media(e->header_value,"text/plain");v->css=media(e->header_value,"text/css");v->font=media(e->header_value,"font/woff2")||media(e->header_value,"font/ttf")||media(e->header_value,"application/octet-stream")||media(e->header_value,"application/x-font-ttf")||media(e->header_value,"application/font-sfnt");}
         if(!strcasecmp(e->header_key,"ETag"))validator(v->etag,sizeof(v->etag),e->header_value);
         if(!strcasecmp(e->header_key,"Last-Modified"))validator(v->modified,sizeof(v->modified),e->header_value);
         if(!strcasecmp(e->header_key,"Content-Encoding")&&(!e->header_value||strcasecmp(e->header_value,"identity")))v->identity=false;
@@ -150,8 +153,8 @@ static int resource(const char *url,bool font,bool image,uint8_t **out,size_t *o
     size_t limit=image?PS_NATIVE_IMAGE_WIRE:font?24576:3072;
     esp_http_client_config_t config={.url=url,.timeout_ms=8000,.crt_bundle_attach=esp_crt_bundle_attach,.skip_cert_common_name_check=false,.disable_auto_redirect=true,.buffer_size=512,.buffer_size_tx=512,.event_handler=event,.user_data=&events};
     esp_http_client_handle_t client=esp_http_client_init(&config);if(!client)return NO_MEMORY;
-    esp_http_client_set_header(client,"Accept",image?"image/jpeg,image/png":font?"font/ttf,application/octet-stream":"text/css");
-    esp_http_client_set_header(client,"Accept-Encoding","identity");esp_http_client_set_header(client,"User-Agent","PocketSearchBot/0.1");
+    esp_http_client_set_header(client,"Accept",image?"image/jpeg,image/png":font?"font/woff2,font/ttf,application/octet-stream":"text/css");
+    esp_http_client_set_header(client,"Accept-Encoding","identity");esp_http_client_set_header(client,"User-Agent",!font&&!image&&!strncmp(url,"https://fonts.googleapis.com/",29)?"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36":"PocketSearchBot/0.1");
     taskENTER_CRITICAL(&lock);++requests;if(!image){if(font)++font_fetches;else ++css_fetches;}taskEXIT_CRITICAL(&lock);
     if(cancelled()||esp_timer_get_time()-start>=COLLECTION_US){error=CANCELLED;goto done;}
     if(esp_http_client_open(client,0)!=ESP_OK){error=CONNECT_FAILED;goto done;}
@@ -173,14 +176,22 @@ done:
     free(body);r->wire_bytes+=(unsigned)total;taskENTER_CRITICAL(&lock);body_bytes+=(unsigned)total;taskEXIT_CRITICAL(&lock);
     memory(r);esp_http_client_cleanup(client);return error;
 }
+static bool font_cancel(void *context){(void)context;++font_checks;return cancelled()||(font_cancel_check&&font_checks>=font_cancel_check);}
+static uint64_t font_clock(void *context){(void)context;static int64_t yielded;int64_t now=esp_timer_get_time();if(now-yielded>=10000){vTaskDelay(1);yielded=now;}return (uint64_t)(now/1000);}
+static size_t font_heap(void *context){memory(context);return heap_caps_get_free_size(MALLOC_CAP_8BIT);}
 static bool load_face(PS_Reply *r,int64_t start,int *cause){
     char url[256];if(ps_local_resource(local_state,sizeof(local_state),1,(uint8_t*)url)<=0){if(cause)*cause=WRONG_TYPE;return false;}
     // Existing readers retain the same immutable atlas, even during refresh.
     if(PS_WebFontReady()){bool same=!strcmp(url,installed_font_url);if(!same&&cause)*cause=WRONG_TYPE;return same;}
     uint8_t *body=NULL;size_t length=0;
     int error=resource(url,true,false,&body,&length,r,start);if(error){if(cause)*cause=error;++resource_fallbacks;return false;}
-    int n=PS_WebFontLoad(body,length);free(body);
-    if(n<=0){if(cause)*cause=WRONG_TYPE;++resource_fallbacks;return false;}
+    font_checks=0;PS_FontBudget budget={.cancel=font_cancel,.clock_ms=font_clock,.free_heap=font_heap,.context=r};
+    int64_t begin=esp_timer_get_time();int n=PS_WebFontLoad(body,length,&budget);
+    char digest[65]={0},atlas_digest[65]={0};uint8_t hash[32];mbedtls_sha256(body,length,hash,0);for(unsigned i=0;i<32;++i)sprintf(digest+i*2,"%02x",hash[i]);
+    if(n>0){mbedtls_sha256(PS_WebFontAtlas(),PS_WebFontAtlasBytes(),hash,0);for(unsigned i=0;i<32;++i)sprintf(atlas_digest+i*2,"%02x",hash[i]);}
+    printf("SEARCH_FONT {\"error\":%d,\"wire_bytes\":%u,\"private_peak_bytes\":%u,\"allocations\":%u,\"decode_raster_us\":%lld,\"atlas_bytes\":%u,\"glyphs\":%d,\"source_sha256\":\"%s\",\"atlas_sha256\":\"%s\",\"checks\":%u}\n",n<0?-n:n?0:10,(unsigned)length,budget.peak_bytes,budget.allocations,(long long)(esp_timer_get_time()-begin),(unsigned)PS_WebFontAtlasBytes(),n>0?n:0,digest,atlas_digest,font_checks);
+    free(body);
+    if(n<=0){if(cause)*cause=n<0?-n:WRONG_TYPE;++resource_fallbacks;return false;}
     memcpy(installed_font_url,url,strlen(url)+1);font_glyphs=(unsigned)n;font_bytes=(unsigned)length;memory(r);return true;
 }
 static bool load_css(const char *url,PS_Reply *r,int64_t start,bool *ready,int *cause){
@@ -206,7 +217,7 @@ static void worker(void *arg){
     // ESP-IDF records each heap's low watermark at allocation time. Their sum
     // is a conservative phase minimum, unlike the periodic sample above.
     bool phase_monitor=false;
-    if(job.request.kind==3||job.request.kind==7){r.tls_heap_window=heap_caps_monitor_local_minimum_free_size_start()==ESP_OK;phase_monitor=r.tls_heap_window;}
+    if(job.request.kind==3||job.request.kind==7||job.request.kind==255){r.tls_heap_window=heap_caps_monitor_local_minimum_free_size_start()==ESP_OK;phase_monitor=r.tls_heap_window;}
     conditional_etag[0]=conditional_modified[0]=0;
     r.heap_before=(unsigned)heap_caps_get_free_size(MALLOC_CAP_8BIT);r.minimum_free_heap_bytes=r.heap_before;r.largest_free_block_bytes=(unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
     // Cached search/reader work never requires a socket, Wi-Fi, clock sync or
@@ -219,7 +230,7 @@ static void worker(void *arg){
         r.clock_synced=true;
         if(job.request.kind==255){
             bool ready=false;
-            int cause=0;if(!load_css(probe_css,&r,start,&ready,&cause)||!ready)r.error=cause?cause:WRONG_TYPE;
+            int cause=0;if(!load_css(font_probe_japanese?probe_jp_css:probe_css,&r,start,&ready,&cause)||!ready)r.error=cause?cause:WRONG_TYPE;
             goto done;
         }
         if(!robots_state){
@@ -304,7 +315,7 @@ cached:
         printf("SEARCH_COMPARE {\"execution_mode\":\"physical-native-cpu\",\"repeats\":%u,\"identical_packets\":%s,\"reference_total_us\":%llu,\"cached_total_us\":%llu,\"decoder_total_cycles\":%llu,\"decoder_allocations\":0,\"cpu_hz_before\":%lu,\"cpu_hz_after\":%lu,\"core\":%u,\"packet_bytes\":%u,\"source_bytes_over_usb\":0}\n",count,equal?"true":"false",(unsigned long long)reference_us,(unsigned long long)cached_us,(unsigned long long)decode_cycles,(unsigned long)cpu_before,(unsigned long)cpu_after,(unsigned)xPortGetCoreID(),(unsigned)r.length);
         r.error=equal&&count==30&&cpu_before==cpu_after?0:INCOMPLETE;goto done;
     }
-    if(job.request.kind==3||job.request.kind==7){
+    if(job.request.kind==3||job.request.kind==7||job.request.kind==255){
         char url[256];
         if(job.request.kind==7){
             // Diagnostic-only original public source files. No caller URL, proxy
@@ -358,7 +369,7 @@ bool PS_NetStart(const PS_Request *request){
     if(!request||!memchr(request->query,0,sizeof(request->query))||request->kind<1||(request->kind>7&&request->kind!=255))return false;
     taskENTER_CRITICAL(&lock);bool allowed=!reading&&!job.running&&!job.ready&&!job.configuring;if(allowed){job.running=true;job.cancelled=false;job.request=*request;}taskEXIT_CRITICAL(&lock);
     if(!allowed)return false;
-    if(xTaskCreatePinnedToCore(worker,"local_search",10240,NULL,2,NULL,0)==pdPASS)return true;
+    if(xTaskCreatePinnedToCore(worker,"local_search",16384,NULL,2,NULL,0)==pdPASS)return true;
     taskENTER_CRITICAL(&lock);job.running=false;memset(job.request.query,0,sizeof(job.request.query));taskEXIT_CRITICAL(&lock);return false;
 }
 bool PS_NetPoll(PS_Reply *reply){taskENTER_CRITICAL(&lock);bool ready=job.ready;if(ready){*reply=job.reply;memset(job.reply.bytes,0,sizeof(job.reply.bytes));job.reply.image_pixels=NULL;job.ready=false;}taskEXIT_CRITICAL(&lock);return ready;}
@@ -388,11 +399,13 @@ bool PS_NetSelectProfile(unsigned value){
 static int status(int argc,char **argv){
     if(argc==3&&!strcmp(argv[1],"profile")){char *end;unsigned long value=strtoul(argv[2],&end,10);return *argv[2]&&!*end&&value<PS_NetProfileCount()&&PS_NetSelectProfile((unsigned)value)?0:1;}
     if(argc==3&&!strcmp(argv[1],"compare")){char *end;unsigned long id=strtoul(argv[2],&end,10);PS_Request request={.kind=6,.document=(uint32_t)id};return *argv[2]&&!*end&&id>0&&id<=4&&PS_NetStart(&request)?0:1;}
-    if(argc==2&&!strcmp(argv[1],"fonts")){PS_Request request={.kind=255};return PS_NetStart(&request)?0:1;}
+    if(argc==2&&(!strcmp(argv[1],"fonts")||!strcmp(argv[1],"jfonts"))){if(PS_NetBusy())return 1;font_cancel_check=0;font_probe_japanese=!strcmp(argv[1],"jfonts");PS_Request request={.kind=255};return PS_NetStart(&request)?0:1;}
+    if(argc==3&&!strcmp(argv[1],"jfonts-cancel")){char *end;unsigned long checks=strtoul(argv[2],&end,10);if(!*argv[2]||*end||!checks||checks>100000||PS_NetBusy())return 1;font_probe_japanese=true;font_cancel_check=(unsigned)checks;PS_Request request={.kind=255};return PS_NetStart(&request)?0:1;}
+    if(argc==2&&!strcmp(argv[1],"font-cancel")){taskENTER_CRITICAL(&lock);bool allowed=job.running&&job.request.kind==255&&job.request.sequence==0;if(allowed)job.cancelled=true;taskEXIT_CRITICAL(&lock);return allowed?0:1;}
     if(argc==2&&!strcmp(argv[1],"refresh"))return PS_NetRefresh()?0:1;
     if(argc!=2||strcmp(argv[1],"status"))return 1;
     taskENTER_CRITICAL(&lock);unsigned count=documents,attempts=requests,bytes=body_bytes;bool running=job.running;taskEXIT_CRITICAL(&lock);
-    printf("SEARCH_LOCAL {\"execution_mode\":\"on-device\",\"service_required\":false,\"documents\":%u,\"requests\":%u,\"body_bytes\":%u,\"running\":%s,\"state_bytes\":%u,\"state_used_bytes\":%u,\"robots_buffer_bytes\":%u,\"maximum_documents\":4,\"text_bytes_per_document\":2560,\"persistent_index\":%s,\"store_generation\":%u,\"store_failures\":%u,\"native_images\":true,\"native_image_formats\":\"baseline-jpeg,png,progressive-jpeg\",\"source_profile\":%u}\n",count,attempts,bytes,running?"true":"false",(unsigned)sizeof(local_state),(unsigned)ps_local_state_bytes(),(unsigned)sizeof(robots),PS_StoreReady()?"true":"false",PS_StoreGeneration(),store_failures,PS_NetProfile());printf("SEARCH_RESOURCES {\"css_cache_hits\":%u,\"css_requests\":%u,\"font_requests\":%u,\"css_rules\":%u,\"font_ready\":%s,\"font_glyphs\":%u,\"font_source_bytes\":%u,\"atlas_bytes\":867,\"fallbacks\":%u,\"server_required\":false}\n",css_cache_hits,css_fetches,font_fetches,css_rules,PS_WebFontReady()?"true":"false",font_glyphs,font_bytes,resource_fallbacks);return 0;
+    printf("SEARCH_LOCAL {\"execution_mode\":\"on-device\",\"service_required\":false,\"documents\":%u,\"requests\":%u,\"body_bytes\":%u,\"running\":%s,\"state_bytes\":%u,\"state_used_bytes\":%u,\"robots_buffer_bytes\":%u,\"maximum_documents\":4,\"text_bytes_per_document\":2560,\"persistent_index\":%s,\"store_generation\":%u,\"store_failures\":%u,\"native_images\":true,\"native_image_formats\":\"baseline-jpeg,png,progressive-jpeg\",\"source_profile\":%u}\n",count,attempts,bytes,running?"true":"false",(unsigned)sizeof(local_state),(unsigned)ps_local_state_bytes(),(unsigned)sizeof(robots),PS_StoreReady()?"true":"false",PS_StoreGeneration(),store_failures,PS_NetProfile());printf("SEARCH_RESOURCES {\"css_cache_hits\":%u,\"css_requests\":%u,\"font_requests\":%u,\"css_rules\":%u,\"font_ready\":%s,\"font_glyphs\":%u,\"font_source_bytes\":%u,\"atlas_bytes\":8708,\"fallbacks\":%u,\"server_required\":false}\n",css_cache_hits,css_fetches,font_fetches,css_rules,PS_WebFontReady()?"true":"false",font_glyphs,font_bytes,resource_fallbacks);return 0;
 }
 static int legacy(int argc,char **argv){if(argc!=2||strcmp(argv[1],"status"))return 1;printf("SEARCH_ENDPOINT_STATE {\"configured\":true,\"service_required\":false,\"execution_mode\":\"on-device\"}\n");return 0;}
 void PS_NetRegister(void){

@@ -36,3 +36,16 @@ class DependencyNotices(unittest.TestCase):
         text=(base/'LICENSE-MIT.txt').read_text()
         self.assertIn('Copyright (c) 2017 Sean Barrett',text)
         self.assertIn(text.rstrip(),source.decode())
+
+    def test_vendored_woff2_brotli_and_ofl_font_fixtures(self):
+        base=ROOT/'devices/chromatic/components/pocket_search_ui/third_party'
+        info=json.loads((base/'sources.json').read_text())
+        self.assertEqual(info['woff2']['commit'],'fb9c3379f2605b10f3e8f1d9636664ab5576775c')
+        self.assertEqual(info['brotli']['commit'],'392b261debb0f478811ddacb98b118da36b06158')
+        actual={str(p.relative_to(base)) for p in base.rglob('*') if p.is_file() and p.name!='sources.json'}
+        self.assertEqual(actual,set(info['files_sha256']))
+        for name,sha in info['files_sha256'].items():self.assertEqual(hashlib.sha256((base/name).read_bytes()).hexdigest(),sha)
+        for name in ['woff2','brotli']:self.assertIn('Permission is hereby granted',(base/name/'LICENSE').read_text())
+        fonts=ROOT/'tests/fixtures/webfonts';provenance=json.loads((fonts/'provenance.json').read_text())
+        self.assertEqual(provenance['license'],'OFL-1.1');self.assertIn('SIL OPEN FONT LICENSE',(fonts/'OFL.txt').read_text())
+        for name,sha in provenance['files'].items():self.assertEqual(hashlib.sha256((fonts/name).read_bytes()).hexdigest(),sha)

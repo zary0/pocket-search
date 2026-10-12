@@ -3,8 +3,8 @@
 //! Only simple glyf outlines and Unicode cmap format 4; fixed limits on every loop.
 pub const LIMIT: usize = 24576;
 pub const ATLAS_BYTES: usize = 95 * 9 + 12; // ASCII 32..126, 6x12 1bpp + presence bits
-const POINTS: usize = 128;
-const CONTOURS: usize = 16;
+const POINTS: usize = 256;
+const CONTOURS: usize = 32;
 #[derive(Clone, Copy, Default)]
 struct Point {
     x: i32,
@@ -158,6 +158,17 @@ impl<'a> Font<'a> {
         self.glyf.get(offset(g)?..offset(g + 1)?)
     }
     fn render(&self, g: usize, out: &mut [u8]) -> Option<()> {
+        self.render_grid(g, out, 6, 12, false, &mut || false)
+    }
+    fn render_grid(
+        &self,
+        g: usize,
+        out: &mut [u8],
+        width: usize,
+        height: usize,
+        smooth: bool,
+        cancel: &mut impl FnMut() -> bool,
+    ) -> Option<()> {
         let b = self.outline(g)?;
         if b.is_empty() {
             return Some(());
@@ -238,15 +249,24 @@ impl<'a> Font<'a> {
             return None;
         }
         for p in &mut points[..n] {
-            p.x = p.x * 6 * 256 / advance;
-            p.y = (self.asc - p.y) * 12 * 256 / self.span;
+            p.x = p.x * width as i32 * 256 / advance;
+            p.y = (self.asc - p.y) * height as i32 * 256 / self.span;
             if !(-32768..=32768).contains(&p.x) || !(-32768..=32768).contains(&p.y) {
                 return None;
             }
         }
         let mut scan = Scan::new(out);
-        for row in 0..12 {
-            scan.y = row * 256 + 128;
+        let samples = if smooth { 4 } else { 1 };
+        let mut coverage = [0u8; 16];
+        for subrow in 0..height * samples {
+            if cancel() {
+                return None;
+            }
+            let row = subrow / samples;
+            if subrow % samples == 0 {
+                coverage.fill(0);
+            }
+            scan.y = (subrow * 256 / samples + 128 / samples) as i32;
             scan.count = 0;
             scan.failed = false;
             let mut start = 0;
@@ -288,7 +308,24 @@ impl<'a> Font<'a> {
             if scan.failed {
                 return None;
             }
-            scan.fill(row as usize);
+            if smooth {
+                for (col, value) in coverage.iter_mut().enumerate().take(width) {
+                    for sample in 0..2 {
+                        if scan.inside((col * 256 + sample * 128 + 64) as i32) {
+                            *value += 1;
+                        }
+                    }
+                }
+                if subrow % samples == samples - 1 {
+                    for (col, value) in coverage.iter().enumerate().take(width) {
+                        let alpha = ((*value as u16 * 3 + 4) / 8) as u8;
+                        let bit = (row * width + col) * 2;
+                        scan.out[bit / 8] |= alpha << (6 - bit % 8);
+                    }
+                }
+            } else {
+                scan.fill(row);
+            }
         }
         Some(())
     }
@@ -345,6 +382,15 @@ impl<'a> Scan<'a> {
             previous = p;
         }
     }
+    fn inside(&self, x: i32) -> bool {
+        let mut winding = 0;
+        for i in 0..self.count {
+            if self.x[i] <= x {
+                winding += i32::from(self.direction[i]);
+            }
+        }
+        winding != 0
+    }
     fn fill(&mut self, row: usize) {
         for col in 0..6 {
             let x = col as i32 * 256 + 128;
@@ -382,6 +428,105 @@ pub fn rasterize(bytes: &[u8], atlas: &mut [u8; ATLAS_BYTES]) -> usize {
         }
     }
     count
+}
+
+/// One immutable, fixed-size face. Slots are ordered by Unicode scalar; 16x16, 2bpp.
+pub const UNICODE_SLOTS: usize = 128;
+#[repr(C)]
+pub struct UnicodeAtlas {
+    pub count: u32,
+    pub codes: [u32; UNICODE_SLOTS],
+    pub pixels: [[u8; 64]; UNICODE_SLOTS],
+}
+impl UnicodeAtlas {
+    pub const EMPTY: Self = Self {
+        count: 0,
+        codes: [0; UNICODE_SLOTS],
+        pixels: [[0; 64]; UNICODE_SLOTS],
+    };
+}
+/// BMP cmap4, simple outlines only. Unsupported glyphs keep the built-in fallback.
+/// Cancellation discards the whole unpublished atlas; no heap is used.
+#[derive(Debug, PartialEq, Eq)]
+pub enum RasterError {
+    Cancelled,
+}
+pub fn rasterize_unicode(
+    bytes: &[u8],
+    atlas: &mut UnicodeAtlas,
+    cancel: impl FnMut() -> bool,
+) -> Result<usize, RasterError> {
+    let mut latched = false;
+    let mut original = cancel;
+    let mut cancel = || {
+        latched |= original();
+        latched
+    };
+    atlas.count = 0;
+    atlas.codes.fill(0);
+    atlas.pixels.fill([0; 64]);
+    let Some(font) = Font::parse(bytes) else {
+        return Ok(0);
+    };
+    let segments = usize::from(u16be(font.cmap, 6).unwrap_or(0)) / 2;
+    let mut scanned = 0usize;
+    let mut previous = 0u16;
+    for i in 0..segments {
+        if cancel() {
+            atlas.count = 0;
+            return Err(RasterError::Cancelled);
+        }
+        let Some(start) = u16be(font.cmap, 16 + 2 * segments + 2 * i) else {
+            return Ok(0);
+        };
+        let Some(end) = u16be(font.cmap, 14 + 2 * i) else {
+            return Ok(0);
+        };
+        if start > end || (i > 0 && start <= previous) {
+            atlas.count = 0;
+            return Ok(0);
+        }
+        previous = end;
+        // Sentinel is not a glyph; broad cmaps are not expanded or sampled silently.
+        if start == 65535 {
+            continue;
+        }
+        scanned += usize::from(end - start) + 1;
+        if scanned > 4096 {
+            atlas.count = 0;
+            return Ok(0);
+        }
+        for code in start..=end {
+            if code < 32 {
+                continue;
+            }
+            if cancel() {
+                atlas.count = 0;
+                return Err(RasterError::Cancelled);
+            }
+            let slot = atlas.count as usize;
+            if slot == UNICODE_SLOTS {
+                return Ok(slot);
+            }
+            let Some(glyph) = font.glyph(code) else {
+                continue;
+            };
+            if font
+                .render_grid(glyph, &mut atlas.pixels[slot], 16, 16, true, &mut cancel)
+                .is_some()
+            {
+                atlas.codes[slot] = u32::from(code);
+                atlas.count += 1;
+            } else {
+                atlas.pixels[slot].fill(0);
+            }
+        }
+    }
+    if cancel() {
+        atlas.count = 0;
+        return Err(RasterError::Cancelled);
+    }
+    Ok(atlas.count as usize)
 }
 
 #[cfg(test)]
@@ -477,6 +622,45 @@ mod tests {
             bytes.extend(data);
         }
         bytes
+    }
+    #[test]
+    fn japanese_reference_uses_bounded_grayscale_and_cancels_before_publication() {
+        let font = include_bytes!("../../../tests/fixtures/webfonts/noto-jp-reference.ttf");
+        let mut atlas = UnicodeAtlas::EMPTY;
+        let n = rasterize_unicode(font, &mut atlas, || false).unwrap();
+        for code in "日本語検索結果がぱ".chars() {
+            assert!(atlas.codes[..n].contains(&(code as u32)), "missing {code}");
+        }
+        assert!(
+            atlas.pixels[..n]
+                .iter()
+                .flatten()
+                .any(|b| (0..4).any(|i| matches!((b >> (i * 2)) & 3, 1 | 2)))
+        );
+        assert!(atlas.codes[..n].windows(2).all(|w| w[0] < w[1]));
+        for stop in [1, 3, 20, 200, 500] {
+            let mut checks = 0;
+            assert_eq!(
+                rasterize_unicode(font, &mut atlas, || {
+                    checks += 1;
+                    checks >= stop
+                }),
+                Err(RasterError::Cancelled)
+            );
+            assert_eq!(atlas.count, 0);
+        }
+        assert!(rasterize_unicode(font, &mut atlas, || false).unwrap() > 0);
+        if let Ok(path) = std::env::var("POCKET_FONT_REFERENCE") {
+            let mut bytes = Vec::new();
+            bytes.extend(atlas.count.to_le_bytes());
+            for c in atlas.codes {
+                bytes.extend(c.to_le_bytes());
+            }
+            for pixels in atlas.pixels {
+                bytes.extend(pixels);
+            }
+            std::fs::write(path, bytes).unwrap();
+        }
     }
     #[test]
     fn mathematical_hole_and_quadratic_outline_have_expected_pixels() {

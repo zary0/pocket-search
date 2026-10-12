@@ -7,3 +7,17 @@ endif()
 add_library(pocket_rust_decoder STATIC IMPORTED)
 set_target_properties(pocket_rust_decoder PROPERTIES IMPORTED_LOCATION "${POCKET_RUST_ARCHIVE}")
 target_link_libraries(${COMPONENT_LIB} PUBLIC pocket_rust_decoder)
+
+set(PS_BROTLI third_party/brotli/c)
+set(PS_WOFF2 third_party/woff2)
+target_sources(${COMPONENT_LIB} PRIVATE pocket_woff2.cpp
+    ${PS_BROTLI}/common/constants.c ${PS_BROTLI}/common/context.c
+    ${PS_BROTLI}/common/dictionary.c ${PS_BROTLI}/common/platform.c
+    ${PS_BROTLI}/common/shared_dictionary.c ${PS_BROTLI}/common/transform.c
+    ${PS_BROTLI}/dec/bit_reader.c ${PS_BROTLI}/dec/decode.c
+    ${PS_BROTLI}/dec/huffman.c ${PS_BROTLI}/dec/state.c
+    ${PS_BROTLI}/dec/static_init.c ${PS_BROTLI}/dec/prefix.c
+    ${PS_WOFF2}/src/woff2_dec.cc ${PS_WOFF2}/src/woff2_common.cc
+    ${PS_WOFF2}/src/table_tags.cc ${PS_WOFF2}/src/variable_length.cc
+    ${PS_WOFF2}/src/woff2_out.cc)
+target_include_directories(${COMPONENT_LIB} PRIVATE ${PS_BROTLI}/include ${PS_WOFF2}/include)

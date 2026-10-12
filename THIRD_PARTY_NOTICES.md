@@ -228,7 +228,7 @@ Supplemental attribution files preserve the Tectonic source-header copyright use
 
 ## Runtime web-font diagnostic
 
-The bounded CSS parser and static TrueType subset rasterizer are original project code under GPL-3.0-only; no font parsing library or font binary is vendored or linked. The optional native diagnostic directly requests a VT323 subset from Google Fonts. VT323 is copyright 2011 The VT323 Project Authors and remains [SIL Open Font License 1.1](https://github.com/google/fonts/blob/main/ofl/vt323/OFL.txt), not GPL. Its runtime-generated glyph atlas is volatile and is not bundled in the firmware or repository. The repository's mathematical font fixtures are original outlines. Any future distribution of downloaded font files or derived font data must retain the applicable copyright and OFL text; do not relabel those assets as project GPL code.
+The bounded CSS parser and static TrueType subset rasterizer are original project code under GPL-3.0-only; the earlier ASCII increment had no third-party font parser. The current native WOFF2 decoder and OFL test fixtures are listed below. The optional native diagnostic directly requests a VT323 subset from Google Fonts. VT323 is copyright 2011 The VT323 Project Authors and remains [SIL Open Font License 1.1](https://github.com/google/fonts/blob/main/ofl/vt323/OFL.txt), not GPL. Its runtime-generated glyph atlas is volatile and is not bundled in the firmware or repository. The repository's mathematical font fixtures are original outlines. Any future distribution of downloaded font files or derived font data must retain the applicable copyright and OFL text; do not relabel those assets as project GPL code.
 
 ## Reproducible native MCU overlay
 
@@ -259,3 +259,31 @@ Only the JPEG implementation is compiled. Original GPL project glue bounds all
 private allocation and uses decoded component planes directly. PNG uses the
 ESP32 ROM miniz inflater and original project chunk/filter/palette code; no stb
 PNG decoder or full-image interleaved RGB allocation is used.
+
+### Native WOFF2 and Brotli decoders
+
+The native component vendors decoder/common source subsets from Google's
+[WOFF2](https://github.com/google/woff2/tree/fb9c3379f2605b10f3e8f1d9636664ab5576775c)
+and [Brotli](https://github.com/google/brotli/tree/392b261debb0f478811ddacb98b118da36b06158),
+both under the MIT license. Their original copyright/license texts remain in
+`devices/chromatic/components/pocket_search_ui/third_party/{woff2,brotli}/LICENSE`.
+The pinned commits and local WOFF2 allocator, cancellation, intermediate-size and
+Xtensa integer-ABI modifications are recorded in `third_party/sources.json`.
+The original bounded allocation wrapper and Unicode rasterizer are GPL-3.0-only.
+No font hinting, script VM or native code contained in a font is executed.
+
+### Japanese web-font test fixtures
+
+`tests/fixtures/webfonts` contains received Noto Sans JP subsets and an
+independently reconstructed TrueType reference for decoder tests, under
+**OFL-1.1**, copyright 2014-2021 Adobe, Reserved Font Name 'Source'. The complete
+notice is retained in that directory's `OFL.txt`; URLs, dates and content hashes
+are in `provenance.json`. These are font assets, not GPL code. Test references
+never replace acquisition/decoding on the physical console. The native Japanese
+diagnostic downloads its face directly from Google Fonts; its glyph atlas is
+volatile. Apple system fonts are not included, fetched or redistributed.
+
+Pocket JP's internal storage is now losslessly compressed: all 16,077 original
+codepoints and bitmap bytes remain identical. Its modified name and OFL notice
+remain unchanged. The stored format, reference hashes and fixed loop bounds are
+recorded in `pocket_jp_storage.json` and tested against the complete glyph set.

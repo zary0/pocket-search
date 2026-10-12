@@ -168,7 +168,7 @@ impl Sheet {
                             }
                         }
                     }
-                    // Only a single url(...), no local(), multiple sources, escapes, or formats other than truetype.
+                    // Only a single url(...), no local(), multiple sources, escapes, or formats other than truetype/woff2.
                     if family.is_empty()
                         || family.len() > 24
                         || !family.is_ascii()
@@ -185,6 +185,8 @@ impl Sheet {
                     if !tail.is_empty()
                         && tail != "format('truetype')"
                         && tail != "format(\"truetype\")"
+                        && tail != "format('woff2')"
+                        && tail != "format(\"woff2\")"
                     {
                         self.limited = 1;
                         continue;
@@ -669,12 +671,22 @@ mod tests {
             b"p{font-size:16px".as_slice(),
             b"\xff",
             b"@font-face{font-family:X;src:local(X)}",
-            b"@font-face{font-family:X;src:url(x.woff2) format('woff2')}",
+            b"@font-face{font-family:X;src:url(x.woff2) format('woff')}",
         ] {
             sheet.parse(data, "https://example.org/x.css");
             assert!(sheet.limited != 0);
             assert!(sheet.font_url().is_empty());
         }
+    }
+    #[test]
+    fn woff2_face_is_a_single_bounded_explicit_source() {
+        let mut sheet = Sheet::EMPTY;
+        sheet.parse(b"@font-face{font-family:'Noto Sans JP';src:url(jp.woff2) format('woff2')}p{font-family:'Noto Sans JP'}","https://fonts.gstatic.com/example/site.css");
+        assert!(sheet.font_len > 0);
+        assert_eq!(
+            core::str::from_utf8(&sheet.font[..sheet.font_len as usize]).unwrap(),
+            "https://fonts.gstatic.com/example/jp.woff2"
+        );
     }
     #[test]
     fn only_bounded_https_urls_resolve() {

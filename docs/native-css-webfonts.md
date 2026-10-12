@@ -1,6 +1,6 @@
 # Native CSS and web-font subset
 
-The measurements and PSR1 description below belong to the earlier CSS increment. The current reader adds a retained semantic tree and basic paint/box layout; see [native flow layout](native-flow-layout.md).
+For the current bounded WOFF2/Japanese/grayscale path, limits and acceptance, see [native web fonts](native-webfonts.md). The measurements and PSR1 description below belong to the earlier CSS increment. The current reader adds a retained semantic tree and basic paint/box layout; see [native flow layout](native-flow-layout.md).
 
 The `0.13.21-css` increment keeps collection, indexing, text layout and font rasterization on Chromatic. It adds a deliberately bounded typography cascade and static TrueType subset. It does **not** reproduce Chrome, complete CSS layout or arbitrary web fonts. No companion search/render service or page data over USB is involved.
 

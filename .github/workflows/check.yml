@@ -95,6 +95,8 @@ jobs:
           cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined -DPS_IMAGE_HOST -Itests/platform tests/test_extended_image.c devices/chromatic/components/pocket_search_ui/pocket_extended_image.c -lz -lm -o /tmp/test-extended-images
           /tmp/test-extended-images ci/native-fixture/bars.png ci/native-fixture/bars-progressive.jpg ci/native-fixture/palette.png
           node --test tests/test_search_input.mjs tests/test_pcs1.mjs tests/test_images.mjs tests/test_feedback.mjs
+      - name: Check bounded native WOFF2 decoder and cancellation
+        run: python3 scripts/test_native_webfonts.py
       - name: Check persistent flash record corruption and torn commits
         run: |
           cc -std=c11 -Wall -Wextra -Werror -fsanitize=address,undefined tests/test_store_format.c -o /tmp/pocket-store-format

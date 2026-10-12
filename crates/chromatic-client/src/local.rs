@@ -39,6 +39,22 @@ impl<const N: usize> Text<N> {
         if c == ' ' && (len == 0 || self.bytes[len - 1] == b' ') {
             return true;
         }
+        // BMP kana composition is exactly three bytes to three bytes: retained
+        // DOM/style offsets stay valid, and a mark does not consume a second cell.
+        if matches!(c, '\u{3099}' | '\u{309a}') && len >= 3 {
+            if let Ok(last) = core::str::from_utf8(&self.bytes[len - 3..len]) {
+                if let Some(composed) = last
+                    .chars()
+                    .next()
+                    .and_then(|base| crate::shaping::compose(base, c))
+                {
+                    let mut encoded = [0; 4];
+                    self.bytes[len - 3..len]
+                        .copy_from_slice(composed.encode_utf8(&mut encoded).as_bytes());
+                    return true;
+                }
+            }
+        }
         let mut buf = [0; 4];
         let encoded = c.encode_utf8(&mut buf).as_bytes();
         if len + encoded.len() > N {
@@ -967,6 +983,9 @@ impl LocalSearch {
         (ids, used)
     }
     pub fn search_packet(&self, query: &str, result: usize, out: &mut [u8]) -> usize {
+        let mut shaped = Text::<96>::EMPTY;
+        shaped.set(query);
+        let query = shaped.as_str();
         let (ids, total) = self.ranking(query);
         if total == 0 {
             return if result == 0 {
@@ -2091,6 +2110,26 @@ mod tests {
         assert!(description.ends_with("..."));
         assert_eq!(result.document_id, 1);
         assert!(index.reader_packet(1, 0, &mut bytes) > 0);
+    }
+    #[test]
+    fn japanese_clusters_preserve_structure_and_query_normal_forms() {
+        let mut state = LocalSearch::new();
+        state.seed();
+        assert!(state.next_url(&mut [0; 128]) > 0);
+        let html = "<title>日本語</title><p>か\u{3099}は\u{309a} 検索</p>".as_bytes();
+        for byte in html {
+            state.feed(core::slice::from_ref(byte));
+        }
+        assert!(state.finish(true));
+        let body = state.documents[0].body.as_str();
+        assert!(body.contains("がぱ 検索"));
+        assert!(!body.contains('\u{3099}'));
+        let mut out = [0; 512];
+        let n = state.search_packet("か\u{3099}", 0, &mut out);
+        assert_ne!(crate::Packet::decode(&out[..n]).unwrap().document_id, 0);
+        let n = state.flow_packet(1, 0, &mut out);
+        assert!(n > 0);
+        crate::flow::Packet::decode(&out[..n]).unwrap();
     }
     #[test]
     fn result_excerpt_preserves_utf8_and_title_only_matches() {

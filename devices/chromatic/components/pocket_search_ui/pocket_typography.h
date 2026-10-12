@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 #pragma once
 #include "lvgl.h"
+#include "pocket_woff2.h"
 #include "pocket_search_net.h"
 void PS_TypographyDraw(lv_event_t *event,const uint8_t *packet,const PS_RichView *view);
 void PS_FlowDraw(lv_event_t *event,const uint8_t *packet,const PS_FlowView *view,const lv_img_dsc_t *image);
@@ -8,4 +9,6 @@ void PS_FlowDraw(lv_event_t *event,const uint8_t *packet,const PS_FlowView *view
 const lv_font_t *PS_TypographyFont(unsigned style);
 
 bool PS_WebFontReady(void);
-int PS_WebFontLoad(const uint8_t *bytes,size_t length);
+int PS_WebFontLoad(const uint8_t *bytes,size_t length,PS_FontBudget *budget);
+size_t PS_WebFontAtlasBytes(void);
+const uint8_t *PS_WebFontAtlas(void);

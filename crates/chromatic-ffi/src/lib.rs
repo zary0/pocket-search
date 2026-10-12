@@ -153,6 +153,44 @@ pub unsafe extern "C" fn ps_webfont(bytes: *const u8, length: usize, atlas: *mut
     ) as i32
 }
 /// # Safety
+/// Disjoint readable input and aligned, exclusive UnicodeAtlas output (8708 bytes).
+/// Callback must not reenter Rust, throw, or access these buffers; context stays live.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_webfont_unicode(
+    bytes: *const u8,
+    length: usize,
+    atlas: *mut u8,
+    cancel: Option<unsafe extern "C" fn(*mut core::ffi::c_void) -> bool>,
+    context: *mut core::ffi::c_void,
+) -> i32 {
+    if bytes.is_null()
+        || atlas.is_null()
+        || length > chromatic_client::webfont::LIMIT
+        || atlas as usize % 4 != 0
+    {
+        return -10;
+    }
+    let atlas = unsafe { &mut *atlas.cast::<chromatic_client::webfont::UnicodeAtlas>() };
+    match chromatic_client::webfont::rasterize_unicode(
+        unsafe { core::slice::from_raw_parts(bytes, length) },
+        atlas,
+        || cancel.is_some_and(|f| unsafe { f(context) }),
+    ) {
+        Ok(n) => n as i32,
+        Err(_) => -9,
+    }
+}
+/// # Safety
+/// out owns 512 exclusively writable bytes.
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn ps_jpfont_probe(out: *mut u8) -> i32 {
+    if out.is_null() {
+        return 0;
+    }
+    chromatic_client::rich::jpfont_probe(unsafe { core::slice::from_raw_parts_mut(out, 512) })
+        as i32
+}
+/// # Safety
 /// out owns 512 writable bytes, exclusively.
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn ps_webfont_probe(out: *mut u8) -> i32 {
