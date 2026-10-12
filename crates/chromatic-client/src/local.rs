@@ -992,23 +992,61 @@ impl LocalSearch {
         }
         let id = ids[result] as usize;
         let doc = &self.documents[id];
-        let url = doc
+        let authority = doc
             .url
             .as_str()
             .strip_prefix("https://")
             .unwrap_or(doc.url.as_str());
+        let authority = authority.split('/').next().unwrap_or(authority);
+        let authority = authority.strip_prefix("www.").unwrap_or(authority);
+        // Native result presentation: title continuation, authority, excerpt.
+        // Keep PCS1 framing and its per-line UTF-8/cell limits unchanged.
+        let (title, rest) = take_line_columns(doc.title.as_str(), 20);
+        let (continuation, remainder) = take_line_columns(rest, 20);
+        let mut title_tail = Text::<48>::EMPTY;
+        let continuation = if remainder.is_empty() {
+            continuation
+        } else {
+            title_tail.set(take_line_columns(continuation, 17).0.trim_end());
+            for c in "...".chars() {
+                title_tail.push(c);
+            }
+            title_tail.as_str()
+        };
+        let body = doc.body.as_str();
+        let start = excerpt_start(body, query);
+        let mut excerpt = Text::<192>::EMPTY;
+        if start > 0 {
+            excerpt.set("... ");
+        }
+        let mut clipped = false;
+        for c in body[start..].chars() {
+            if !excerpt.push(c) {
+                clipped = true;
+                break;
+            }
+        }
         let mut lines = [""; TEXT_ROWS];
-        let mut count = wrapped(url, &mut lines[..4], 0);
-        count += wrapped(doc.body.as_str(), &mut lines[count..], 0);
-        packet(
-            1,
-            id as u32 + 1,
-            result,
-            total,
-            doc.title.as_str(),
-            &lines[..count],
-            out,
-        )
+        lines[0] = continuation;
+        lines[1] = short_title(authority);
+        let limit = if continuation.is_empty() { 4 } else { 3 };
+        let mut remaining = excerpt.as_str().trim_end();
+        let mut count = 2;
+        while count < 2 + limit && !remaining.is_empty() {
+            let (line, rest) = take_line(remaining);
+            lines[count] = line;
+            count += 1;
+            remaining = rest;
+        }
+        let mut excerpt_tail = Text::<48>::EMPTY;
+        if count > 2 && (!remaining.is_empty() || clipped) {
+            excerpt_tail.set(take_line_columns(lines[count - 1], 21).0.trim_end());
+            for c in "...".chars() {
+                excerpt_tail.push(c);
+            }
+            lines[count - 1] = excerpt_tail.as_str();
+        }
+        packet(1, id as u32 + 1, result, total, title, &lines[..count], out)
     }
     pub fn metadata(&mut self, bytes: u32, fetched_at: u32, status: u16) -> bool {
         if self.active == 0 || bytes > 65536 || status != 200 || fetched_at < 1609459200 {
@@ -1794,6 +1832,9 @@ fn occurrences(text: &str, term: &str) -> usize {
     }
 }
 fn take_line(text: &str) -> (&str, &str) {
+    take_line_columns(text, TEXT_COLUMNS)
+}
+fn take_line_columns(text: &str, limit: usize) -> (&str, &str) {
     let mut columns = 0;
     let mut end = 0;
     let mut space = None;
@@ -1802,7 +1843,7 @@ fn take_line(text: &str) -> (&str, &str) {
             return (&text[..at], text[at..].trim_start());
         }
         let width = if c.is_ascii() { 1 } else { 2 };
-        if columns + width > TEXT_COLUMNS {
+        if columns + width > limit {
             break;
         }
         columns += width;
@@ -1817,6 +1858,47 @@ fn take_line(text: &str) -> (&str, &str) {
         }
     }
     (&text[..end], text[end..].trim_start())
+}
+// Match the same word boundaries as ranking. Keep a small amount of context,
+// preferring a nearby sentence or paragraph boundary over the page's navigation.
+fn excerpt_start(body: &str, query: &str) -> usize {
+    let hit = words(query)
+        .filter_map(|term| {
+            if !term.is_ascii() {
+                return body.find(term);
+            }
+            let mut start = 0;
+            for (at, c) in body
+                .char_indices()
+                .chain(core::iter::once((body.len(), ' ')))
+            {
+                if c.is_ascii() && !c.is_ascii_alphanumeric() && c != '_' {
+                    if at > start && body[start..at].eq_ignore_ascii_case(term) {
+                        return Some(start);
+                    }
+                    start = at + c.len_utf8();
+                }
+            }
+            None
+        })
+        .min()
+        .unwrap_or(0);
+    let start = body[..hit]
+        .char_indices()
+        .rev()
+        .take(40)
+        .last()
+        .map_or(0, |(at, _)| at);
+    let prefix = &body[start..hit];
+    if let Some(at) = prefix.rfind(['\n', '.', '!', '?']) {
+        return start + at + 1;
+    }
+    if start > 0 {
+        if let Some(at) = prefix.find(' ') {
+            return start + at + 1;
+        }
+    }
+    start
 }
 pub(crate) fn short_title(text: &str) -> &str {
     take_line(text).0
@@ -1955,6 +2037,7 @@ fn pattern_match(pattern: &[u8], text: &[u8]) -> bool {
 
 #[cfg(test)]
 mod tests {
+    extern crate std;
     use super::*;
     use crate::Packet;
     fn collect(index: &mut LocalSearch, html: &[u8], split: usize) {
@@ -1990,6 +2073,60 @@ mod tests {
             t.push(c);
         }
         t
+    }
+    #[test]
+    fn result_excerpt_uses_query_context_and_keeps_long_urls_out_of_body() {
+        let mut index = LocalSearch::new();
+        index.seed();
+        collect(&mut index, b"<title>A practical guide to artificial intelligence research</title><p>Home navigation maintain about contact archive catalogue introduction resources references resources references resources references.</p><p>Useful AI tools answer questions and explain the research. Read the complete article for examples and more practical advice.</p>", 3);
+        let mut bytes = [0; MAX_PACKET_BYTES];
+        let n = index.search_packet("ai", 0, &mut bytes);
+        let result = Packet::decode(&bytes[..n]).unwrap();
+        assert!(result.title.starts_with("A practical guide"));
+        assert!(!result.lines[0].is_empty());
+        assert_eq!(result.lines[1], "www-formal.stanford.edu");
+        let description = result.lines[2..result.line_count].join(" ");
+        assert!(description.contains("Useful AI tools"), "{description}");
+        assert!(!description.contains("navigation") && !description.contains("https://"));
+        assert!(description.ends_with("..."));
+        assert_eq!(result.document_id, 1);
+        assert!(index.reader_packet(1, 0, &mut bytes) > 0);
+    }
+    #[test]
+    fn result_excerpt_preserves_utf8_and_title_only_matches() {
+        for (title, query, body) in [
+            (
+                "日本語の検索結果について学ぶための短い記事です",
+                "検索",
+                "前置きの文章です。検索結果の説明を読みます。本文の日本語は文字境界を壊さず表示します。",
+            ),
+            ("AI", "AI", "A short article about useful tools."),
+            ("AI", "AI", "AI"),
+        ] {
+            let mut index = LocalSearch::new();
+            index.seed();
+            collect(
+                &mut index,
+                std::format!("<title>{title}</title><p>{body}</p>").as_bytes(),
+                1,
+            );
+            let mut bytes = [0; MAX_PACKET_BYTES];
+            let n = index.search_packet(query, 0, &mut bytes);
+            let result = Packet::decode(&bytes[..n]).unwrap();
+            assert!(crate::cells(result.title) <= 20);
+            assert!(crate::cells(result.lines[0]) <= 20);
+            assert!((3..=6).contains(&result.line_count));
+            let description = result.lines[2..result.line_count].join(" ");
+            assert!(!description.is_empty());
+            if title == "AI" {
+                assert_eq!(result.lines[0], "");
+                assert_eq!(description, body);
+            } else {
+                assert!(description.contains(query));
+            }
+        }
+        let body = "maintain links, navigation, guide. Recent Ai news starts here.";
+        assert!(excerpt_start(body, "AI") > body.find("guide").unwrap());
     }
     impl<const N: usize> Text<N> {
         fn as_bytes(&self) -> &[u8] {

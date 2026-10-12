@@ -64,6 +64,9 @@ See [retained-content implementation and limits](native-retained-content.md).
 
 ## P2 — Native source pixels and staged browser fidelity
 
+- [x] Native result titles, bounded query-context excerpts and compact source
+  labels with result selection and complete provenance still available. See
+  [result presentation](native-search-results.md).
 - [x] Resolve the visible image source; directly acquire a bounded verified HTTPS
   baseline JPEG on the selected public authority; decode with the ESP32 ROM path,
   resize to RGB565 and release temporary buffers on leaving the article.

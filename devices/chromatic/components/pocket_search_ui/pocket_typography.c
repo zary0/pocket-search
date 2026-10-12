@@ -45,6 +45,7 @@ static const uint8_t *bitmap(const lv_font_t *font,uint32_t c){
 }
 #define FONT(s,h) {.get_glyph_dsc=describe,.get_glyph_bitmap=bitmap,.line_height=h,.base_line=2,.subpx=LV_FONT_SUBPX_NONE,.dsc=(const void*)(uintptr_t)s}
 static const lv_font_t fonts[16]={FONT(0,14),FONT(1,18),FONT(2,16),FONT(3,12),FONT(4,14),FONT(5,18),FONT(6,16),FONT(7,12),FONT(8,14),FONT(9,18),FONT(10,16),FONT(11,12),FONT(12,14),FONT(13,18),FONT(14,16),FONT(15,12)};
+const lv_font_t *PS_TypographyFont(unsigned style){return &fonts[style&7];}
 
 // One immutable face per boot. Acquire/release publication avoids GUI/worker races.
 bool PS_WebFontReady(void){return atomic_load_explicit(&web_ready,memory_order_acquire);}

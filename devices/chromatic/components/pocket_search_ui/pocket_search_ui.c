@@ -24,7 +24,7 @@ static struct {
     const char *notice; CW_Status wifi;
     unsigned sequence; uint16_t result_index,requested_page;uint32_t requested_id;uint8_t requested_kind;
     uint8_t packet[512];PS_View view;int network_error;bool verified;
-    PS_RichView rich_view;PS_FlowView flow_view;bool rich,flow,probe,image_error;
+    PS_RichView rich_view;PS_FlowView flow_view;bool rich,flow,probe,image_error,local_results;
     uint32_t probe_document;uint16_t probe_position;
     uint8_t *image_pixels;uint16_t image_width,image_height,image_rows;
     PS_InlineImage inline_image;uint8_t reader_image_slot;bool inline_loading,deferred;
@@ -184,6 +184,11 @@ static void render(void) {
     visible(brand,home); visible(submit,home); visible(status,home); visible(field,home||typing); visible(heading,!home); visible(body,!home&&!typing);
     for(unsigned i=0;i<12;++i) visible(cells[i],false);
     for(unsigned i=0;i<7;++i)visible(rows[i],false);
+    for(unsigned i=0;i<7;++i){lv_obj_set_style_text_font(rows[i],&pocket_jp,0);lv_obj_set_height(rows[i],13);}
+    lv_obj_set_style_text_font(heading,&pocket_jp,0);lv_obj_set_style_text_line_space(heading,1,0);lv_obj_set_height(heading,14);
+    lv_obj_set_style_text_font(footer,&pocket_jp,0);
+    lv_obj_set_pos(footer,8,129);lv_obj_set_style_text_font(status,&pocket_jp,0);
+    lv_obj_set_pos(input,10,6);lv_obj_set_width(input,124);
     visible(rich_body,false);
     visible(picture,false);
     lv_label_set_text_static(status,u.wifi.state==CW_CONNECTED?"Wi-Fi":"Offline");
@@ -206,6 +211,30 @@ static void render(void) {
         }
         lv_label_set_text_static(footer,u.notice?u.notice:"Select:ABC Start:OK");
     } else if(u.mode==LOADING||u.mode==IMAGE_LOADING){lv_label_set_text_static(body,u.mode==IMAGE_LOADING?"Loading image...":u.requested_kind==5?"Checking updates...\nB:Cancel":"On-device search\n\nCollecting if needed\nVerified HTTPS");lv_label_set_text_static(footer,"B:Cancel Start:Type");}
+    else if(u.mode==RESULTS&&u.local_results&&u.view.document_id&&u.view.line_count>=2){
+        visible(body,false);visible(field,true);visible(status,true);
+        lv_obj_set_pos(field,6,3);lv_obj_set_size(field,108,24);lv_obj_set_pos(input,8,5);lv_obj_set_width(input,92);
+        lv_label_set_text(input,tail(u.query,15));
+        lv_obj_set_pos(status,118,8);lv_obj_set_width(status,36);lv_obj_set_style_text_align(status,LV_TEXT_ALIGN_RIGHT,0);
+        lv_obj_set_style_text_font(status,PS_TypographyFont(3),0);
+        snprintf(text,sizeof(text),"%u/%u",u.view.page_index+1,u.view.page_count);lv_label_set_text(status,text);
+        memcpy(text,u.packet+u.view.title.offset,u.view.title.length);size_t used=u.view.title.length;
+        bool two_lines=u.view.lines[0].length!=0;
+        if(two_lines){text[used++]='\n';memcpy(text+used,u.packet+u.view.lines[0].offset,u.view.lines[0].length);used+=u.view.lines[0].length;}
+        text[used]=0;lv_label_set_text(heading,text);lv_obj_set_pos(heading,8,34);lv_obj_set_height(heading,28);
+        lv_obj_set_style_text_font(heading,PS_TypographyFont(4),0);lv_obj_set_style_text_line_space(heading,0,0);
+        lv_obj_set_style_text_color(heading,lv_color_hex(0x1a0dab),0);
+        for(unsigned i=2;i<u.view.line_count&&i<(two_lines?5u:6u);++i){
+            memcpy(text,u.packet+u.view.lines[i].offset,u.view.lines[i].length);text[u.view.lines[i].length]=0;
+            visible(rows[i],true);lv_obj_set_pos(rows[i],8,(two_lines?66:52)+(i-2)*13);
+            lv_label_set_text(rows[i],text);lv_obj_set_style_text_color(rows[i],lv_color_hex(0x3c4043),0);
+        }
+        memcpy(text,u.packet+u.view.lines[1].offset,u.view.lines[1].length);text[u.view.lines[1].length]=0;
+        visible(rows[1],true);lv_obj_set_pos(rows[1],8,112);lv_obj_set_style_text_font(rows[1],PS_TypographyFont(3),0);
+        lv_label_set_text(rows[1],text);lv_obj_set_style_text_color(rows[1],lv_color_hex(0x70757a),0);
+        lv_obj_set_pos(footer,8,130);lv_obj_set_style_text_font(footer,PS_TypographyFont(3),0);
+        lv_label_set_text_static(footer,"Up/Down A:Read B:Back");
+    }
     else if(u.mode==RESULTS||u.mode==READER||u.mode==IMAGE_READER||u.mode==INFO){
         visible(body,false);visible(status,true);lv_obj_set_pos(status,8,3);lv_obj_set_width(status,144);lv_obj_set_style_text_align(status,LV_TEXT_ALIGN_LEFT,0);
         if(u.probe)snprintf(text,sizeof(text),"TEST");
@@ -415,7 +444,7 @@ void PocketUI_Poll(void) {
         }else{
             PS_View view;valid=valid&&reply.finished&&reply.length<=sizeof(u.packet)&&ps_packet_decode(reply.bytes,reply.length,&view)==0;
             if(valid&&(view.page_index!=u.requested_page||((u.requested_kind==1||u.requested_kind==5)?(view.kind!=1||view.page_count>256):(view.kind<2||view.kind>5||view.document_id!=u.requested_id))))valid=false;
-            if(valid){memcpy(u.generation,reply.generation,sizeof(u.generation));u.sample=reply.sample;memcpy(u.packet,reply.bytes,reply.length);u.view=view;u.rich=false;u.flow=false;u.verified=true;if(view.kind==1){u.result_index=view.page_index;mode(RESULTS);}else if(view.kind==3)request(3,view.document_id,view.page_index);else mode(u.requested_kind==4?INFO:READER);}
+            if(valid){memcpy(u.generation,reply.generation,sizeof(u.generation));u.sample=reply.sample;memcpy(u.packet,reply.bytes,reply.length);u.view=view;u.rich=false;u.flow=false;u.verified=true;u.local_results=reply.local&&view.kind==1;if(view.kind==1){u.result_index=view.page_index;mode(RESULTS);}else if(view.kind==3)request(3,view.document_id,view.page_index);else mode(u.requested_kind==4?INFO:READER);}
         }
         if(!valid){bool diagnostic=u.image_diagnostic,image_request=u.requested_kind==3||u.requested_kind==7;release_image();u.image_diagnostic=diagnostic;if(image_request&&!diagnostic){PS_InlineBegin(&u.inline_image,u.view.document_id,u.reader_image_slot);PS_InlineFinish(&u.inline_image,reply.error?reply.error:10);}u.network_error=reply.error;u.verified=false;message(image_request?image_notice(reply.error):reply.error==PS_NET_STALE_COLLECTION?"Collection changed.\nA: Search again":reply.error==1?"Wi-Fi disconnected.\nSelect: Wi-Fi setup":reply.error==2?"Clock sync failed.\nTry again.":reply.error==12?"robots.txt blocks\nthis collection.":reply.error==13?"No usable pages.\nRight on home:\nRetry collection.":reply.error?"Connection failed.\nTry again.":"Invalid response.\nTry again.",QUERY);u.image_error=image_request;}
     }
