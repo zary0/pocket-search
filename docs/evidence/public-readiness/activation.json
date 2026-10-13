@@ -225,5 +225,7 @@
       ],
       "bypass_actors": []
     }
-  }
+  },
+  "verified_local": "2026-10-13T07:21:21+09:00",
+  "local_timezone": "Asia/Tokyo"
 }
