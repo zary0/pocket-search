@@ -1,0 +1,229 @@
+{
+  "repository": "zary0/pocket-search",
+  "source_head": "070a1361fcf896f00ced11352e45be1d8d1e0358",
+  "develop": "bbae4a65aa8bd3d4081c6157ebc129dc27b24754",
+  "pr18_merged_by": "zary0",
+  "pr_merge_by_agent": false,
+  "visibility": "public",
+  "allow_auto_merge": false,
+  "security_and_analysis": {
+    "secret_scanning": {
+      "status": "enabled"
+    },
+    "secret_scanning_push_protection": {
+      "status": "enabled"
+    },
+    "dependabot_security_updates": {
+      "status": "enabled"
+    },
+    "secret_scanning_non_provider_patterns": {
+      "status": "disabled"
+    },
+    "secret_scanning_validity_checks": {
+      "status": "disabled"
+    }
+  },
+  "private_vulnerability_reporting": true,
+  "actions_permissions": {
+    "default_workflow_permissions": "read",
+    "can_approve_pull_request_reviews": false
+  },
+  "verified_utc": "2026-10-12T22:21:21Z",
+  "public_verification": {
+    "anonymous_public_access": true,
+    "html_status": 200,
+    "secret_scanning_open_alerts": 0,
+    "dependabot_open_alerts": 0,
+    "registered_self_hosted_runners": 0,
+    "merged_checks": [
+      {
+        "name": "qualify",
+        "status": "completed",
+        "conclusion": "skipped",
+        "app_id": 15368
+      },
+      {
+        "name": "Lab disabled \u2014 no physical test performed",
+        "status": "completed",
+        "conclusion": "success",
+        "app_id": 15368
+      },
+      {
+        "name": "ci",
+        "status": "completed",
+        "conclusion": "success",
+        "app_id": 15368
+      },
+      {
+        "name": "native-firmware",
+        "status": "completed",
+        "conclusion": "success",
+        "app_id": 15368
+      },
+      {
+        "name": "secret-scan",
+        "status": "completed",
+        "conclusion": "success",
+        "app_id": 15368
+      }
+    ]
+  },
+  "scope": "Historical source-publication snapshot; not a security proof or hardware qualification. Owner credentials can act as owner; manual merging is maintainer/agent policy.",
+  "audit": {
+    "current_run_log_archives": 114,
+    "previous_attempt_log_archives": 1,
+    "artifacts": 33,
+    "verified_secret_findings": 0,
+    "raw_candidates": 200,
+    "reviewed_candidates": "Source-file SHA-256 fields. The earlier Git candidate is the exact public SDK default for disabled OpenThread. Raw logs remain private."
+  },
+  "branches": {
+    "develop": {
+      "required_status_checks": {
+        "url": "https://api.github.com/repos/zary0/pocket-search/branches/develop/protection/required_status_checks",
+        "strict": true,
+        "contexts": [
+          "ci",
+          "native-firmware",
+          "secret-scan"
+        ],
+        "contexts_url": "https://api.github.com/repos/zary0/pocket-search/branches/develop/protection/required_status_checks/contexts",
+        "checks": [
+          {
+            "context": "ci",
+            "app_id": 15368
+          },
+          {
+            "context": "native-firmware",
+            "app_id": 15368
+          },
+          {
+            "context": "secret-scan",
+            "app_id": 15368
+          }
+        ]
+      },
+      "required_pull_request_reviews": {
+        "url": "https://api.github.com/repos/zary0/pocket-search/branches/develop/protection/required_pull_request_reviews",
+        "dismiss_stale_reviews": true,
+        "require_code_owner_reviews": false,
+        "require_last_push_approval": false,
+        "required_approving_review_count": 0
+      },
+      "enforce_admins": {
+        "url": "https://api.github.com/repos/zary0/pocket-search/branches/develop/protection/enforce_admins",
+        "enabled": true
+      },
+      "allow_force_pushes": {
+        "enabled": false
+      },
+      "allow_deletions": {
+        "enabled": false
+      },
+      "required_conversation_resolution": {
+        "enabled": true
+      }
+    },
+    "main": {
+      "required_status_checks": {
+        "url": "https://api.github.com/repos/zary0/pocket-search/branches/main/protection/required_status_checks",
+        "strict": true,
+        "contexts": [
+          "ci",
+          "native-firmware",
+          "qualify / chromatic-required",
+          "secret-scan"
+        ],
+        "contexts_url": "https://api.github.com/repos/zary0/pocket-search/branches/main/protection/required_status_checks/contexts",
+        "checks": [
+          {
+            "context": "ci",
+            "app_id": 15368
+          },
+          {
+            "context": "native-firmware",
+            "app_id": 15368
+          },
+          {
+            "context": "qualify / chromatic-required",
+            "app_id": 15368
+          },
+          {
+            "context": "secret-scan",
+            "app_id": 15368
+          }
+        ]
+      },
+      "required_pull_request_reviews": {
+        "url": "https://api.github.com/repos/zary0/pocket-search/branches/main/protection/required_pull_request_reviews",
+        "dismiss_stale_reviews": true,
+        "require_code_owner_reviews": false,
+        "require_last_push_approval": false,
+        "required_approving_review_count": 0
+      },
+      "enforce_admins": {
+        "url": "https://api.github.com/repos/zary0/pocket-search/branches/main/protection/enforce_admins",
+        "enabled": true
+      },
+      "allow_force_pushes": {
+        "enabled": false
+      },
+      "allow_deletions": {
+        "enabled": false
+      },
+      "required_conversation_resolution": {
+        "enabled": true
+      }
+    }
+  },
+  "rulesets": {
+    "Maintainer-only PR merges": {
+      "id": 24956633,
+      "enforcement": "active",
+      "target": "branch",
+      "conditions": {
+        "ref_name": {
+          "exclude": [],
+          "include": [
+            "refs/heads/main",
+            "refs/heads/develop"
+          ]
+        }
+      },
+      "rules": [
+        {
+          "type": "update"
+        }
+      ],
+      "bypass_actors": [
+        {
+          "actor_id": 94175002,
+          "actor_type": "User",
+          "bypass_mode": "pull_request"
+        }
+      ]
+    },
+    "Immutable stable version tags": {
+      "id": 24956634,
+      "enforcement": "active",
+      "target": "tag",
+      "conditions": {
+        "ref_name": {
+          "exclude": [],
+          "include": [
+            "refs/tags/v*"
+          ]
+        }
+      },
+      "rules": [
+        {
+          "type": "update"
+        },
+        {
+          "type": "deletion"
+        }
+      ],
+      "bypass_actors": []
+    }
+  }
+}
