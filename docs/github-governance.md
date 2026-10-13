@@ -101,3 +101,9 @@ ruleset publishes a firmware release.
 ## Ongoing secret checks
 
 The `secret-scan` check uses checksum-pinned official Gitleaks 8.30.1, full available checkout history, default provider/generic rules, archive decoding and fully redacted diagnostics. The only source exception requires both the exact SDK configuration path and the exact upstream public default for disabled OpenThread. It does not ignore that entire file, source hashes, or arbitrary credentials. Native repository secret scanning and push protection are enabled separately; CI scanning does not replace them.
+
+## Verified public activation on 2026-10-13 (JST)
+
+After the maintainer manually merged PR #18, the repository became Public. Both branch protections, maintainer-only PR updates, immutable version tags, secret scanning, push protection and private vulnerability reporting were applied and read back. Anonymous access and merged CI checks passed. The final audit covered 114 current run-log archives, one prior attempt and 33 artifacts, with no verified credentials in that scope. See the [activation snapshot](evidence/public-readiness/activation.json); it does not guarantee future settings or qualify a hardware release. Verification was recorded at 2026-10-12T22:21:21Z (2026-10-13 07:21:21 JST).
+
+Personal-repository protection payloads omit organization-only review bypass allowances. No review bypass is granted.
