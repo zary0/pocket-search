@@ -335,7 +335,8 @@ void app_main(void)
     // All commands must be registered prior to starting the REPL
     ESP_ERROR_CHECK(esp_console_start_repl(pRepl));
 
-    // Leave the cartridge game visible until the user opens the menu.
+    // Keep the stock power-manager startup timing; the user opens the menu.
+    vTaskDelay( pdMS_TO_TICKS(2000) );
     xTaskCreate(PwrMgr_Task, "pwr_mgr_task", kSleepTask_StackDepth, NULL, kSleepTask_Priority, NULL);
 }
 
