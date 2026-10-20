@@ -335,13 +335,7 @@ void app_main(void)
     // All commands must be registered prior to starting the REPL
     ESP_ERROR_CHECK(esp_console_start_repl(pRepl));
 
-    vTaskDelay( pdMS_TO_TICKS(2000) );
-    if(!OSD_IsVisible()){
-        // FPGA accepts bit 8 as the menu key; bit 9 is its readback state.
-        Button_PokeInputs(kButtonBits_MenuEnAlt);
-        vTaskDelay(pdMS_TO_TICKS(150));
-        Button_PokeInputs(0);
-    }
+    // Leave the cartridge game visible until the user opens the menu.
     xTaskCreate(PwrMgr_Task, "pwr_mgr_task", kSleepTask_StackDepth, NULL, kSleepTask_Priority, NULL);
 }
 
