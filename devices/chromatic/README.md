@@ -2,6 +2,18 @@
 
 Pocket Search targets a custom application in the ModRetro Chromatic MCU firmware, using the console's menu display, buttons, and Wi-Fi-capable development hardware. This is a development target, not a claim that stock firmware includes a browser.
 
+## Playing cartridge games
+
+Startup leaves the cartridge game on screen. The side menu button opens and
+closes the normal console menu, initially on Status. Cycling the settings tabs
+does not open Pocket Search. To use search, select **System > SEARCH** and press
+**A**. From the search home screen, **B** returns to System; the side menu button
+closes the overlay and returns to the game.
+
+This startup change requires an MCU application update. Closing the existing
+search overlay with the side menu button works without an update. Cartridge-game
+startup on the new candidate still needs physical verification.
+
 ## Measured development profile
 
 Earlier work outside this repository inspected and tested one Chromatic DevDay unit:

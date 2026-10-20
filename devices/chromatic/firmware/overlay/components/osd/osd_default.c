@@ -46,6 +46,12 @@ static void CreateMenuSystem(lv_obj_t *const pScreen);
 static bool IsPaletteTabActive(void);
 static bool IsColorTempTabActive(void);
 
+static bool IsSearchTabNavigable(void)
+{
+    // Open Search explicitly from System > SEARCH, not by cycling settings.
+    return false;
+}
+
 static OSD_Result_t (*battery_draw)(void *);
 static OSD_Result_t DrawVisibleBattery(void *arg)
 {
@@ -90,13 +96,13 @@ void OSD_Default_Init(lv_obj_t *const pScreen)
     CreateMenuSystem(pScreen);
     static MenuTab_t Search = {
         .Widget={.Name="PocketSearch",.fnDraw=PocketUI_Draw,.fnOnButton=PocketUI_Button,.fnOnTransition=PocketUI_Transition},
-        .pImageDesc=&menu_system,.CaptureNavigation=true,
+        .pImageDesc=&menu_system,.fnIsActive=IsSearchTabNavigable,.CaptureNavigation=true,
     };
     MenuMgr_AddTab(kTabID_Search,&Search);
 
     OSD_AddWidget(&Battery);
     OSD_AddWidget(&MenuMgr);
-    MenuMgr_SelectTab(kTabID_Search);
+    MenuMgr_SelectTab(kTabID_Status);
 
     ESP_LOGI(TAG, "Default OSD init OK");
 }
